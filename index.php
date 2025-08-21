@@ -108,11 +108,32 @@ $urlSite  = isset($urlSite)  && $urlSite  ? $urlSite  : '/';
     <?php if (is_file(__DIR__.'/inc/footer.php')) include __DIR__.'/inc/footer.php'; ?>
 
     <script>
-        // Loading screen
-        window.addEventListener('load', function () {
-            const loadingScreen = document.getElementById('loadingScreen');
-            setTimeout(() => loadingScreen.classList.add('hidden'), 1000);
-        });
+       (function () {
+    function hideLoading() {
+      var s = document.getElementById('loadingScreen');
+      if (s && !s.classList.contains('hidden')) s.classList.add('hidden');
+    }
+
+    // 1) DOM pronto (deve rodar cedo)
+    document.addEventListener('DOMContentLoaded', function () {
+      // dá tempo do CSS aplicar, mas não trava a UI
+      setTimeout(hideLoading, 800);
+    });
+
+    // 2) Tudo carregado (imagens, fontes, etc.)
+    window.addEventListener('load', hideLoading);
+
+    // 3) Fallback hard (se algum JS externo quebrar)
+    setTimeout(hideLoading, 5000);
+
+    // Log de segurança pra você ver erros de JS que impedem o hide()
+    window.addEventListener('error', function (e) {
+      console.error('[RaspinhaPix] Erro global:', e?.error || e?.message || e);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      console.error('[RaspinhaPix] Promessa rejeitada:', e?.reason || e);
+    });
+  })();
 
         // Aparecer com animação ao entrar no viewport
         const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
