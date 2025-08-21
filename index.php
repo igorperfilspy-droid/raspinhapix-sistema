@@ -1,9 +1,23 @@
-include<?php '../includes/session.php';
-include<?php '../conexao.php';
-include<?php '../includes/notiflix.php';
+<?php
+require __DIR__ . '/includes/session.php';
+require __DIR__ . '/conexao.php';
+require __DIR__ . '/includes/notiflix.php';
 
-$usuarioId<?php =<?php $_SESSION['usuario_id'];
-$admin<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php admin<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;
+// pega o usuário logado (se houver)
+$usuarioId = $_SESSION['usuario_id'] ?? null;
 
-if(<?php $admin<?php !=<?php 1){
-<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php não<?php é<?php um<?php administrador!'];
+// consulta flag de admin com segurança
+$admin = null;
+if ($usuarioId) {
+    $stmt = $pdo->prepare('SELECT admin FROM usuarios WHERE id = ?');
+    $stmt->execute([$usuarioId]);
+    $admin = $stmt->fetchColumn();
+}
+
+// regra de acesso (ajuste o destino conforme seu fluxo)
+if ($admin != 1) {
+    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você não é um administrador!'];
+    // header('Location: /login'); exit; // se quiser redirecionar
+}
+
+// …aqui segue o restante do seu HTML/PHP da página inicial…
