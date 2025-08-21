@@ -1,0 +1,17 @@
+# IDE / SO
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs / cache
+*.log
+logs/*.log
+cache/
+tmp/
+vendor/
+node_modules/
+
+# Ambientes / segredos
+.env
+.env.*
+*.parc
