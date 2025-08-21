@@ -129,11 +129,11 @@ try {
     }
     ?>
     <?php if ($faviconSite && file_exists($_SERVER['DOCUMENT_ROOT'] . $faviconSite)): ?>
-        <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="shortcut icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="apple-touch-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="icon" type="image/x-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="shortcut icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="apple-touch-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
     <?php else: ?>
-        <link rel="icon" href="data:image/svg+xml,<?= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
+        <link rel="icon" href="data:image/svg+xml,<?php= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
     <?php endif; ?>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -144,7 +144,7 @@ try {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -685,7 +685,7 @@ try {
                             <input type="text" 
                                    id="linkIndicacao" 
                                    class="link-input"
-                                   value="<?= $link_indicacao ?>" 
+                                   value="<?php= $link_indicacao ?>" 
                                    readonly>
                         </div>
                         
@@ -702,7 +702,7 @@ try {
                         <div class="stat-header">
                             <div class="stat-info">
                                 <h3>Indicados</h3>
-                                <div class="stat-value"><?= $total_indicados ?></div>
+                                <div class="stat-value"><?php= $total_indicados ?></div>
                             </div>
                             <div class="stat-icon indicados">
                                 <i class="bi bi-people"></i>
@@ -717,7 +717,7 @@ try {
                         <div class="stat-header">
                             <div class="stat-info">
                                 <h3>Total Depositado</h3>
-                                <div class="stat-value">R$ <?= number_format($total_depositado, 0, ',', '.') ?></div>
+                                <div class="stat-value">R$ <?php= number_format($total_depositado, 0, ',', '.') ?></div>
                             </div>
                             <div class="stat-icon depositos">
                                 <i class="bi bi-cash-stack"></i>
@@ -732,7 +732,7 @@ try {
                         <div class="stat-header">
                             <div class="stat-info">
                                 <h3>Suas Comissões</h3>
-                                <div class="stat-value">R$ <?= number_format($total_comissoes, 2, ',', '.') ?></div>
+                                <div class="stat-value">R$ <?php= number_format($total_comissoes, 2, ',', '.') ?></div>
                             </div>
                             <div class="stat-icon comissoes">
                                 <i class="bi bi-wallet2"></i>
@@ -744,21 +744,21 @@ try {
                             <?php if ($total_comissoes_cpa > 0): ?>
                             <div class="commission-item">
                                 <span class="commission-label">CPA (Cadastros):</span>
-                                <span class="commission-value">R$ <?= number_format($total_comissoes_cpa, 2, ',', '.') ?></span>
+                                <span class="commission-value">R$ <?php= number_format($total_comissoes_cpa, 2, ',', '.') ?></span>
                             </div>
                             <?php endif; ?>
                             
                             <?php if ($total_comissoes_revshare > 0): ?>
                             <div class="commission-item">
                                 <span class="commission-label">RevShare (Ganhos):</span>
-                                <span class="commission-value">R$ <?= number_format($total_comissoes_revshare, 2, ',', '.') ?></span>
+                                <span class="commission-value">R$ <?php= number_format($total_comissoes_revshare, 2, ',', '.') ?></span>
                             </div>
                             <?php endif; ?>
                             
                             <?php if ($total_deducoes_revshare > 0): ?>
                             <div class="commission-item">
                                 <span class="commission-label">Deduções (Perdas):</span>
-                                <span class="commission-value" style="color: #ef4444;">-R$ <?= number_format($total_deducoes_revshare, 2, ',', '.') ?></span>
+                                <span class="commission-value" style="color: #ef4444;">-R$ <?php= number_format($total_deducoes_revshare, 2, ',', '.') ?></span>
                             </div>
                             <?php endif; ?>
                             
@@ -766,8 +766,8 @@ try {
                             <hr style="border-color: rgba(255,255,255,0.1); margin: 0.5rem 0;">
                             <div class="commission-item">
                                 <span class="commission-label"><strong>Saldo RevShare:</strong></span>
-                                <span class="commission-value" style="color: <?= $saldo_revshare_liquido >= 0 ? '#22c55e' : '#ef4444' ?>;">
-                                    R$ <?= number_format($saldo_revshare_liquido, 2, ',', '.') ?>
+                                <span class="commission-value" style="color: <?php= $saldo_revshare_liquido >= 0 ? '#22c55e' : '#ef4444' ?>;">
+                                    R$ <?php= number_format($saldo_revshare_liquido, 2, ',', '.') ?>
                                 </span>
                             </div>
                             <?php endif; ?>
@@ -802,23 +802,23 @@ try {
                                     <div class="indicado-grid">
                                         <div class="indicado-field">
                                             <span class="field-label">Nome</span>
-                                            <span class="field-value"><?= htmlspecialchars($indicado['nome']) ?></span>
+                                            <span class="field-value"><?php= htmlspecialchars($indicado['nome']) ?></span>
                                         </div>
                                         
                                         <div class="indicado-field">
                                             <span class="field-label">E-mail</span>
-                                            <span class="field-value email"><?= htmlspecialchars($indicado['email']) ?></span>
+                                            <span class="field-value email"><?php= htmlspecialchars($indicado['email']) ?></span>
                                         </div>
                                         
                                         <div class="indicado-field">
                                             <span class="field-label">Cadastro</span>
-                                            <span class="field-value"><?= date('d/m/Y', strtotime($indicado['created_at'])) ?></span>
+                                            <span class="field-value"><?php= date('d/m/Y', strtotime($indicado['created_at'])) ?></span>
                                         </div>
                                         
                                         <div class="indicado-field">
                                             <span class="field-label">Total Depositado</span>
                                             <span class="field-value money">
-                                                R$ <?= number_format($indicado['total_depositado'] ?? 0, 2, ',', '.') ?>
+                                                R$ <?php= number_format($indicado['total_depositado'] ?? 0, 2, ',', '.') ?>
                                             </span>
                                         </div>
                                     </div>
@@ -899,9 +899,9 @@ try {
         // Console log
         document.addEventListener('DOMContentLoaded', function() {
             console.log('%c💰 Programa de Afiliados carregado!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            console.log(`Indicados: ${<?= $total_indicados ?>}, Comissões Total: R$ ${<?= $total_comissoes ?>}`);
-            console.log(`CPA: R$ ${<?= $total_comissoes_cpa ?>}, RevShare: R$ ${<?= $total_comissoes_revshare ?>}`);
-            console.log(`Deduções: R$ ${<?= $total_deducoes_revshare ?>}, Saldo RevShare: R$ ${<?= $saldo_revshare_liquido ?>}`);
+            console.log(`Indicados: ${<?php= $total_indicados ?>}, Comissões Total: R$ ${<?php= $total_comissoes ?>}`);
+            console.log(`CPA: R$ ${<?php= $total_comissoes_cpa ?>}, RevShare: R$ ${<?php= $total_comissoes_revshare ?>}`);
+            console.log(`Deduções: R$ ${<?php= $total_deducoes_revshare ?>}, Saldo RevShare: R$ ${<?php= $saldo_revshare_liquido ?>}`);
         });
     </script>
 </body>

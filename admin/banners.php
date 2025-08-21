@@ -980,12 +980,12 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
 <body>
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -1069,9 +1069,9 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -1108,7 +1108,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                     <i class="fas fa-images"></i>
                     Banners Cadastrados
                     <span style="background: rgba(34, 197, 94, 0.2); color: #22c55e; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.8rem; margin-left: auto;">
-                        <?= count($banners) ?> banner<?= count($banners) != 1 ? 's' : '' ?>
+                        <?php= count($banners) ?> banner<?php= count($banners) != 1 ? 's' : '' ?>
                     </span>
                 </h2>
                 
@@ -1124,42 +1124,42 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                     <div class="banners-grid">
                         <?php foreach ($banners as $banner): ?>
                             <div class="banner-card">
-                                <img src="<?= htmlspecialchars($banner['banner_img']) ?>" 
-                                     alt="Banner #<?= $banner['id'] ?>" 
+                                <img src="<?php= htmlspecialchars($banner['banner_img']) ?>" 
+                                     alt="Banner #<?php= $banner['id'] ?>" 
                                      class="banner-image"
                                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNTAiIGhlaWdodD0iMTgwIiB2aWV3Qm94PSIwIDAgMzUwIDE4MCI+PHJlY3Qgd2lkdGg9IjM1MCIgaGVpZ2h0PSIxODAiIGZpbGw9IiMzNzQxNTEiLz48dGV4dCB4PSIxNzUiIHk9IjkwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZDFkNWRiIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiPkltYWdlbSBuw6NvIGVuY29udHJhZGE8L3RleHQ+PC9zdmc+'"
                                      loading="lazy">
                                 
                                 <div class="banner-info">
                                     <div class="banner-status">
-                                        <span class="status-badge <?= $banner['ativo'] ? 'ativo' : 'inativo' ?>">
-                                            <i class="fas fa-<?= $banner['ativo'] ? 'check-circle' : 'times-circle' ?>"></i>
-                                            <?= $banner['ativo'] ? 'Ativo' : 'Inativo' ?>
+                                        <span class="status-badge <?php= $banner['ativo'] ? 'ativo' : 'inativo' ?>">
+                                            <i class="fas fa-<?php= $banner['ativo'] ? 'check-circle' : 'times-circle' ?>"></i>
+                                            <?php= $banner['ativo'] ? 'Ativo' : 'Inativo' ?>
                                         </span>
                                     </div>
                                     <span class="ordem-badge">
                                         <i class="fas fa-sort"></i>
-                                        Ordem: <?= $banner['ordem'] ?>
+                                        Ordem: <?php= $banner['ordem'] ?>
                                     </span>
                                 </div>
                                 
                                 <div class="banner-actions">
-                                    <button type="button" class="btn-action btn-edit" onclick="openEditModal(<?= $banner['id'] ?>, '<?= htmlspecialchars($banner['banner_img']) ?>')">
+                                    <button type="button" class="btn-action btn-edit" onclick="openEditModal(<?php= $banner['id'] ?>, '<?php= htmlspecialchars($banner['banner_img']) ?>')">
                                         <i class="fas fa-edit"></i>
                                         Editar
                                     </button>
                                     
                                     <form method="POST" style="flex: 1;">
-                                        <input type="hidden" name="banner_id" value="<?= $banner['id'] ?>">
-                                        <input type="hidden" name="novo_status" value="<?= $banner['ativo'] ? 0 : 1 ?>">
+                                        <input type="hidden" name="banner_id" value="<?php= $banner['id'] ?>">
+                                        <input type="hidden" name="novo_status" value="<?php= $banner['ativo'] ? 0 : 1 ?>">
                                         <button type="submit" name="toggle_banner" class="btn-action btn-toggle">
-                                            <i class="fas fa-<?= $banner['ativo'] ? 'eye-slash' : 'eye' ?>"></i>
-                                            <?= $banner['ativo'] ? 'Desativar' : 'Ativar' ?>
+                                            <i class="fas fa-<?php= $banner['ativo'] ? 'eye-slash' : 'eye' ?>"></i>
+                                            <?php= $banner['ativo'] ? 'Desativar' : 'Ativar' ?>
                                         </button>
                                     </form>
                                     
                                     <form method="POST" style="flex: 1;" onsubmit="return confirm('Tem certeza que deseja deletar este banner?')">
-                                        <input type="hidden" name="banner_id" value="<?= $banner['id'] ?>">
+                                        <input type="hidden" name="banner_id" value="<?php= $banner['id'] ?>">
                                         <button type="submit" name="deletar_banner" class="btn-action btn-delete">
                                             <i class="fas fa-trash"></i>
                                             Deletar
@@ -1181,15 +1181,15 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                 <?php foreach ($banners as $banner): ?>
                                     <div class="order-item">
                                         <input type="number" 
-                                               name="ordem[<?= $banner['id'] ?>]" 
-                                               value="<?= $banner['ordem'] ?>" 
+                                               name="ordem[<?php= $banner['id'] ?>]" 
+                                               value="<?php= $banner['ordem'] ?>" 
                                                min="1" 
                                                class="order-input"
                                                title="Ordem do banner">
                                         <span class="order-label">
                                             <i class="fas fa-image"></i>
-                                            Banner #<?= $banner['id'] ?>
-                                            <?= $banner['ativo'] ? '(Ativo)' : '(Inativo)' ?>
+                                            Banner #<?php= $banner['id'] ?>
+                                            <?php= $banner['ativo'] ? '(Ativo)' : '(Inativo)' ?>
                                         </span>
                                     </div>
                                 <?php endforeach; ?>

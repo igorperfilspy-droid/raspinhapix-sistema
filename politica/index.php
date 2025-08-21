@@ -10,7 +10,7 @@ require_once '../conexao.php';
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title><?php echo $nomeSite;?></title>
-  <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>"/>
+  <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>"/>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
   <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -125,7 +125,7 @@ require_once '../conexao.php';
 
         <div class="border-t border-[var(--support-color)] pt-6 mt-8">
           <p>Ao utilizar nossos serviços, você declara ter lido, compreendido e aceitado integralmente os termos desta Política de Privacidade.</p>
-          <p class="mt-2 text-sm text-[var(--support-color)]">Última atualização: <?= date('d/m/Y') ?></p>
+          <p class="mt-2 text-sm text-[var(--support-color)]">Última atualização: <?php= date('d/m/Y') ?></p>
         </div>
       </div>
     </div>

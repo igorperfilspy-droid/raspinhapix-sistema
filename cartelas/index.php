@@ -30,7 +30,7 @@ $cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -466,11 +466,11 @@ $cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
                 
                 <div class="stats-bar">
                     <div class="stat-item">
-                        <span class="stat-number"><?= count($cartelas); ?></span>
+                        <span class="stat-number"><?php= count($cartelas); ?></span>
                         <span class="stat-label">Raspadinhas</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number">R$ <?= number_format(array_sum(array_column($cartelas, 'maior_premio')), 0, ',', '.'); ?></span>
+                        <span class="stat-number">R$ <?php= number_format(array_sum(array_column($cartelas, 'maior_premio')), 0, ',', '.'); ?></span>
                         <span class="stat-label">Em Prêmios</span>
                     </div>
                     <div class="stat-item">
@@ -510,21 +510,21 @@ $cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
             <?php else: ?>
                 <div class="cartelas-grid stagger-animation" id="cartelasGrid">
                     <?php foreach ($cartelas as $c): ?>
-                        <a href="/raspadinhas/show.php?id=<?= $c['id']; ?>" 
+                        <a href="/raspadinhas/show.php?id=<?php= $c['id']; ?>" 
                            class="cartela-card" 
-                           data-price="<?= $c['valor']; ?>"
+                           data-price="<?php= $c['valor']; ?>"
                            data-aos="fade-up">
                             
                             <div style="position: relative; overflow: hidden;">
-                                <img src="<?= htmlspecialchars($c['banner']); ?>"
-                                     alt="Banner <?= htmlspecialchars($c['nome']); ?>"
+                                <img src="<?php= htmlspecialchars($c['banner']); ?>"
+                                     alt="Banner <?php= htmlspecialchars($c['nome']); ?>"
                                      class="cartela-image" 
                                      loading="lazy"
                                      onerror="this.src='/assets/img/placeholder-raspadinha.jpg'">
                                 
                                 <div class="price-badge">
                                     <i class="bi bi-tag-fill"></i>
-                                    R$ <?= number_format($c['valor'], 2, ',', '.'); ?>
+                                    R$ <?php= number_format($c['valor'], 2, ',', '.'); ?>
                                 </div>
                             </div>
 
@@ -543,11 +543,11 @@ $cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
 
                                 <h2 class="cartela-title">
-                                    <?= htmlspecialchars($c['nome']); ?>
+                                    <?php= htmlspecialchars($c['nome']); ?>
                                 </h2>
                                 
                                 <p class="cartela-description">
-                                    <?= htmlspecialchars($c['descricao']); ?>
+                                    <?php= htmlspecialchars($c['descricao']); ?>
                                 </p>
 
                                 <div class="prize-info">
@@ -555,7 +555,7 @@ $cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="prize-label">Prêmio máximo</div>
                                         <div class="prize-value">
                                             <i class="bi bi-trophy-fill"></i>
-                                            R$ <?= number_format($c['maior_premio'], 0, ',', '.'); ?>
+                                            R$ <?php= number_format($c['maior_premio'], 0, ',', '.'); ?>
                                         </div>
                                     </div>
                                     <div style="text-align: right;">

@@ -785,12 +785,12 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -878,9 +878,9 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -915,7 +915,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                     <i class="fas fa-tag"></i>
                                     Nome do Site
                                 </label>
-                                <input type="text" name="nome_site" value="<?= htmlspecialchars($config['nome_site'] ?? '') ?>" class="form-input" placeholder="Digite o nome do seu site" required>
+                                <input type="text" name="nome_site" value="<?php= htmlspecialchars($config['nome_site'] ?? '') ?>" class="form-input" placeholder="Digite o nome do seu site" required>
                             </div>
                             
                             <div class="form-group">
@@ -934,7 +934,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                 <?php if (!empty($config['logo'])): ?>
                                     <div class="current-logo">
                                         <p><i class="fas fa-image"></i> Logo atual:</p>
-                                        <img src="<?= htmlspecialchars($config['logo']) ?>" alt="Logo atual">
+                                        <img src="<?php= htmlspecialchars($config['logo']) ?>" alt="Logo atual">
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -954,7 +954,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                     <i class="fas fa-plus-circle"></i>
                                     Depósito Mínimo (R$)
                                 </label>
-                                <input type="text" name="deposito_min" value="<?= htmlspecialchars($config['deposito_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 10,00" required>
+                                <input type="text" name="deposito_min" value="<?php= htmlspecialchars($config['deposito_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 10,00" required>
                             </div>
                             
                             <div class="form-group">
@@ -962,7 +962,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                     <i class="fas fa-minus-circle"></i>
                                     Saque Mínimo (R$)
                                 </label>
-                                <input type="text" name="saque_min" value="<?= htmlspecialchars($config['saque_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 20,00" required>
+                                <input type="text" name="saque_min" value="<?php= htmlspecialchars($config['saque_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 20,00" required>
                             </div>
                         </div>
                     </div>
@@ -980,7 +980,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                     <i class="fas fa-user-plus"></i>
                                     CPA Padrão (R$)
                                 </label>
-                                <input type="text" name="cpa_padrao" value="<?= htmlspecialchars($config['cpa_padrao'] ?? '0') ?>" class="form-input" placeholder="Ex: 5,00" required>
+                                <input type="text" name="cpa_padrao" value="<?php= htmlspecialchars($config['cpa_padrao'] ?? '0') ?>" class="form-input" placeholder="Ex: 5,00" required>
                                 <p style="color: #6b7280; font-size: 0.8rem; margin-top: 0.5rem;">
                                     <i class="fas fa-info-circle"></i> 
                                     Comissão fixa paga por cada novo cadastro indicado
@@ -993,7 +993,7 @@ $nome = $nome ? explode(' ', $nome)[0] : null;
                                     RevShare Padrão (%)
                                 </label>
                                 <div class="input-container">
-                                    <input type="text" name="revshare_padrao" value="<?= htmlspecialchars($config['revshare_padrao'] ?? '0') ?>" class="form-input percentage" placeholder="Ex: 10,00" required>
+                                    <input type="text" name="revshare_padrao" value="<?php= htmlspecialchars($config['revshare_padrao'] ?? '0') ?>" class="form-input percentage" placeholder="Ex: 10,00" required>
                                     <span class="percentage-symbol">%</span>
                                 </div>
                                 <p style="color: #6b7280; font-size: 0.8rem; margin-top: 0.5rem;">

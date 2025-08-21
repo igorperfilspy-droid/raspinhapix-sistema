@@ -930,9 +930,9 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -942,7 +942,7 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="dashboard-content">
             <!-- Welcome Section -->
             <section class="welcome-section">
-                <h2 class="welcome-title">Olá, <?= htmlspecialchars($nome) ?>!</h2>
+                <h2 class="welcome-title">Olá, <?php= htmlspecialchars($nome) ?>!</h2>
                 <p class="welcome-subtitle">Aqui está um resumo das principais métricas e atividades do sistema</p>
             </section>
             
@@ -958,7 +958,7 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <span>+12%</span>
                         </div>
                     </div>
-                    <div class="stat-value"><?= number_format($total_usuarios, 0, ',', '.') ?></div>
+                    <div class="stat-value"><?php= number_format($total_usuarios, 0, ',', '.') ?></div>
                     <div class="stat-label">Total de Usuários Ativos</div>
                 </div>
                 
@@ -972,7 +972,7 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <span>+8%</span>
                         </div>
                     </div>
-                    <div class="stat-value"><?= number_format($total_depositos, 0, ',', '.') ?></div>
+                    <div class="stat-value"><?php= number_format($total_depositos, 0, ',', '.') ?></div>
                     <div class="stat-label">Depósitos Confirmados</div>
                 </div>
                 
@@ -986,7 +986,7 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <span>+24%</span>
                         </div>
                     </div>
-                    <div class="stat-value">R$ <?= number_format($total_saldo, 2, ',', '.') ?></div>
+                    <div class="stat-value">R$ <?php= number_format($total_saldo, 2, ',', '.') ?></div>
                     <div class="stat-label">Saldo Total em Carteiras</div>
                 </div>
             </section>
@@ -1006,15 +1006,15 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <?php foreach ($depositos_recentes as $deposito): ?>
                             <div class="activity-item">
                                 <div class="activity-item-header">
-                                    <span class="activity-name"><?= htmlspecialchars($deposito['nome']) ?></span>
-                                    <span class="activity-value">R$ <?= number_format($deposito['valor'], 2, ',', '.') ?></span>
+                                    <span class="activity-name"><?php= htmlspecialchars($deposito['nome']) ?></span>
+                                    <span class="activity-value">R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 <div class="activity-meta">
                                     <div class="activity-status">
                                         <div class="status-dot"></div>
                                         <span>Confirmado</span>
                                     </div>
-                                    <span><?= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
+                                    <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -1039,15 +1039,15 @@ $saques_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <?php foreach ($saques_recentes as $saque): ?>
                             <div class="activity-item">
                                 <div class="activity-item-header">
-                                    <span class="activity-name"><?= htmlspecialchars($saque['nome']) ?></span>
-                                    <span class="activity-value">R$ <?= number_format($saque['valor'], 2, ',', '.') ?></span>
+                                    <span class="activity-name"><?php= htmlspecialchars($saque['nome']) ?></span>
+                                    <span class="activity-value">R$ <?php= number_format($saque['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 <div class="activity-meta">
                                     <div class="activity-status" style="background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); color: #f59e0b;">
                                         <div class="status-dot" style="background: #f59e0b;"></div>
                                         <span>Pendente</span>
                                     </div>
-                                    <span><?= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
+                                    <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>

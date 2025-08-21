@@ -69,7 +69,7 @@ try {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -487,17 +487,17 @@ try {
                                 <div class="transaction-row">
                                     <div class="transaction-date">
                                         <i class="bi bi-calendar-event"></i>
-                                        <span><?= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
+                                        <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
                                     </div>
-                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?= htmlspecialchars($deposito['cpf']) ?>">
-                                        <?= substr($deposito['cpf'], 0, 3) ?>.***.***-**
+                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($deposito['cpf']) ?>">
+                                        <?php= substr($deposito['cpf'], 0, 3) ?>.***.***-**
                                     </div>
                                     <div class="transaction-amount">
-                                        R$ <?= number_format($deposito['valor'], 2, ',', '.') ?>
+                                        R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?>
                                     </div>
-                                    <div class="status-badge <?= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                        <i class="bi bi-<?= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                        <?= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
+                                    <div class="status-badge <?php= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
+                                        <i class="bi bi-<?php= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
+                                        <?php= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
                                     </div>
                                 </div>
                                 
@@ -506,19 +506,19 @@ try {
                                     <div class="transaction-mobile-header">
                                         <div class="transaction-date">
                                             <i class="bi bi-calendar-event"></i>
-                                            <span><?= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
+                                            <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
                                         </div>
                                         <div class="transaction-amount">
-                                            R$ <?= number_format($deposito['valor'], 2, ',', '.') ?>
+                                            R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?>
                                         </div>
                                     </div>
                                     <div class="transaction-mobile-footer">
-                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?= htmlspecialchars($deposito['cpf']) ?>">
-                                            <?= substr($deposito['cpf'], 0, 3) ?>.***.***-**
+                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($deposito['cpf']) ?>">
+                                            <?php= substr($deposito['cpf'], 0, 3) ?>.***.***-**
                                         </div>
-                                        <div class="status-badge <?= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                            <i class="bi bi-<?= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                            <?= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
+                                        <div class="status-badge <?php= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
+                                            <i class="bi bi-<?php= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
+                                            <?php= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
                                         </div>
                                     </div>
                                 </div>
@@ -548,17 +548,17 @@ try {
                                 <div class="transaction-row">
                                     <div class="transaction-date">
                                         <i class="bi bi-calendar-event"></i>
-                                        <span><?= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
+                                        <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
                                     </div>
-                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?= htmlspecialchars($saque['cpf']) ?>">
-                                        <?= substr($saque['cpf'], 0, 3) ?>.***.***-**
+                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($saque['cpf']) ?>">
+                                        <?php= substr($saque['cpf'], 0, 3) ?>.***.***-**
                                     </div>
                                     <div class="transaction-amount">
-                                        R$ <?= number_format($saque['valor'], 2, ',', '.') ?>
+                                        R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
                                     </div>
-                                    <div class="status-badge <?= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                        <i class="bi bi-<?= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                        <?= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
+                                    <div class="status-badge <?php= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
+                                        <i class="bi bi-<?php= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
+                                        <?php= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
                                     </div>
                                 </div>
                                 
@@ -567,19 +567,19 @@ try {
                                     <div class="transaction-mobile-header">
                                         <div class="transaction-date">
                                             <i class="bi bi-calendar-event"></i>
-                                            <span><?= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
+                                            <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
                                         </div>
                                         <div class="transaction-amount">
-                                            R$ <?= number_format($saque['valor'], 2, ',', '.') ?>
+                                            R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
                                         </div>
                                     </div>
                                     <div class="transaction-mobile-footer">
-                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?= htmlspecialchars($saque['cpf']) ?>">
-                                            <?= substr($saque['cpf'], 0, 3) ?>.***.***-**
+                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($saque['cpf']) ?>">
+                                            <?php= substr($saque['cpf'], 0, 3) ?>.***.***-**
                                         </div>
-                                        <div class="status-badge <?= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                            <i class="bi bi-<?= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                            <?= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
+                                        <div class="status-badge <?php= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
+                                            <i class="bi bi-<?php= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
+                                            <?php= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
                                         </div>
                                     </div>
                                 </div>

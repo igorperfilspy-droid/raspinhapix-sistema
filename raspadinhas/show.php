@@ -29,7 +29,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - <?= htmlspecialchars($cartela['nome']); ?></title>
+    <title><?php echo $nomeSite;?> - <?php= htmlspecialchars($cartela['nome']); ?></title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,7 +40,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -655,17 +655,17 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
             <!-- Header Card -->
             <div class="header-card">
                 <div class="cartela-banner">
-                    <img src="<?= htmlspecialchars($cartela['banner']); ?>" 
+                    <img src="<?php= htmlspecialchars($cartela['banner']); ?>" 
                          class="cartela-image" 
-                         alt="Banner <?= htmlspecialchars($cartela['nome']); ?>">
+                         alt="Banner <?php= htmlspecialchars($cartela['nome']); ?>">
                     
                     <div class="cartela-overlay">
-                        <h1 class="cartela-title"><?= htmlspecialchars($cartela['nome']); ?></h1>
+                        <h1 class="cartela-title"><?php= htmlspecialchars($cartela['nome']); ?></h1>
                     </div>
                     
                     <div class="price-badge">
                         <i class="bi bi-tag-fill"></i>
-                        R$ <?= number_format($cartela['valor'], 2, ',', '.'); ?>
+                        R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>
                     </div>
                 </div>
 
@@ -704,13 +704,13 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
                         <?php foreach ($premios as $premio): ?>
                             <div class="prize-card">
                                 <div class="prize-image">
-                                    <img src="<?= htmlspecialchars($premio['icone']); ?>" 
-                                         alt="<?= htmlspecialchars($premio['nome']); ?>"
+                                    <img src="<?php= htmlspecialchars($premio['icone']); ?>" 
+                                         alt="<?php= htmlspecialchars($premio['nome']); ?>"
                                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMyMmM1NWUiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0id2hpdGUiPgo8cGF0aCBkPSJNMTYgOGMwLTQuNDExIDMuNTg5LTggOC04czggMy41ODkgOCA4djJjMCAxLjEwNS0uODk1IDItMiAySDJjLTEuMTA1IDAtMi0uODk1LTItMlY4eiIvPgo8L3N2Zz4KPC9zdmc+'">
                                 </div>
                                 <div class="prize-info">
-                                    <div class="prize-name"><?= htmlspecialchars($premio['nome']); ?></div>
-                                    <div class="prize-value">R$ <?= number_format($premio['valor'], 2, ',', '.'); ?></div>
+                                    <div class="prize-name"><?php= htmlspecialchars($premio['nome']); ?></div>
+                                    <div class="prize-value">R$ <?php= number_format($premio['valor'], 2, ',', '.'); ?></div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -738,7 +738,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
 
                 <button id="btn-buy" class="buy-button">
                     <i class="bi bi-credit-card"></i>
-                    Comprar e Raspar (R$ <?= number_format($cartela['valor'], 2, ',', '.'); ?>)
+                    Comprar e Raspar (R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>)
                 </button>
 
                 <div id="result-msg"></div>
@@ -968,7 +968,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
             ajustarCanvas();
             resetCanvas();
             btnBuy.disabled = false;
-            btnBuy.innerHTML = '<i class="bi bi-credit-card"></i> Comprar e Raspar (R$ <?= number_format($cartela['valor'], 2, ',', '.'); ?>)';
+            btnBuy.innerHTML = '<i class="bi bi-credit-card"></i> Comprar e Raspar (R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>)';
             btnBuy.style.opacity = '1';
         }
 
@@ -986,7 +986,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
             overlay.style.display = 'none';
 
             const fd = new FormData();
-            fd.append('raspadinha_id', <?= $cartela['id']; ?>);
+            fd.append('raspadinha_id', <?php= $cartela['id']; ?>);
             const res = await fetch('/raspadinhas/buy.php', { method: 'POST', body: fd });
             const json = await res.json();
 
@@ -1041,7 +1041,7 @@ $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             console.log('%c🎮 Raspadinha carregada!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            console.log(`Cartela: ${<?= json_encode($cartela['nome']); ?>}`);
+            console.log(`Cartela: ${<?php= json_encode($cartela['nome']); ?>}`);
         });
     </script>
 </body>

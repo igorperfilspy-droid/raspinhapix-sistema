@@ -1246,12 +1246,12 @@ if (!empty($premios)) {
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -1339,9 +1339,9 @@ if (!empty($premios)) {
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -1363,7 +1363,7 @@ if (!empty($premios)) {
                             <i class="fas fa-ticket"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_raspadinhas, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_raspadinhas, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Raspadinhas</div>
                 </div>
                 
@@ -1373,7 +1373,7 @@ if (!empty($premios)) {
                             <i class="fas fa-gift"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_premios, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_premios, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Prêmios</div>
                 </div>
                 
@@ -1383,7 +1383,7 @@ if (!empty($premios)) {
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($valor_total_raspadinhas, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_raspadinhas, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Valor Total Raspadinhas</div>
                 </div>
                 
@@ -1393,7 +1393,7 @@ if (!empty($premios)) {
                             <i class="fas fa-trophy"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($valor_total_premios, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_premios, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Valor Total Prêmios</div>
                 </div>
             </section>
@@ -1402,7 +1402,7 @@ if (!empty($premios)) {
                 <!-- Selected Raspadinha Header -->
                 <div class="selected-raspadinha">
                     <div class="flex-1">
-                        <h3>🎯 Gerenciando: <?= htmlspecialchars($raspadinha_selecionada['nome']) ?></h3>
+                        <h3>🎯 Gerenciando: <?php= htmlspecialchars($raspadinha_selecionada['nome']) ?></h3>
                         <p>Configure os prêmios desta raspadinha</p>
                     </div>
                     <a href="?" class="back-btn">
@@ -1418,10 +1418,10 @@ if (!empty($premios)) {
                 <section class="form-section">
                     <div class="form-header">
                         <div class="form-icon-container">
-                            <i class="fas fa-<?= isset($_GET['editar_raspadinha']) ? 'edit' : 'plus' ?>"></i>
+                            <i class="fas fa-<?php= isset($_GET['editar_raspadinha']) ? 'edit' : 'plus' ?>"></i>
                         </div>
                         <h3 class="form-title">
-                            <?= isset($_GET['editar_raspadinha']) ? 'Editar' : 'Adicionar' ?> Raspadinha
+                            <?php= isset($_GET['editar_raspadinha']) ? 'Editar' : 'Adicionar' ?> Raspadinha
                         </h3>
                     </div>
                     
@@ -1437,7 +1437,7 @@ if (!empty($premios)) {
                     
                     <form method="POST" enctype="multipart/form-data">
                         <?php if ($raspadinha_edit): ?>
-                            <input type="hidden" name="id" value="<?= $raspadinha_edit['id'] ?>">
+                            <input type="hidden" name="id" value="<?php= $raspadinha_edit['id'] ?>">
                         <?php endif; ?>
                         
                         <div class="form-group">
@@ -1445,7 +1445,7 @@ if (!empty($premios)) {
                                 <i class="fas fa-signature"></i>
                                 Nome da Raspadinha
                             </label>
-                            <input type="text" name="nome" value="<?= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome da raspadinha..." required>
+                            <input type="text" name="nome" value="<?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome da raspadinha..." required>
                         </div>
                         
                         <div class="form-group">
@@ -1453,7 +1453,7 @@ if (!empty($premios)) {
                                 <i class="fas fa-align-left"></i>
                                 Descrição
                             </label>
-                            <textarea name="descricao" class="form-input" rows="3" placeholder="Descreva a raspadinha..." required><?= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['descricao']) : '' ?></textarea>
+                            <textarea name="descricao" class="form-input" rows="3" placeholder="Descreva a raspadinha..." required><?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['descricao']) : '' ?></textarea>
                         </div>
                         
                         <div class="form-group">
@@ -1461,7 +1461,7 @@ if (!empty($premios)) {
                                 <i class="fas fa-dollar-sign"></i>
                                 Valor (R$)
                             </label>
-                            <input type="text" name="valor" value="<?= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
+                            <input type="text" name="valor" value="<?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
                         </div>
                         
                         <div class="form-group">
@@ -1473,14 +1473,14 @@ if (!empty($premios)) {
                             <?php if ($raspadinha_edit && $raspadinha_edit['banner']): ?>
                                 <div class="current-image">
                                     <p>Banner atual:</p>
-                                    <img src="<?= htmlspecialchars($raspadinha_edit['banner']) ?>" alt="Banner atual">
+                                    <img src="<?php= htmlspecialchars($raspadinha_edit['banner']) ?>" alt="Banner atual">
                                 </div>
                             <?php endif; ?>
                         </div>
                         
-                        <button type="submit" name="<?= $raspadinha_edit ? 'editar_raspadinha' : 'adicionar_raspadinha' ?>" class="form-button">
+                        <button type="submit" name="<?php= $raspadinha_edit ? 'editar_raspadinha' : 'adicionar_raspadinha' ?>" class="form-button">
                             <i class="fas fa-save"></i>
-                            <?= $raspadinha_edit ? 'Atualizar' : 'Adicionar' ?> Raspadinha
+                            <?php= $raspadinha_edit ? 'Atualizar' : 'Adicionar' ?> Raspadinha
                         </button>
                         
                         <?php if ($raspadinha_edit): ?>
@@ -1513,33 +1513,33 @@ if (!empty($premios)) {
                                 <div class="raspadinha-card">
                                     <div class="raspadinha-header">
                                         <div class="flex-1">
-                                            <h3 class="raspadinha-name"><?= htmlspecialchars($raspadinha['nome']) ?></h3>
-                                            <p class="raspadinha-description"><?= htmlspecialchars($raspadinha['descricao']) ?></p>
+                                            <h3 class="raspadinha-name"><?php= htmlspecialchars($raspadinha['nome']) ?></h3>
+                                            <p class="raspadinha-description"><?php= htmlspecialchars($raspadinha['descricao']) ?></p>
                                         </div>
                                         <?php if ($raspadinha['banner']): ?>
-                                            <img src="<?= htmlspecialchars($raspadinha['banner']) ?>" alt="Banner" class="raspadinha-banner">
+                                            <img src="<?php= htmlspecialchars($raspadinha['banner']) ?>" alt="Banner" class="raspadinha-banner">
                                         <?php endif; ?>
                                     </div>
                                     
                                     <div class="raspadinha-value">
-                                        R$ <?= number_format($raspadinha['valor'], 2, ',', '.') ?>
+                                        R$ <?php= number_format($raspadinha['valor'], 2, ',', '.') ?>
                                     </div>
                                     
                                     <div class="raspadinha-date">
                                         <i class="fas fa-calendar"></i>
-                                        <span><?= date('d/m/Y H:i', strtotime($raspadinha['created_at'])) ?></span>
+                                        <span><?php= date('d/m/Y H:i', strtotime($raspadinha['created_at'])) ?></span>
                                     </div>
                                     
                                     <div class="action-buttons">
-                                        <a href="?raspadinha_id=<?= $raspadinha['id'] ?>" class="action-btn btn-manage">
+                                        <a href="?raspadinha_id=<?php= $raspadinha['id'] ?>" class="action-btn btn-manage">
                                             <i class="fas fa-cog"></i>
                                             Gerenciar
                                         </a>
-                                        <a href="?editar_raspadinha&id=<?= $raspadinha['id'] ?>" class="action-btn btn-edit">
+                                        <a href="?editar_raspadinha&id=<?php= $raspadinha['id'] ?>" class="action-btn btn-edit">
                                             <i class="fas fa-edit"></i>
                                             Editar
                                         </a>
-                                        <a href="?excluir_raspadinha&id=<?= $raspadinha['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir esta raspadinha e todos os seus prêmios?')" class="action-btn btn-delete">
+                                        <a href="?excluir_raspadinha&id=<?php= $raspadinha['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir esta raspadinha e todos os seus prêmios?')" class="action-btn btn-delete">
                                             <i class="fas fa-trash"></i>
                                             Excluir
                                         </a>
@@ -1558,10 +1558,10 @@ if (!empty($premios)) {
                     <section class="form-section">
                         <div class="form-header">
                             <div class="form-icon-container">
-                                <i class="fas fa-<?= isset($_GET['editar_premio']) ? 'edit' : 'gift' ?>"></i>
+                                <i class="fas fa-<?php= isset($_GET['editar_premio']) ? 'edit' : 'gift' ?>"></i>
                             </div>
                             <h3 class="form-title">
-                                <?= isset($_GET['editar_premio']) ? 'Editar' : 'Adicionar' ?> Prêmio
+                                <?php= isset($_GET['editar_premio']) ? 'Editar' : 'Adicionar' ?> Prêmio
                             </h3>
                         </div>
                         
@@ -1576,9 +1576,9 @@ if (!empty($premios)) {
                         ?>
                         
                         <form method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="raspadinha_id" value="<?= $_GET['raspadinha_id'] ?>">
+                            <input type="hidden" name="raspadinha_id" value="<?php= $_GET['raspadinha_id'] ?>">
                             <?php if ($premio_edit): ?>
-                                <input type="hidden" name="id" value="<?= $premio_edit['id'] ?>">
+                                <input type="hidden" name="id" value="<?php= $premio_edit['id'] ?>">
                             <?php endif; ?>
                             
                             <div class="form-group">
@@ -1586,7 +1586,7 @@ if (!empty($premios)) {
                                     <i class="fas fa-tag"></i>
                                     Nome do Prêmio
                                 </label>
-                                <input type="text" name="nome" value="<?= $premio_edit ? htmlspecialchars($premio_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome do prêmio..." required>
+                                <input type="text" name="nome" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome do prêmio..." required>
                             </div>
                             
                             <div class="form-group">
@@ -1594,7 +1594,7 @@ if (!empty($premios)) {
                                     <i class="fas fa-dollar-sign"></i>
                                     Valor (R$)
                                 </label>
-                                <input type="text" name="valor" value="<?= $premio_edit ? htmlspecialchars($premio_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
+                                <input type="text" name="valor" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
                             </div>
                             
                             <div class="form-group">
@@ -1602,7 +1602,7 @@ if (!empty($premios)) {
                                     <i class="fas fa-percentage"></i>
                                     Probabilidade (0.00 - 100.00)
                                 </label>
-                                <input type="text" name="probabilidade" value="<?= $premio_edit ? htmlspecialchars($premio_edit['probabilidade']) : '' ?>" class="form-input" placeholder="5.00" required>
+                                <input type="text" name="probabilidade" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['probabilidade']) : '' ?>" class="form-input" placeholder="5.00" required>
                             </div>
                             
                             <div class="form-group">
@@ -1614,18 +1614,18 @@ if (!empty($premios)) {
                                 <?php if ($premio_edit && $premio_edit['icone']): ?>
                                     <div class="current-image">
                                         <p>Ícone atual:</p>
-                                        <img src="<?= htmlspecialchars($premio_edit['icone']) ?>" alt="Ícone atual">
+                                        <img src="<?php= htmlspecialchars($premio_edit['icone']) ?>" alt="Ícone atual">
                                     </div>
                                 <?php endif; ?>
                             </div>
                             
-                            <button type="submit" name="<?= $premio_edit ? 'editar_premio' : 'adicionar_premio' ?>" class="form-button">
+                            <button type="submit" name="<?php= $premio_edit ? 'editar_premio' : 'adicionar_premio' ?>" class="form-button">
                                 <i class="fas fa-save"></i>
-                                <?= $premio_edit ? 'Atualizar' : 'Adicionar' ?> Prêmio
+                                <?php= $premio_edit ? 'Atualizar' : 'Adicionar' ?> Prêmio
                             </button>
                             
                             <?php if ($premio_edit): ?>
-                                <a href="?raspadinha_id=<?= $_GET['raspadinha_id'] ?>" class="cancel-button">
+                                <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>" class="cancel-button">
                                     <i class="fas fa-times"></i>
                                     Cancelar
                                 </a>
@@ -1655,29 +1655,29 @@ if (!empty($premios)) {
                                         <div class="prize-header">
                                             <div class="prize-name">
                                                 <?php if ($premio['icone']): ?>
-                                                    <img src="<?= htmlspecialchars($premio['icone']) ?>" alt="Ícone" class="prize-icon">
+                                                    <img src="<?php= htmlspecialchars($premio['icone']) ?>" alt="Ícone" class="prize-icon">
                                                 <?php endif; ?>
-                                                <?= htmlspecialchars($premio['nome']) ?>
+                                                <?php= htmlspecialchars($premio['nome']) ?>
                                             </div>
                                         </div>
                                         
                                         <div class="prize-info">
                                             <div class="prize-stat">
                                                 <i class="fas fa-dollar-sign"></i>
-                                                <span>R$ <?= number_format($premio['valor'], 2, ',', '.') ?></span>
+                                                <span>R$ <?php= number_format($premio['valor'], 2, ',', '.') ?></span>
                                             </div>
                                             <div class="prize-stat">
                                                 <i class="fas fa-percentage"></i>
-                                                <span><?= number_format($premio['probabilidade'], 2, ',', '.') ?>%</span>
+                                                <span><?php= number_format($premio['probabilidade'], 2, ',', '.') ?>%</span>
                                             </div>
                                         </div>
                                         
                                         <div class="prize-actions">
-                                            <a href="?raspadinha_id=<?= $_GET['raspadinha_id'] ?>&editar_premio&id=<?= $premio['id'] ?>" class="prize-action-btn prize-edit-btn">
+                                            <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>&editar_premio&id=<?php= $premio['id'] ?>" class="prize-action-btn prize-edit-btn">
                                                 <i class="fas fa-edit"></i>
                                                 Editar
                                             </a>
-                                            <a href="?raspadinha_id=<?= $_GET['raspadinha_id'] ?>&excluir_premio&id=<?= $premio['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir este prêmio?')" class="prize-action-btn prize-delete-btn">
+                                            <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>&excluir_premio&id=<?php= $premio['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir este prêmio?')" class="prize-action-btn prize-delete-btn">
                                                 <i class="fas fa-trash"></i>
                                                 Excluir
                                             </a>

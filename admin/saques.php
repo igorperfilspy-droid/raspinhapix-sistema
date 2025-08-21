@@ -321,11 +321,11 @@ $activeGateway = $stmt->fetchColumn();
     }
     ?>
     <?php if ($faviconSite && file_exists($_SERVER['DOCUMENT_ROOT'] . $faviconSite)): ?>
-        <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="shortcut icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="apple-touch-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="icon" type="image/x-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="shortcut icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="apple-touch-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
     <?php else: ?>
-        <link rel="icon" href="data:image/svg+xml,<?= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
+        <link rel="icon" href="data:image/svg+xml,<?php= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
     <?php endif; ?>
     <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1088,12 +1088,12 @@ $activeGateway = $stmt->fetchColumn();
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -1181,9 +1181,9 @@ $activeGateway = $stmt->fetchColumn();
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -1205,7 +1205,7 @@ $activeGateway = $stmt->fetchColumn();
                             <i class="fas fa-money-bill-wave"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_saques, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_saques, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Saques</div>
                 </div>
                 
@@ -1215,7 +1215,7 @@ $activeGateway = $stmt->fetchColumn();
                             <i class="fas fa-check-circle"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($saques_aprovados), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($saques_aprovados), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Saques Aprovados</div>
                 </div>
                 
@@ -1225,7 +1225,7 @@ $activeGateway = $stmt->fetchColumn();
                             <i class="fas fa-clock"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($saques_pendentes), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($saques_pendentes), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Saques Pendentes</div>
                 </div>
                 
@@ -1235,7 +1235,7 @@ $activeGateway = $stmt->fetchColumn();
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($valor_total_aprovado, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_aprovado, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Valor Total Pago</div>
                 </div>
             </section>
@@ -1254,34 +1254,34 @@ $activeGateway = $stmt->fetchColumn();
                             <div class="withdrawal-card">
                                 <div class="withdrawal-header">
                                     <div>
-                                        <h3 class="withdrawal-user"><?= htmlspecialchars($saque['nome']) ?></h3>
+                                        <h3 class="withdrawal-user"><?php= htmlspecialchars($saque['nome']) ?></h3>
                                         <div class="withdrawal-cpf">
                                             <i class="fas fa-key"></i>
-                                            PIX: <?= htmlspecialchars($saque['cpf']) ?>
+                                            PIX: <?php= htmlspecialchars($saque['cpf']) ?>
                                         </div>
                                     </div>
                                     
-                                    <div class="withdrawal-status <?= $saque['status'] == 'PAID' ? 'approved' : 'pending' ?>">
+                                    <div class="withdrawal-status <?php= $saque['status'] == 'PAID' ? 'approved' : 'pending' ?>">
                                         <div class="status-dot"></div>
-                                        <span><?= $saque['status'] == 'PAID' ? 'Aprovado' : 'Pendente' ?></span>
+                                        <span><?php= $saque['status'] == 'PAID' ? 'Aprovado' : 'Pendente' ?></span>
                                     </div>
                                 </div>
                                 
                                 <div class="withdrawal-value">
-                                    R$ <?= number_format($saque['valor'], 2, ',', '.') ?>
+                                    R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
                                 </div>
                                 
                                 <?php if ($saque['status'] == 'PENDING'): ?>
                                     <div class="withdrawal-actions">
                                         <form method="POST" style="flex: 1;">
-                                            <input type="hidden" name="saque_id" value="<?= $saque['id'] ?>">
+                                            <input type="hidden" name="saque_id" value="<?php= $saque['id'] ?>">
                                             <button type="submit" name="aprovar_saque" class="action-btn btn-approve" onclick="openLoading()">
                                                 <i class="fas fa-check"></i>
                                                 Aprovar Saque
                                             </button>
                                         </form>
                                         <form method="POST" style="flex: 1;">
-                                            <input type="hidden" name="saque_id" value="<?= $saque['id'] ?>">
+                                            <input type="hidden" name="saque_id" value="<?php= $saque['id'] ?>">
                                             <button type="submit" name="reprovar_saque" class="action-btn btn-reject" onclick="openLoading()">
                                                 <i class="fas fa-times"></i>
                                                 Reprovar
@@ -1299,7 +1299,7 @@ $activeGateway = $stmt->fetchColumn();
                                 
                                 <div class="withdrawal-date">
                                     <i class="fas fa-calendar"></i>
-                                    <span><?= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
+                                    <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>

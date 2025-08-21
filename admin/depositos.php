@@ -812,12 +812,12 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -905,9 +905,9 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -929,7 +929,7 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                             <i class="fas fa-receipt"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_depositos, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_depositos, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Depósitos</div>
                 </div>
                 
@@ -939,7 +939,7 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                             <i class="fas fa-check-circle"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($depositos_aprovados), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($depositos_aprovados), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Depósitos Aprovados</div>
                 </div>
                 
@@ -949,7 +949,7 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                             <i class="fas fa-clock"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($depositos_pendentes), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($depositos_pendentes), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Depósitos Pendentes</div>
                 </div>
                 
@@ -959,7 +959,7 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($valor_total_aprovado, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_aprovado, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Valor Total Aprovado</div>
                 </div>
             </section>
@@ -1005,31 +1005,31 @@ $valor_total_pendente = array_sum(array_column($depositos_pendentes, 'valor'));
                     <div class="deposits-grid" id="depositsGrid">
                         <?php foreach ($depositos as $deposito): ?>
                             <div class="deposit-card" 
-                                 data-status="<?= $deposito['status'] ?>" 
-                                 data-date="<?= date('Y-m-d', strtotime($deposito['updated_at'])) ?>">
+                                 data-status="<?php= $deposito['status'] ?>" 
+                                 data-date="<?php= date('Y-m-d', strtotime($deposito['updated_at'])) ?>">
                                 <div class="deposit-header">
                                     <div>
-                                        <h3 class="deposit-user"><?= htmlspecialchars($deposito['nome']) ?></h3>
+                                        <h3 class="deposit-user"><?php= htmlspecialchars($deposito['nome']) ?></h3>
                                         <?php if (!empty($deposito['transactionId'])): ?>
                                             <div class="deposit-transaction">
-                                                ID: <?= htmlspecialchars($deposito['transactionId']) ?>
+                                                ID: <?php= htmlspecialchars($deposito['transactionId']) ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>
                                     
-                                    <div class="deposit-status <?= $deposito['status'] == 'PAID' ? 'approved' : 'pending' ?>">
+                                    <div class="deposit-status <?php= $deposito['status'] == 'PAID' ? 'approved' : 'pending' ?>">
                                         <div class="status-dot"></div>
-                                        <span><?= $deposito['status'] == 'PAID' ? 'Aprovado' : 'Pendente' ?></span>
+                                        <span><?php= $deposito['status'] == 'PAID' ? 'Aprovado' : 'Pendente' ?></span>
                                     </div>
                                 </div>
                                 
                                 <div class="deposit-value">
-                                    R$ <?= number_format($deposito['valor'], 2, ',', '.') ?>
+                                    R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?>
                                 </div>
                                 
                                 <div class="deposit-date">
                                     <i class="fas fa-calendar"></i>
-                                    <span><?= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
+                                    <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>

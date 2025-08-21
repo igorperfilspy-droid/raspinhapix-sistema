@@ -1105,12 +1105,12 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -1198,9 +1198,9 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -1222,7 +1222,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                             <i class="fas fa-users"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_usuarios, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_usuarios, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Usuários</div>
                 </div>
                 
@@ -1232,7 +1232,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                             <i class="fas fa-user-check"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($usuarios_ativos), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($usuarios_ativos), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Usuários Ativos</div>
                 </div>
                 
@@ -1242,7 +1242,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                             <i class="fas fa-star"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format(count($influencers), 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format(count($influencers), 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Influencers</div>
                 </div>
                 
@@ -1252,7 +1252,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                             <i class="fas fa-wallet"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($total_saldo, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($total_saldo, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Saldo Total</div>
                 </div>
             </section>
@@ -1269,7 +1269,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                 <form method="GET">
                     <div class="search-container">
                         <i class="fa-solid fa-search search-icon"></i>
-                        <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
+                        <input type="text" name="search" value="<?php= htmlspecialchars($search) ?>" 
                                class="search-input" 
                                placeholder="Pesquisar por nome, email ou telefone..." 
                                onchange="this.form.submit()">
@@ -1302,7 +1302,7 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                             <div class="user-card">
                                 <div class="user-header">
                                     <div>
-                                        <h3 class="user-name"><?= htmlspecialchars($usuario['nome']) ?></h3>
+                                        <h3 class="user-name"><?php= htmlspecialchars($usuario['nome']) ?></h3>
                                         <div class="user-badges">
                                             <?php if ($usuario['admin'] == 1): ?>
                                                 <span class="badge admin">Admin</span>
@@ -1320,48 +1320,48 @@ $total_saldo = array_sum(array_column($usuarios, 'saldo'));
                                 <div class="user-info">
                                     <div class="info-item">
                                         <i class="fa-solid fa-envelope info-icon"></i>
-                                        <span><?= htmlspecialchars($usuario['email']) ?></span>
+                                        <span><?php= htmlspecialchars($usuario['email']) ?></span>
                                     </div>
                                     <div class="info-item">
                                         <i class="fa-solid fa-phone info-icon"></i>
-                                        <span><?= $telefoneFormatado ?></span>
-                                        <a href="<?= $whatsappLink ?>" target="_blank" class="whatsapp-link">
+                                        <span><?php= $telefoneFormatado ?></span>
+                                        <a href="<?php= $whatsappLink ?>" target="_blank" class="whatsapp-link">
                                             <i class="fa-brands fa-whatsapp"></i>
                                         </a>
                                     </div>
                                     <div class="info-item">
                                         <i class="fa-solid fa-wallet info-icon"></i>
-                                        <span>R$ <?= number_format($usuario['saldo'], 2, ',', '.') ?></span>
+                                        <span>R$ <?php= number_format($usuario['saldo'], 2, ',', '.') ?></span>
                                     </div>
                                     <div class="info-item">
                                         <i class="fa-solid fa-user-plus info-icon"></i>
-                                        <span>Indicado por: <?= $usuario['email_indicador'] ? htmlspecialchars($usuario['email_indicador']) : 'Ninguém' ?></span>
+                                        <span>Indicado por: <?php= $usuario['email_indicador'] ? htmlspecialchars($usuario['email_indicador']) : 'Ninguém' ?></span>
                                     </div>
                                 </div>
                                 
                                 <div class="action-buttons">
-                                    <button onclick="abrirModalEditarSaldo('<?= $usuario['id'] ?>', '<?= number_format($usuario['saldo'], 2, '.', '') ?>')" 
+                                    <button onclick="abrirModalEditarSaldo('<?php= $usuario['id'] ?>', '<?php= number_format($usuario['saldo'], 2, '.', '') ?>')" 
                                             class="action-btn btn-balance">
                                         <i class="fa-solid fa-edit"></i>
                                         Editar Saldo
                                     </button>
                                     
-                                    <a href="?toggle_banido&id=<?= $usuario['id'] ?>" 
-                                       class="action-btn <?= $usuario['banido'] ? 'btn-unban' : 'btn-ban' ?>">
-                                        <i class="fa-solid fa-<?= $usuario['banido'] ? 'user-check' : 'user-slash' ?>"></i>
-                                        <?= $usuario['banido'] ? 'Desbanir' : 'Banir' ?>
+                                    <a href="?toggle_banido&id=<?php= $usuario['id'] ?>" 
+                                       class="action-btn <?php= $usuario['banido'] ? 'btn-unban' : 'btn-ban' ?>">
+                                        <i class="fa-solid fa-<?php= $usuario['banido'] ? 'user-check' : 'user-slash' ?>"></i>
+                                        <?php= $usuario['banido'] ? 'Desbanir' : 'Banir' ?>
                                     </a>
                                     
-                                    <a href="?toggle_influencer&id=<?= $usuario['id'] ?>" 
-                                       class="action-btn <?= $usuario['influencer'] ? 'btn-remove-inf' : 'btn-influencer' ?>">
-                                        <i class="fa-solid fa-<?= $usuario['influencer'] ? 'user-minus' : 'star' ?>"></i>
-                                        <?= $usuario['influencer'] ? 'Remover Inf.' : 'Tornar Inf.' ?>
+                                    <a href="?toggle_influencer&id=<?php= $usuario['id'] ?>" 
+                                       class="action-btn <?php= $usuario['influencer'] ? 'btn-remove-inf' : 'btn-influencer' ?>">
+                                        <i class="fa-solid fa-<?php= $usuario['influencer'] ? 'user-minus' : 'star' ?>"></i>
+                                        <?php= $usuario['influencer'] ? 'Remover Inf.' : 'Tornar Inf.' ?>
                                     </a>
                                 </div>
                                 
                                 <div class="user-meta">
                                     <i class="fa-solid fa-calendar"></i>
-                                    <span>Cadastrado em: <?= date('d/m/Y H:i', strtotime($usuario['created_at'])) ?></span>
+                                    <span>Cadastrado em: <?php= date('d/m/Y H:i', strtotime($usuario['created_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>

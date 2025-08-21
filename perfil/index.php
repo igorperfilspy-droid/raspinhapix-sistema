@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -756,7 +756,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- Page Header -->
             <div class="page-header fade-in">
                 <div class="user-avatar">
-                    <?= strtoupper(substr($usuario['nome'], 0, 2)) ?>
+                    <?php= strtoupper(substr($usuario['nome'], 0, 2)) ?>
                 </div>
                 <h1 class="page-title">Meu Perfil</h1>
                 <p class="page-subtitle">
@@ -770,7 +770,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="stat-header">
                         <div class="stat-info">
                             <h3>Saldo Atual</h3>
-                            <div class="stat-value">R$ <?= number_format($usuario['saldo'] ?? 0, 2, ',', '.') ?></div>
+                            <div class="stat-value">R$ <?php= number_format($usuario['saldo'] ?? 0, 2, ',', '.') ?></div>
                         </div>
                         <div class="stat-icon saldo">
                             <i class="bi bi-wallet2"></i>
@@ -782,7 +782,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="stat-header">
                         <div class="stat-info">
                             <h3>Total Depositado</h3>
-                            <div class="stat-value">R$ <?= number_format($total_depositado, 2, ',', '.') ?></div>
+                            <div class="stat-value">R$ <?php= number_format($total_depositado, 2, ',', '.') ?></div>
                         </div>
                         <div class="stat-icon depositos">
                             <i class="bi bi-arrow-down-circle"></i>
@@ -794,7 +794,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="stat-header">
                         <div class="stat-info">
                             <h3>Total Sacado</h3>
-                            <div class="stat-value">R$ <?= number_format($total_sacado, 2, ',', '.') ?></div>
+                            <div class="stat-value">R$ <?php= number_format($total_sacado, 2, ',', '.') ?></div>
                         </div>
                         <div class="stat-icon saques">
                             <i class="bi bi-arrow-up-circle"></i>
@@ -823,7 +823,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="text" 
                                name="nome" 
                                class="form-input"
-                               value="<?= htmlspecialchars($usuario['nome'] ?? '') ?>" 
+                               value="<?php= htmlspecialchars($usuario['nome'] ?? '') ?>" 
                                placeholder="Nome completo" 
                                required>
                     </div>
@@ -836,7 +836,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                id="telefone" 
                                name="telefone" 
                                class="form-input"
-                               value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
+                               value="<?php= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
                                placeholder="(11) 99999-9999" 
                                required>
                     </div>
@@ -848,7 +848,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="email" 
                                name="email" 
                                class="form-input"
-                               value="<?= htmlspecialchars($usuario['email'] ?? '') ?>" 
+                               value="<?php= htmlspecialchars($usuario['email'] ?? '') ?>" 
                                placeholder="seu@email.com" 
                                required>
                     </div>

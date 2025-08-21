@@ -252,11 +252,11 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
     }
     ?>
     <?php if ($faviconSite && file_exists($_SERVER['DOCUMENT_ROOT'] . $faviconSite)): ?>
-        <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="shortcut icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="apple-touch-icon" href="<?= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="icon" type="image/x-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="shortcut icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
+        <link rel="apple-touch-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
     <?php else: ?>
-        <link rel="icon" href="data:image/svg+xml,<?= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
+        <link rel="icon" href="data:image/svg+xml,<?php= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
     <?php endif; ?>
     <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1605,12 +1605,12 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
     <!-- Notifications -->
     <?php if (isset($_SESSION['success'])): ?>
         <script>
-            Notiflix.Notify.success('<?= $_SESSION['success'] ?>');
+            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
         </script>
         <?php unset($_SESSION['success']); ?>
     <?php elseif (isset($_SESSION['failure'])): ?>
         <script>
-            Notiflix.Notify.failure('<?= $_SESSION['failure'] ?>');
+            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
         </script>
         <?php unset($_SESSION['failure']); ?>
     <?php endif; ?>
@@ -1698,9 +1698,9 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                 </div>
                 
                 <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?= htmlspecialchars($nome) ?></span>
+                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
                     <div class="user-avatar">
-                        <?= strtoupper(substr($nome, 0, 1)) ?>
+                        <?php= strtoupper(substr($nome, 0, 1)) ?>
                     </div>
                 </div>
             </div>
@@ -1722,7 +1722,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <i class="fas fa-handshake"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_afiliados, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_afiliados, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Afiliados</div>
                 </div>
                 
@@ -1732,7 +1732,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <i class="fas fa-users"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($total_indicados, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($total_indicados, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Total de Indicados</div>
                 </div>
                 
@@ -1742,7 +1742,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($total_depositos_afiliados, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($total_depositos_afiliados, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Depósitos dos Indicados</div>
                 </div>
                 
@@ -1752,7 +1752,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <i class="fas fa-chart-line"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value">R$ <?= number_format($total_revshare_pago, 2, ',', '.') ?></div>
+                    <div class="mini-stat-value">R$ <?php= number_format($total_revshare_pago, 2, ',', '.') ?></div>
                     <div class="mini-stat-label">Total RevShare Pago</div>
                 </div>
                 
@@ -1762,7 +1762,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <i class="fas fa-star"></i>
                         </div>
                     </div>
-                    <div class="mini-stat-value"><?= number_format($influencers_count, 0, ',', '.') ?></div>
+                    <div class="mini-stat-value"><?php= number_format($influencers_count, 0, ',', '.') ?></div>
                     <div class="mini-stat-label">Influencers Ativos</div>
                 </div>
             </section>
@@ -1779,7 +1779,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                 <form method="GET">
                     <div class="search-container">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
+                        <input type="text" name="search" value="<?php= htmlspecialchars($search) ?>" 
                                class="search-input" 
                                placeholder="Pesquisar por nome, email ou telefone..." 
                                onchange="this.form.submit()">
@@ -1814,7 +1814,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                             <div class="affiliate-card">
                                 <div class="affiliate-header">
                                     <div>
-                                        <h3 class="affiliate-name"><?= htmlspecialchars($afiliado['nome']) ?></h3>
+                                        <h3 class="affiliate-name"><?php= htmlspecialchars($afiliado['nome']) ?></h3>
                                         <div class="affiliate-badges">
                                             <span class="badge affiliate">Afiliado</span>
                                             <?php if ($afiliado['admin'] == 1): ?>
@@ -1833,12 +1833,12 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                 <div class="contact-info">
                                     <div class="contact-item">
                                         <i class="fas fa-envelope"></i>
-                                        <span><?= htmlspecialchars($afiliado['email']) ?></span>
+                                        <span><?php= htmlspecialchars($afiliado['email']) ?></span>
                                     </div>
                                     <div class="contact-item">
                                         <i class="fas fa-phone"></i>
-                                        <span><?= $telefoneFormatado ?></span>
-                                        <a href="<?= $whatsappLink ?>" target="_blank" class="whatsapp-link">
+                                        <span><?php= $telefoneFormatado ?></span>
+                                        <a href="<?php= $whatsappLink ?>" target="_blank" class="whatsapp-link">
                                             <i class="fab fa-whatsapp"></i>
                                         </a>
                                     </div>
@@ -1850,14 +1850,14 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                             <i class="fas fa-users"></i>
                                             Indicados
                                         </div>
-                                        <div class="stat-value"><?= $afiliado['total_indicados'] ?></div>
+                                        <div class="stat-value"><?php= $afiliado['total_indicados'] ?></div>
                                     </div>
                                     <div class="stat-card">
                                         <div class="stat-label">
                                             <i class="fas fa-money-bill-wave"></i>
                                             Depósitos
                                         </div>
-                                        <div class="stat-value">R$ <?= number_format($afiliado['total_depositos'], 2, ',', '.') ?></div>
+                                        <div class="stat-value">R$ <?php= number_format($afiliado['total_depositos'], 2, ',', '.') ?></div>
                                     </div>
                                     <div class="stat-card">
                                         <div class="stat-label">
@@ -1865,8 +1865,8 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                             CPA
                                         </div>
                                         <div class="stat-value">
-                                            R$ <?= $comissao_cpa ?>
-                                            <button onclick="abrirModalComissao('<?= $afiliado['id'] ?>', '<?= isset($afiliado['comissao_cpa']) ? $afiliado['comissao_cpa'] : '0' ?>', 'cpa')"
+                                            R$ <?php= $comissao_cpa ?>
+                                            <button onclick="abrirModalComissao('<?php= $afiliado['id'] ?>', '<?php= isset($afiliado['comissao_cpa']) ? $afiliado['comissao_cpa'] : '0' ?>', 'cpa')"
                                                     class="edit-commission">
                                                 <i class="fas fa-edit"></i>
                                             </button>
@@ -1878,8 +1878,8 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                             RevShare
                                         </div>
                                         <div class="stat-value">
-                                            <?= $comissao_revshare ?>%
-                                            <button onclick="abrirModalComissao('<?= $afiliado['id'] ?>', '<?= isset($afiliado['comissao_revshare']) ? $afiliado['comissao_revshare'] : '0' ?>', 'revshare')"
+                                            <?php= $comissao_revshare ?>%
+                                            <button onclick="abrirModalComissao('<?php= $afiliado['id'] ?>', '<?php= isset($afiliado['comissao_revshare']) ? $afiliado['comissao_revshare'] : '0' ?>', 'revshare')"
                                                     class="edit-commission">
                                                 <i class="fas fa-edit"></i>
                                             </button>
@@ -1890,24 +1890,24 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                             <i class="fas fa-wallet"></i>
                                             Rev. Ganho
                                         </div>
-                                        <div class="stat-value">R$ <?= number_format($afiliado['total_revshare'] ?? 0, 2, ',', '.') ?></div>
+                                        <div class="stat-value">R$ <?php= number_format($afiliado['total_revshare'] ?? 0, 2, ',', '.') ?></div>
                                     </div>
                                 </div>
                                 
                                 <div class="action-buttons">
-                                    <a href="?toggle_banido&id=<?= $afiliado['id'] ?>" 
-                                    class="action-btn <?= $afiliado['banido'] ? 'btn-unban' : 'btn-ban' ?>">
-                                        <i class="fas fa-<?= $afiliado['banido'] ? 'user-check' : 'user-slash' ?>"></i>
-                                        <?= $afiliado['banido'] ? 'Desbanir' : 'Banir' ?>
+                                    <a href="?toggle_banido&id=<?php= $afiliado['id'] ?>" 
+                                    class="action-btn <?php= $afiliado['banido'] ? 'btn-unban' : 'btn-ban' ?>">
+                                        <i class="fas fa-<?php= $afiliado['banido'] ? 'user-check' : 'user-slash' ?>"></i>
+                                        <?php= $afiliado['banido'] ? 'Desbanir' : 'Banir' ?>
                                     </a>
                                     
-                                    <a href="?toggle_influencer&id=<?= $afiliado['id'] ?>" 
-                                    class="action-btn <?= $afiliado['influencer'] ? 'btn-remove-inf' : 'btn-influencer' ?>">
-                                        <i class="fas fa-<?= $afiliado['influencer'] ? 'user-minus' : 'star' ?>"></i>
-                                        <?= $afiliado['influencer'] ? 'Remover Inf.' : 'Tornar Inf.' ?>
+                                    <a href="?toggle_influencer&id=<?php= $afiliado['id'] ?>" 
+                                    class="action-btn <?php= $afiliado['influencer'] ? 'btn-remove-inf' : 'btn-influencer' ?>">
+                                        <i class="fas fa-<?php= $afiliado['influencer'] ? 'user-minus' : 'star' ?>"></i>
+                                        <?php= $afiliado['influencer'] ? 'Remover Inf.' : 'Tornar Inf.' ?>
                                     </a>
                                     
-                                    <button onclick="abrirDetalhesAfiliado(<?= $afiliado['id'] ?>)" 
+                                    <button onclick="abrirDetalhesAfiliado(<?php= $afiliado['id'] ?>)" 
                                             class="action-btn btn-details">
                                         <i class="fas fa-eye"></i>
                                         Detalhes
@@ -1916,7 +1916,7 @@ $influencers_count = count(array_filter($afiliados, function($a) { return $a['in
                                 
                                 <div class="affiliate-meta">
                                     <i class="fas fa-calendar"></i>
-                                    <span>Cadastrado em: <?= date('d/m/Y H:i', strtotime($afiliado['created_at'])) ?></span>
+                                    <span>Cadastrado em: <?php= date('d/m/Y H:i', strtotime($afiliado['created_at'])) ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>

@@ -11,9 +11,9 @@ $banners = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Container dos slides -->
                 <div class="carousel-wrapper">
                     <?php foreach ($banners as $index => $banner): ?>
-                        <div class="hero-slide banner-slide <?= $index === 0 ? 'active' : '' ?>" 
-                             data-slide="<?= $index ?>" 
-                             style="background-image: url('<?= htmlspecialchars($banner['banner_img']) ?>');">
+                        <div class="hero-slide banner-slide <?php= $index === 0 ? 'active' : '' ?>" 
+                             data-slide="<?php= $index ?>" 
+                             style="background-image: url('<?php= htmlspecialchars($banner['banner_img']) ?>');">
                             <div class="banner-overlay"></div>
                         </div>
                     <?php endforeach; ?>
@@ -31,9 +31,9 @@ $banners = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Indicadores -->
                     <div class="carousel-indicators">
                         <?php foreach ($banners as $index => $banner): ?>
-                            <button class="indicator <?= $index === 0 ? 'active' : '' ?>" 
-                                    onclick="goToSlide(<?= $index ?>)"
-                                    aria-label="Ir para banner <?= $index + 1 ?>"></button>
+                            <button class="indicator <?php= $index === 0 ? 'active' : '' ?>" 
+                                    onclick="goToSlide(<?php= $index ?>)"
+                                    aria-label="Ir para banner <?php= $index + 1 ?>"></button>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>

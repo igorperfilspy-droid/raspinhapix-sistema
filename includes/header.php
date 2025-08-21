@@ -4,7 +4,7 @@
     <div style="width: 95%; height: 100%; max-width: 1200px; display: flex; justify-content: space-between; align-items: center; margin: 0 auto;">
         <div onclick="openProfile(event)" class="user_container" style="display:flex; justify-content: space-between; align-items: center; color: #34D399; gap: 0.6rem; font-size: 17px; padding: 12px 12px; border-radius: 8px; cursor: pointer;">
             <i class="fa-solid fa-user"></i>
-            <p style="font-weight:600;"><?= $nome; ?></p>
+            <p style="font-weight:600;"><?php= $nome; ?></p>
             <i class="fa fa-chevron-right" style="transform: rotate(90deg); font-size: 14px; "></i>
             <div class="menu-profile" style="position: absolute; top:64px; z-index:4; transform: translateX(-12px); display:none; flex-direction: column; justify-content: space-around; background-color: #0a2332; font-size: 17px; padding: 8px 0px; border-radius: 8px; cursor: pointer; min-width: 180px; border: 1px solid #34d39956;">
                 <p onclick="openEditModal()" class="edit-profile"><i class="fa-solid fa-pen" style="margin-right: 12px; font-size: 15px; vertical-align: middle; padding: 12px;"></i>Editar Perfil</p>
@@ -51,7 +51,7 @@
         <div style="width: 40%; max-width: 200px; display: flex; align-items: center; justify-content: space-between;">
 
             <div style="color: #34D399;">
-                R$ <?= number_format($saldo, 2, ',', ''); ?>
+                R$ <?php= number_format($saldo, 2, ',', ''); ?>
             </div>
 
             <div style="color: #34D399;">

@@ -4,10 +4,10 @@
             <div>
                 <div class="footer-brand">
                     <?php if ($logoSite && file_exists($_SERVER['DOCUMENT_ROOT'] . $logoSite)): ?>
-                        <img src="<?= htmlspecialchars($logoSite) ?>" alt="<?= htmlspecialchars($nomeSite) ?>" class="footer-logo-image">
+                        <img src="<?php= htmlspecialchars($logoSite) ?>" alt="<?php= htmlspecialchars($nomeSite) ?>" class="footer-logo-image">
                     <?php else: ?>
                         <div class="footer-logo-icon">
-                            <?= strtoupper(substr($nomeSite, 0, 1)) ?>
+                            <?php= strtoupper(substr($nomeSite, 0, 1)) ?>
                         </div>
                     <?php endif; ?>
                 </div>

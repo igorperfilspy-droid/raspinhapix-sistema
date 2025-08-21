@@ -68,7 +68,7 @@ try {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?= time(); ?>">
+    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
     
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
@@ -520,21 +520,21 @@ try {
                         <div class="stat-icon">
                             <i class="bi bi-collection"></i>
                         </div>
-                        <div class="stat-value"><?= $totalApostas ?></div>
+                        <div class="stat-value"><?php= $totalApostas ?></div>
                         <div class="stat-label">Total de Apostas</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">
                             <i class="bi bi-file-earmark-text"></i>
                         </div>
-                        <div class="stat-value"><?= $paginaAtual ?>/<?= $totalPaginas ?></div>
+                        <div class="stat-value"><?php= $paginaAtual ?>/<?php= $totalPaginas ?></div>
                         <div class="stat-label">Página Atual</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">
                             <i class="bi bi-grid-3x3"></i>
                         </div>
-                        <div class="stat-value"><?= count($apostas) ?></div>
+                        <div class="stat-value"><?php= count($apostas) ?></div>
                         <div class="stat-label">Nesta Página</div>
                     </div>
                 </div>
@@ -561,15 +561,15 @@ try {
                                 $valorGanho = number_format($aposta['valor_ganho'], 2, ',', '.');
                                 $valorApostado = number_format($aposta['valor_apostado'], 2, ',', '.');
                             ?>
-                            <div class="bet-item <?= $statusClass ?>">
+                            <div class="bet-item <?php= $statusClass ?>">
                                 <div class="bet-header">
                                     <div class="bet-date">
                                         <i class="bi bi-calendar-event"></i>
-                                        <span><?= $data ?></span>
+                                        <span><?php= $data ?></span>
                                     </div>
-                                    <div class="bet-status <?= $statusClass ?>">
-                                        <i class="bi bi-<?= $isWin ? 'trophy-fill' : 'x-circle-fill' ?>"></i>
-                                        <?= $status ?>
+                                    <div class="bet-status <?php= $statusClass ?>">
+                                        <i class="bi bi-<?php= $isWin ? 'trophy-fill' : 'x-circle-fill' ?>"></i>
+                                        <?php= $status ?>
                                     </div>
                                 </div>
                                 
@@ -577,26 +577,26 @@ try {
                                     <div class="bet-details">
                                         <div class="bet-game">
                                             <i class="bi bi-gem"></i>
-                                            <?= htmlspecialchars($aposta['nome']) ?>
+                                            <?php= htmlspecialchars($aposta['nome']) ?>
                                         </div>
                                         <div class="bet-values">
                                             <div class="bet-value">
                                                 <span class="bet-value-label">Valor Apostado:</span>
-                                                <span class="bet-value-amount">R$ <?= $valorApostado ?></span>
+                                                <span class="bet-value-amount">R$ <?php= $valorApostado ?></span>
                                             </div>
                                             <div class="bet-value">
                                                 <span class="bet-value-label">Valor Ganho:</span>
-                                                <span class="bet-value-amount <?= $statusClass ?>">R$ <?= $valorGanho ?></span>
+                                                <span class="bet-value-amount <?php= $statusClass ?>">R$ <?php= $valorGanho ?></span>
                                             </div>
                                         </div>
                                     </div>
                                     
                                     <div class="bet-summary">
-                                        <div class="bet-summary-value <?= $statusClass ?>">
-                                            <?= $isWin ? '+' : '' ?>R$ <?= number_format($aposta['valor_ganho'] - $aposta['valor_apostado'], 2, ',', '.') ?>
+                                        <div class="bet-summary-value <?php= $statusClass ?>">
+                                            <?php= $isWin ? '+' : '' ?>R$ <?php= number_format($aposta['valor_ganho'] - $aposta['valor_apostado'], 2, ',', '.') ?>
                                         </div>
                                         <div class="bet-summary-label">
-                                            <?= $isWin ? 'Lucro' : 'Perda' ?>
+                                            <?php= $isWin ? 'Lucro' : 'Perda' ?>
                                         </div>
                                     </div>
                                 </div>
@@ -608,9 +608,9 @@ try {
                     <?php if ($totalPaginas > 1): ?>
                         <div class="pagination">
                             <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                                <a href="?pagina=<?= $i ?>" 
-                                   class="pagination-item <?= $i == $paginaAtual ? 'active' : '' ?>">
-                                    <?= $i ?>
+                                <a href="?pagina=<?php= $i ?>" 
+                                   class="pagination-item <?php= $i == $paginaAtual ? 'active' : '' ?>">
+                                    <?php= $i ?>
                                 </a>
                             <?php endfor; ?>
                         </div>

@@ -25,7 +25,7 @@ try {
                     <div class="raspinha-card" data-category="dinheiro">
                         <div class="card-banner">
                             <?php if ($raspinha['banner'] && file_exists($_SERVER['DOCUMENT_ROOT'] . $raspinha['banner'])): ?>
-                                <img src="<?= htmlspecialchars($raspinha['banner']) ?>" alt="<?= htmlspecialchars($raspinha['nome']) ?>" class="banner-image">
+                                <img src="<?php= htmlspecialchars($raspinha['banner']) ?>" alt="<?php= htmlspecialchars($raspinha['nome']) ?>" class="banner-image">
                             <?php else: ?>
                                 <div class="banner-placeholder">
                                     <i class="bi bi-grid-3x3-gap-fill"></i>
@@ -33,8 +33,8 @@ try {
                             <?php endif; ?>
                             
                             <!-- Category Badge -->
-                            <div class="category-badge <?= rand(0, 1) ? 'dinheiro' : 'produtos' ?>">
-                                <?= rand(0, 1) ? 'Dinheiro' : 'Produtos' ?>
+                            <div class="category-badge <?php= rand(0, 1) ? 'dinheiro' : 'produtos' ?>">
+                                <?php= rand(0, 1) ? 'Dinheiro' : 'Produtos' ?>
                             </div>
                             
                             <!-- Play Button Overlay -->
@@ -46,13 +46,13 @@ try {
                         </div>
                         
                         <div class="card-content">
-                            <h3 class="card-title"><?= htmlspecialchars($raspinha['nome']) ?></h3>
-                            <p class="card-description"><?= htmlspecialchars($raspinha['descricao'] ?: 'Raspe e ganhe prêmios incríveis!') ?></p>
+                            <h3 class="card-title"><?php= htmlspecialchars($raspinha['nome']) ?></h3>
+                            <p class="card-description"><?php= htmlspecialchars($raspinha['descricao'] ?: 'Raspe e ganhe prêmios incríveis!') ?></p>
                             
                             <div class="card-footer">
                                 <div class="card-price">
                                     <span class="price-label">R$</span>
-                                    <span class="price-value"><?= number_format($raspinha['valor'], 2, ',', '.') ?></span>
+                                    <span class="price-value"><?php= number_format($raspinha['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 
                                 <a href="/cartelas/" class="play-btn">

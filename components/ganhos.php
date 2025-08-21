@@ -60,7 +60,7 @@ $ganhadores_duplicados = array_merge($ganhadores, $ganhadores);
             <h2 class="winners-title">Últimos Ganhadores</h2>
             <div class="total-distributed">
                 <span class="distributed-label">Prêmios Distribuídos</span>
-                <span class="distributed-value">R$ <?= number_format($valor_total_distribuido, 2, ',', '.') ?></span>
+                <span class="distributed-value">R$ <?php= number_format($valor_total_distribuido, 2, ',', '.') ?></span>
             </div>
         </div>
         
@@ -70,7 +70,7 @@ $ganhadores_duplicados = array_merge($ganhadores, $ganhadores);
                     <div class="winner-item">
                         <div class="winner-avatar">
                             <?php if (!empty($ganhador['icone']) && file_exists($_SERVER['DOCUMENT_ROOT'] . $ganhador['icone'])): ?>
-                                <img src="<?= htmlspecialchars($ganhador['icone']) ?>" alt="<?= htmlspecialchars($ganhador['premio']) ?>" class="winner-image">
+                                <img src="<?php= htmlspecialchars($ganhador['icone']) ?>" alt="<?php= htmlspecialchars($ganhador['premio']) ?>" class="winner-image">
                             <?php else: ?>
                                 <div class="winner-placeholder">
                                     <i class="bi bi-gift"></i>
@@ -79,12 +79,12 @@ $ganhadores_duplicados = array_merge($ganhadores, $ganhadores);
                         </div>
                         
                         <div class="winner-info">
-                            <div class="winner-name">***<?= strtolower(substr($ganhador['nome'], 0, 1)) . str_repeat('*', strlen($ganhador['nome']) - 1) ?></div>
-                            <div class="winner-time">há <?= $ganhador['tempo'] ?> min</div>
+                            <div class="winner-name">***<?php= strtolower(substr($ganhador['nome'], 0, 1)) . str_repeat('*', strlen($ganhador['nome']) - 1) ?></div>
+                            <div class="winner-time">há <?php= $ganhador['tempo'] ?> min</div>
                         </div>
                         
                         <div class="winner-prize">
-                            <div class="prize-value">R$ <?= number_format($ganhador['valor'], 0, ',', '.') ?></div>
+                            <div class="prize-value">R$ <?php= number_format($ganhador['valor'], 0, ',', '.') ?></div>
                             <div class="prize-type">
                                 <?php if ($ganhador['valor'] >= 1000): ?>
                                     <span class="prize-badge premium">PRÊMIO</span>
