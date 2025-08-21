@@ -1,21 +1,200 @@
-<?php @session_start();<?php 
-include('./conexao.php');<?php 
-//<?php Capturar UTMs da URL e salvar na sessão
-if (isset($_GET["utm_source"]))<?php $_SESSION["utm_source"]<?php =<?php $_GET["utm_source"];
-if (isset($_GET["utm_medium"]))<?php $_SESSION["utm_medium"]<?php =<?php $_GET["utm_medium"];
-if (isset($_GET["utm_campaign"]))<?php $_SESSION["utm_campaign"]<?php =<?php $_GET["utm_campaign"];
-if (isset($_GET["utm_term"]))<?php $_SESSION["utm_term"]<?php =<?php $_GET["utm_term"];
-if (isset($_GET["utm_content"]))<?php $_SESSION["utm_content"]<?php =<?php $_GET["utm_content"];
-if (isset($_GET["click_id"]))<?php $_SESSION["click_id"]<?php =<?php $_GET["click_id"];
-?><?php <!DOCTYPE html><?php 
-<html lang="pt-BR"><?php 
-<head><?php <!--<?php xTracky Integration -->
-<?php <script <?php src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
-<?php data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
-<?php data-click-id-param="click_id">
-<?php </script>
-<?php <meta charset="UTF-8"><?php <meta name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php <title><?php echo $nomeSite;?><?php -<?php Raspadinhas Online</title><?php <meta name="description"<?php content="Raspe e ganhe prêmios incríveis!<?php PIX na conta instantâneo."><?php <?php <!--<?php Preload Critical Resources --><?php <link rel="preconnect"<?php href="https://fonts.googleapis.com"><?php <link rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php <?php <!--<?php Styles --><?php <link rel="stylesheet"<?php href="assets/style/globalStyles.css?v=<?php echo time();?>"/><?php <?php <!--<?php Bootstrap Icons --><?php <link rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php <?php <!--<?php Scripts --><?php <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script><?php <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php <?php <!--<?php Favicon --><?php <link rel="icon"<?php type="image/x-icon"<?php href="assets/images/favicon.ico"><?php <?php <!--<?php Open Graph --><?php <meta property="og:title"<?php content="<?php echo $nomeSite;?><?php -<?php Raspadinhas Online"><?php <meta property="og:description"<?php content="Raspe e ganhe prêmios incríveis!<?php PIX na conta instantâneo."><?php <meta property="og:type"<?php content="website"><?php <meta property="og:url"<?php content="<?php echo $urlSite;?>"><?php <?php <style><?php /*<?php Loading Animation */<?php /*<?php Solução definitiva para loading spinner fixo */<?php .loading-screen {<?php position:<?php fixed;<?php top:<?php 0;<?php left:<?php 0;<?php width:<?php 100vw;<?php height:<?php 100vh;<?php background:<?php #0a0a0a;<?php z-index:<?php 9999;<?php transition:<?php opacity 0.5s ease;<?php <?php /*<?php Centralização perfeita */<?php display:<?php grid;<?php place-items:<?php center;<?php }<?php <?php .loading-spinner {<?php width:<?php 50px;<?php height:<?php 50px;<?php position:<?php relative;<?php /*<?php Remove todas as propriedades de borda do elemento principal */<?php }<?php <?php .loading-spinner::before {<?php content:<?php '';<?php position:<?php absolute;<?php top:<?php 0;<?php left:<?php 0;<?php width:<?php 100%;<?php height:<?php 100%;<?php border:<?php 3px solid rgba(34,<?php 197,<?php 94,<?php 0.3);<?php border-top-color:<?php #22c55e;<?php border-radius:<?php 50%;<?php <?php /*<?php Chaves para rotação sem movimento */<?php transform-origin:<?php 50%<?php 50%;<?php /*<?php Centro exato */<?php animation:<?php spinFixed 1s linear infinite;<?php <?php /*<?php Força o elemento a manter posição */<?php margin:<?php 0;<?php padding:<?php 0;<?php box-sizing:<?php border-box;<?php }<?php <?php @keyframes spinFixed {<?php from {<?php transform:<?php rotate(0deg);<?php }<?php to {<?php transform:<?php rotate(360deg);<?php }<?php }<?php <?php /*<?php Alternativa ainda mais simples usando apenas border-image */<?php .loading-spinner-simple {<?php width:<?php 50px;<?php height:<?php 50px;<?php border-radius:<?php 50%;<?php background:<?php conic-gradient(#22c55e,<?php rgba(34,<?php 197,<?php 94,<?php 0.3));<?php animation:<?php rotateSimple 1s linear infinite;<?php position:<?php relative;<?php <?php /*<?php Máscara para criar o efeito de spinner */<?php mask:<?php radial-gradient(circle at center,<?php transparent 18px,<?php black 21px);<?php -webkit-mask:<?php radial-gradient(circle at center,<?php transparent 18px,<?php black 21px);<?php }<?php <?php @keyframes rotateSimple {<?php to {<?php transform:<?php rotate(360deg);<?php }<?php }<?php <?php /*<?php Versão com CSS puro -<?php mais moderna */<?php .loading-spinner-modern {<?php width:<?php 50px;<?php height:<?php 50px;<?php background:<?php conic-gradient(from 0deg,<?php transparent,<?php #22c55e,<?php transparent),<?php conic-gradient(from 180deg,<?php transparent,<?php rgba(34,<?php 197,<?php 94,<?php 0.3),<?php transparent);<?php border-radius:<?php 50%;<?php animation:<?php rotateModern 1s linear infinite;<?php position:<?php relative;<?php <?php /*<?php Efeito de máscara para criar o anel */<?php mask:<?php radial-gradient(circle,<?php transparent 17px,<?php black 20px);<?php -webkit-mask:<?php radial-gradient(circle,<?php transparent 17px,<?php black 20px);<?php }<?php <?php @keyframes rotateModern {<?php 100%<?php {<?php transform:<?php rotate(360deg);<?php }<?php }<?php <?php .hidden {<?php opacity:<?php 0;<?php pointer-events:<?php none;<?php }<?php <?php /*<?php Reset completo para garantir que não há<?php interferências */<?php .loading-screen *<?php {<?php box-sizing:<?php border-box;<?php margin:<?php 0;<?php padding:<?php 0;<?php }<?php <?php /*<?php Smooth scroll */<?php html {<?php scroll-behavior:<?php smooth;<?php }<?php <?php /*<?php Parallax effect */<?php .parallax-element {<?php transform:<?php translateZ(0);<?php will-change:<?php transform;<?php }<?php <?php /*<?php Animations */<?php @keyframes fadeInUp {<?php from {<?php opacity:<?php 0;<?php transform:<?php translateY(30px);<?php }<?php to {<?php opacity:<?php 1;<?php transform:<?php translateY(0);<?php }<?php }<?php <?php .animate-fade-in-up {<?php animation:<?php fadeInUp 0.6s ease-out forwards;<?php }<?php <?php /*<?php Floating elements animation */<?php .floating {<?php animation:<?php floating 3s ease-in-out infinite;<?php }<?php <?php @keyframes floating {<?php 0%,<?php 100%<?php {<?php transform:<?php translateY(0);<?php }<?php 50%<?php {<?php transform:<?php translateY(-10px);<?php }<?php }<?php <?php /*<?php Glowing effect */<?php .glow {<?php box-shadow:<?php 0 0 20px rgba(34,<?php 197,<?php 94,<?php 0.3);<?php }<?php <?php .glow:hover {<?php box-shadow:<?php 0 0 30px rgba(34,<?php 197,<?php 94,<?php 0.5);<?php }<?php </style><?php 
-</head><?php 
-<body><?php <!--<?php Loading Screen --><?php <div class="loading-screen"<?php id="loadingScreen"><?php <div class="loading-spinner"></div><?php </div><?php <?php <?php include('./inc/header.php');<?php ?><?php <?php <main><?php <?php include('./components/carrossel.php');<?php ?><?php <?php <?php include('./components/ganhos.php');<?php ?><?php <?php <?php include('./components/chamada.php');<?php ?><?php <?php <?php include('./components/modals.php');<?php ?><?php <?php <?php include('./components/testimonials.php');<?php ?><?php </main><?php <?php <?php include('./inc/footer.php');<?php ?><?php <?php <script><?php //<?php Loading screen <?php window.addEventListener('load',<?php function()<?php {<?php const loadingScreen =<?php document.getElementById('loadingScreen');<?php setTimeout(()<?php =><?php {<?php loadingScreen.classList.add('hidden');<?php },<?php 1000);<?php });<?php <?php //<?php Smooth animations on scroll <?php const observerOptions =<?php {<?php threshold:<?php 0.1,<?php rootMargin:<?php '0px 0px -50px 0px'<?php };<?php <?php const observer =<?php new IntersectionObserver((entries)<?php =><?php {<?php entries.forEach(entry =><?php {<?php if (entry.isIntersecting)<?php {<?php entry.target.classList.add('animate-fade-in-up');<?php }<?php });<?php },<?php observerOptions);<?php <?php //<?php Observe elements for animation <?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php const elementsToAnimate =<?php document.querySelectorAll('.step-item,<?php .game-category,<?php .prize-item');<?php elementsToAnimate.forEach(el =><?php {<?php observer.observe(el);<?php });<?php });<?php <?php //<?php Parallax effect for hero section <?php window.addEventListener('scroll',<?php ()<?php =><?php {<?php const scrolled =<?php window.pageYOffset;<?php const heroElements =<?php document.querySelectorAll('.parallax-element');<?php <?php heroElements.forEach(element =><?php {<?php const speed =<?php element.dataset.speed ||<?php 0.5;<?php element.style.transform =<?php `translateY(${scrolled *<?php speed}px)`;<?php });<?php });<?php <?php //<?php Add floating animation to certain elements <?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php const floatingElements =<?php document.querySelectorAll('.hero-visuals .gaming-item');<?php floatingElements.forEach((el,<?php index)<?php =><?php {<?php el.style.animationDelay =<?php `${index *<?php 0.5}s`;<?php el.classList.add('floating');<?php });<?php });<?php <?php //<?php Notiflix configuration <?php Notiflix.Notify.init({<?php width:<?php '300px',<?php position:<?php 'right-top',<?php distance:<?php '20px',<?php opacity:<?php 1,<?php borderRadius:<?php '12px',<?php rtl:<?php false,<?php timeout:<?php 4000,<?php messageMaxLength:<?php 110,<?php backOverlay:<?php false,<?php backOverlayColor:<?php 'rgba(0,0,0,0.5)',<?php plainText:<?php true,<?php showOnlyTheLastOne:<?php false,<?php clickToClose:<?php true,<?php pauseOnHover:<?php true,<?php ID:<?php 'NotiflixNotify',<?php className:<?php 'notiflix-notify',<?php zindex:<?php 4001,<?php fontFamily:<?php 'Inter',<?php fontSize:<?php '14px',<?php cssAnimation:<?php true,<?php cssAnimationDuration:<?php 400,<?php cssAnimationStyle:<?php 'zoom',<?php closeButton:<?php false,<?php useIcon:<?php true,<?php useFontAwesome:<?php false,<?php fontAwesomeIconStyle:<?php 'basic',<?php fontAwesomeIconSize:<?php '16px',<?php success:<?php {<?php background:<?php '#22c55e',<?php textColor:<?php '#fff',<?php childClassName:<?php 'notiflix-notify-success',<?php notiflixIconColor:<?php 'rgba(0,0,0,0.2)',<?php fontAwesomeClassName:<?php 'fas fa-check-circle',<?php fontAwesomeIconColor:<?php 'rgba(0,0,0,0.2)',<?php backOverlayColor:<?php 'rgba(34,197,94,0.2)',<?php }<?php });<?php <?php //<?php Dynamic copyright year <?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php const currentYear =<?php new Date().getFullYear();<?php const copyrightElements =<?php document.querySelectorAll('.footer-description');<?php if (copyrightElements.length ><?php 0)<?php {<?php copyrightElements[0].innerHTML =<?php copyrightElements[0].innerHTML.replace('2025',<?php currentYear);<?php }<?php });<?php <?php //<?php Add glow effect to interactive elements <?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php const glowElements =<?php document.querySelectorAll('.btn-register,<?php .hero-cta,<?php .game-btn');<?php glowElements.forEach(el =><?php {<?php el.classList.add('glow');<?php });<?php });<?php <?php //<?php Mobile menu toggle (if needed)<?php function toggleMobileMenu()<?php {<?php const mobileMenu =<?php document.querySelector('.mobile-menu');<?php if (mobileMenu)<?php {<?php mobileMenu.classList.toggle('active');<?php }<?php }<?php <?php //<?php Console welcome message <?php console.log('%c🎯<?php RaspaGreen -<?php Bem-vindo!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php console.log('%cSistema carregado com sucesso!',<?php 'color:<?php #16a34a;<?php font-size:<?php 12px;');<?php </script><?php <?php <!--<?php Performance and Analytics --><?php <script><?php //<?php Performance monitoring <?php window.addEventListener('load',<?php function()<?php {<?php if ('performance'<?php in window)<?php {<?php const loadTime =<?php performance.timing.loadEventEnd -<?php performance.timing.navigationStart;<?php console.log(`Página carregada em ${loadTime}ms`);<?php }<?php });<?php <?php //<?php Error handling <?php window.addEventListener('error',<?php function(e)<?php {<?php console.error('Erro na página:',<?php e.error);<?php });<?php <?php //<?php Lazy loading for images when implemented <?php if ('IntersectionObserver'<?php in window)<?php {<?php const imageObserver =<?php new IntersectionObserver((entries,<?php observer)<?php =><?php {<?php entries.forEach(entry =><?php {<?php if (entry.isIntersecting)<?php {<?php const img =<?php entry.target;<?php img.src =<?php img.dataset.src;<?php img.classList.remove('lazy');<?php imageObserver.unobserve(img);<?php }<?php });<?php });<?php <?php document.querySelectorAll('img[data-src]').forEach(img =><?php {<?php imageObserver.observe(img);<?php });<?php }<?php </script><?php 
-</body><?php 
+<?php
+@session_start();
+require __DIR__ . '/conexao.php'; // garante $pdo, $nomeSite, $urlSite (como você já tinha)
+
+/* Captura de UTM/ClickId na sessão */
+foreach ([
+    'utm_source','utm_medium','utm_campaign','utm_term','utm_content','click_id'
+] as $k) {
+    if (isset($_GET[$k])) $_SESSION[$k] = $_GET[$k];
+}
+
+/* Fallbacks seguros */
+$nomeSite = isset($nomeSite) && $nomeSite ? $nomeSite : 'RaspinhaPix';
+$urlSite  = isset($urlSite)  && $urlSite  ? $urlSite  : '/';
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <!-- xTracky Integration -->
+    <script 
+        src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
+        data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
+        data-click-id-param="click_id">
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars($nomeSite); ?> - Raspadinhas Online</title>
+    <meta name="description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
+
+    <!-- Preload / Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/style/globalStyles.css?v=<?php echo time(); ?>"/>
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Scripts utilitários -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="<?php echo htmlspecialchars($nomeSite); ?> - Raspadinhas Online">
+    <meta property="og:description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<?php echo htmlspecialchars($urlSite); ?>">
+
+    <style>
+        /* -------- Loading -------- */
+        .loading-screen {
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            background:#0a0a0a; z-index: 9999; transition: opacity .5s ease;
+            display: grid; place-items: center;
+        }
+        .loading-spinner { width: 50px; height: 50px; position: relative; }
+        .loading-spinner::before {
+            content: ''; position: absolute; inset: 0;
+            border: 3px solid rgba(34, 197, 94, 0.3);
+            border-top-color: #22c55e; border-radius: 50%;
+            transform-origin: 50% 50%; animation: spinFixed 1s linear infinite;
+            margin:0; padding:0; box-sizing:border-box;
+        }
+        @keyframes spinFixed { from {transform:rotate(0)} to {transform:rotate(360deg)} }
+        .hidden { opacity:0; pointer-events:none; }
+
+        /* Efeitos extras */
+        html { scroll-behavior: smooth; }
+        .parallax-element { transform: translateZ(0); will-change: transform; }
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+        .animate-fade-in-up { animation: fadeInUp .6s ease-out forwards; }
+        @keyframes floating { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        .floating { animation: floating 3s ease-in-out infinite; }
+        .glow { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+        .glow:hover { box-shadow: 0 0 30px rgba(34, 197, 94, 0.5); }
+        .loading-screen *, body, html { box-sizing: border-box; margin: 0; padding: 0; }
+    </style>
+</head>
+<body>
+    <!-- Loading -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <?php
+    // Atenção: garanta que esses arquivos existem nesses caminhos:
+    // ./inc/header.php, ./components/*.php, ./inc/footer.php
+    // Se estiverem em outra pasta, ajuste os paths.
+    if (is_file(__DIR__.'/inc/header.php')) include __DIR__.'/inc/header.php';
+    ?>
+
+    <main>
+        <?php
+        foreach (['carrossel','ganhos','chamada','modals','testimonials'] as $comp) {
+            $p = __DIR__."/components/{$comp}.php";
+            if (is_file($p)) include $p;
+        }
+        ?>
+    </main>
+
+    <?php if (is_file(__DIR__.'/inc/footer.php')) include __DIR__.'/inc/footer.php'; ?>
+
+    <script>
+        // Loading screen
+        window.addEventListener('load', function () {
+            const loadingScreen = document.getElementById('loadingScreen');
+            setTimeout(() => loadingScreen.classList.add('hidden'), 1000);
+        });
+
+        // Aparecer com animação ao entrar no viewport
+        const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('animate-fade-in-up'); });
+        }, observerOptions);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.step-item, .game-category, .prize-item').forEach((el) => observer.observe(el));
+        });
+
+        // Parallax
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            document.querySelectorAll('.parallax-element').forEach((el) => {
+                const speed = parseFloat(el.dataset.speed || 0.5);
+                el.style.transform = `translateY(${scrolled * speed}px)`;
+            });
+        });
+
+        // Elementos flutuantes
+        document.addEventListener('DOMContentLoaded', function () {
+            const els = document.querySelectorAll('.hero-visuals .gaming-item');
+            els.forEach((el, i) => {
+                el.style.animationDelay = `${i * 0.5}s`;
+                el.classList.add('floating');
+            });
+        });
+
+        // Notiflix
+        Notiflix.Notify.init({
+            width: '300px', position: 'right-top', distance: '20px', opacity: 1, borderRadius: '12px',
+            timeout: 4000, messageMaxLength: 110, backOverlay: false, plainText: true,
+            showOnlyTheLastOne: false, clickToClose: true, pauseOnHover: true, zindex: 4001,
+            fontFamily: 'Inter', fontSize: '14px', cssAnimation: true, cssAnimationDuration: 400,
+            cssAnimationStyle: 'zoom', success: { background: '#22c55e', textColor: '#fff' }
+        });
+
+        // Footer ano dinâmico
+        document.addEventListener('DOMContentLoaded', function () {
+            const y = new Date().getFullYear();
+            const els = document.querySelectorAll('.footer-description');
+            if (els.length) els[0].innerHTML = els[0].innerHTML.replace(/\b20\d{2}\b/, y);
+        });
+
+        // Glow
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.btn-register, .hero-cta, .game-btn').forEach((el) => el.classList.add('glow'));
+        });
+
+        // Menu móvel (se existir)
+        function toggleMobileMenu() {
+            const mobileMenu = document.querySelector('.mobile-menu');
+            if (mobileMenu) mobileMenu.classList.toggle('active');
+        }
+
+        // Logs
+        console.log('%c🎯 RaspaGreen - Bem-vindo!', 'color:#22c55e;font-size:16px;font-weight:bold');
+        console.log('%cSistema carregado com sucesso!', 'color:#16a34a;font-size:12px');
+
+        // Performance
+        window.addEventListener('load', function () {
+            if ('performance' in window && performance.timing) {
+                const t = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                console.log(`Página carregada em ${t}ms`);
+            }
+        });
+
+        // Lazy Loading (quando tiver imagens com data-src)
+        if ('IntersectionObserver' in window) {
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((e) => {
+                    if (e.isIntersecting) {
+                        const img = e.target;
+                        img.src = img.dataset.src;
+                        img.classList.remove('lazy');
+                        io.unobserve(img);
+                    }
+                });
+            });
+            document.querySelectorAll('img[data-src]').forEach((img) => io.observe(img));
+        }
+    </script>
+</body>
 </html>
