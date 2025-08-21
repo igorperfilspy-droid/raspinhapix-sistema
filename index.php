@@ -1,221 +1,172 @@
 <?php
 @session_start();
-require __DIR__ . '/conexao.php'; // garante $pdo, $nomeSite, $urlSite (como você já tinha)
+require __DIR__ . '/conexao.php'; // aqui você já define $pdo, $nomeSite, $urlSite, etc.
 
-/* Captura de UTM/ClickId na sessão */
-foreach ([
-    'utm_source','utm_medium','utm_campaign','utm_term','utm_content','click_id'
-] as $k) {
+// --- UTMs na sessão ---
+foreach (['utm_source','utm_medium','utm_campaign','utm_term','utm_content','click_id'] as $k) {
     if (isset($_GET[$k])) $_SESSION[$k] = $_GET[$k];
 }
 
-/* Fallbacks seguros */
-$nomeSite = isset($nomeSite) && $nomeSite ? $nomeSite : 'RaspinhaPix';
-$urlSite  = isset($urlSite)  && $urlSite  ? $urlSite  : '/';
+// --- Fallbacks seguros ---
+$nomeSite = !empty($nomeSite) ? $nomeSite : 'RaspinhaPix';
+$urlSite  = !empty($urlSite)  ? $urlSite  : '/';
+
+// --- Flags de arquivos existentes (evita erros) ---
+$haveHeader = is_file(__DIR__.'/inc/header.php');
+$haveFooter = is_file(__DIR__.'/inc/footer.php');
+
+$components = [
+  'carrossel','ganhos','chamada','modals','testimonials'
+];
+$haveAnyComponent = false;
+foreach ($components as $c) {
+    if (is_file(__DIR__."/components/{$c}.php")) { $haveAnyComponent = true; break; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <!-- xTracky Integration -->
-    <script 
-        src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
-        data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
-        data-click-id-param="click_id">
-    </script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title><?= htmlspecialchars($nomeSite) ?> - Raspadinhas Online</title>
+  <meta name="description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
+  <meta property="og:title" content="<?= htmlspecialchars($nomeSite) ?> - Raspadinhas Online">
+  <meta property="og:description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="<?= htmlspecialchars($urlSite) ?>">
 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($nomeSite); ?> - Raspadinhas Online</title>
-    <meta name="description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
+  <!-- Fonts / Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <!-- Preload / Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Notiflix CSS primeiro (evita flash sem estilo) -->
+  <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
+  <!-- Seu CSS -->
+  <link rel="stylesheet" href="assets/style/globalStyles.css?v=<?= time() ?>">
+  <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="assets/style/globalStyles.css?v=<?php echo time(); ?>"/>
+  <style>
+    :root { color-scheme: dark; }
+    body,html { margin:0; padding:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0b0b; color:#e5e5e5; }
+    a { color:#22c55e; text-decoration:none; }
+    .container { max-width: 1120px; margin: 0 auto; padding: 16px; }
+    .card { background:#121212; border:1px solid #1f1f1f; border-radius:14px; padding:16px; }
 
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    /* Loader ultra-resiliente */
+    .loading-screen { position: fixed; inset:0; display:grid; place-items:center; background:#0a0a0a; z-index:9999; transition:opacity .3s ease; }
+    .loading-spinner { width: 52px; height: 52px; position: relative; }
+    .loading-spinner::before {
+      content:""; position:absolute; inset:0;
+      border:3px solid rgba(34, 197, 94, .25);
+      border-top-color:#22c55e; border-radius:50%;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Se JS estiver off, não travar tela */
+    noscript .loading-screen { display:none !important; }
 
-    <!-- Scripts utilitários -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
-
-    <!-- Open Graph -->
-    <meta property="og:title" content="<?php echo htmlspecialchars($nomeSite); ?> - Raspadinhas Online">
-    <meta property="og:description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="<?php echo htmlspecialchars($urlSite); ?>">
-
-    <style>
-        /* -------- Loading -------- */
-        .loading-screen {
-            position: fixed; inset: 0; width: 100vw; height: 100vh;
-            background:#0a0a0a; z-index: 9999; transition: opacity .5s ease;
-            display: grid; place-items: center;
-        }
-        .loading-spinner { width: 50px; height: 50px; position: relative; }
-        .loading-spinner::before {
-            content: ''; position: absolute; inset: 0;
-            border: 3px solid rgba(34, 197, 94, 0.3);
-            border-top-color: #22c55e; border-radius: 50%;
-            transform-origin: 50% 50%; animation: spinFixed 1s linear infinite;
-            margin:0; padding:0; box-sizing:border-box;
-        }
-        @keyframes spinFixed { from {transform:rotate(0)} to {transform:rotate(360deg)} }
-        .hidden { opacity:0; pointer-events:none; }
-
-        /* Efeitos extras */
-        html { scroll-behavior: smooth; }
-        .parallax-element { transform: translateZ(0); will-change: transform; }
-        @keyframes fadeInUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-        .animate-fade-in-up { animation: fadeInUp .6s ease-out forwards; }
-        @keyframes floating { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-        .floating { animation: floating 3s ease-in-out infinite; }
-        .glow { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
-        .glow:hover { box-shadow: 0 0 30px rgba(34, 197, 94, 0.5); }
-        .loading-screen *, body, html { box-sizing: border-box; margin: 0; padding: 0; }
-    </style>
+    /* Fallback básico quando faltam includes */
+    .fallback-hero { padding:60px 0; text-align:center; }
+    .fallback-hero h1 { font-size: 32px; margin: 0 0 12px; }
+    .fallback-hero p { color:#b5b5b5; margin:0; }
+  </style>
 </head>
 <body>
-    <!-- Loading -->
-    <div class="loading-screen" id="loadingScreen">
-        <div class="loading-spinner"></div>
-    </div>
 
-    <?php
-    // Atenção: garanta que esses arquivos existem nesses caminhos:
-    // ./inc/header.php, ./components/*.php, ./inc/footer.php
-    // Se estiverem em outra pasta, ajuste os paths.
-    if (is_file(__DIR__.'/inc/header.php')) include __DIR__.'/inc/header.php';
-    ?>
+  <!-- Loader -->
+  <div id="loadingScreen" class="loading-screen" aria-hidden="true">
+    <div class="loading-spinner" role="status" aria-label="Carregando"></div>
+  </div>
+  <noscript><div class="loading-screen" style="display:none"></div></noscript>
 
-    <main>
-        <?php
-        foreach (['carrossel','ganhos','chamada','modals','testimonials'] as $comp) {
-            $p = __DIR__."/components/{$comp}.php";
-            if (is_file($p)) include $p;
-        }
-        ?>
-    </main>
+  <?php if ($haveHeader) { include __DIR__.'/inc/header.php'; } ?>
 
-    <?php if (is_file(__DIR__.'/inc/footer.php')) include __DIR__.'/inc/footer.php'; ?>
+  <main class="container" id="appRoot">
+    <?php if ($haveAnyComponent): ?>
+      <?php foreach ($components as $c): $p = __DIR__."/components/{$c}.php"; if (is_file($p)) include $p; endforeach; ?>
+    <?php else: ?>
+      <!-- Fallback amigável: NUNCA deixa tela preta -->
+      <section class="card fallback-hero">
+        <h1>🎯 <?= htmlspecialchars($nomeSite) ?></h1>
+        <p>Seu site está online! Adicione seus arquivos em <code>/inc</code> e <code>/components</code> para ver o conteúdo completo.</p>
+        <p style="margin-top:12px">Caminhos esperados: <code>inc/header.php</code>, <code>components/carrossel.php</code>, etc.</p>
+      </section>
+    <?php endif; ?>
+  </main>
 
-    <script>
-       (function () {
-    function hideLoading() {
-      var s = document.getElementById('loadingScreen');
-      if (s && !s.classList.contains('hidden')) s.classList.add('hidden');
-    }
+  <?php if ($haveFooter) { include __DIR__.'/inc/footer.php'; } ?>
 
-    // 1) DOM pronto (deve rodar cedo)
-    document.addEventListener('DOMContentLoaded', function () {
-      // dá tempo do CSS aplicar, mas não trava a UI
-      setTimeout(hideLoading, 800);
-    });
+  <!-- Scripts NÃO bloqueantes -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
 
-    // 2) Tudo carregado (imagens, fontes, etc.)
-    window.addEventListener('load', hideLoading);
+  <!-- xTracky (UTM handler) - também defer -->
+  <script defer
+    src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
+    data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
+    data-click-id-param="click_id"></script>
 
-    // 3) Fallback hard (se algum JS externo quebrar)
-    setTimeout(hideLoading, 5000);
+  <script>
+    // ====== HIDE LOADER (remove de verdade do DOM) ======
+    (function () {
+      var scr = document.getElementById('loadingScreen');
+      if (!scr) return;
 
-    // Log de segurança pra você ver erros de JS que impedem o hide()
-    window.addEventListener('error', function (e) {
-      console.error('[RaspinhaPix] Erro global:', e?.error || e?.message || e);
-    });
-    window.addEventListener('unhandledrejection', function (e) {
-      console.error('[RaspinhaPix] Promessa rejeitada:', e?.reason || e);
-    });
-  })();
+      function hide() {
+        // remove do DOM (não só opacity)
+        if (scr && scr.parentNode) scr.parentNode.removeChild(scr);
+        scr = null;
+      }
 
-        // Aparecer com animação ao entrar no viewport
-        const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('animate-fade-in-up'); });
-        }, observerOptions);
+      // 1) Assim que DOM montar
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(hide, 600);
+      });
 
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.step-item, .game-category, .prize-item').forEach((el) => observer.observe(el));
-        });
+      // 2) Quando tudo carregar (imagens, fontes…)
+      window.addEventListener('load', hide);
 
-        // Parallax
-        window.addEventListener('scroll', () => {
-            const scrolled = window.pageYOffset;
-            document.querySelectorAll('.parallax-element').forEach((el) => {
-                const speed = parseFloat(el.dataset.speed || 0.5);
-                el.style.transform = `translateY(${scrolled * speed}px)`;
-            });
-        });
+      // 3) Failsafe absoluto
+      setTimeout(hide, 4000);
 
-        // Elementos flutuantes
-        document.addEventListener('DOMContentLoaded', function () {
-            const els = document.querySelectorAll('.hero-visuals .gaming-item');
-            els.forEach((el, i) => {
-                el.style.animationDelay = `${i * 0.5}s`;
-                el.classList.add('floating');
-            });
-        });
+      // Log de erros JS para debug
+      window.addEventListener('error', function (e) {
+        console.error('[RaspinhaPix] JS error:', e?.error || e?.message || e);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        console.error('[RaspinhaPix] Promise rejection:', e?.reason || e);
+      });
+    })();
 
-        // Notiflix
+    // ====== UX extra (não impacta o loader) ======
+    (function () {
+      // Notiflix é opcional — só inicializa se existir
+      function initNotiflix() {
+        if (!window.Notiflix || !Notiflix.Notify) return;
         Notiflix.Notify.init({
-            width: '300px', position: 'right-top', distance: '20px', opacity: 1, borderRadius: '12px',
-            timeout: 4000, messageMaxLength: 110, backOverlay: false, plainText: true,
-            showOnlyTheLastOne: false, clickToClose: true, pauseOnHover: true, zindex: 4001,
-            fontFamily: 'Inter', fontSize: '14px', cssAnimation: true, cssAnimationDuration: 400,
-            cssAnimationStyle: 'zoom', success: { background: '#22c55e', textColor: '#fff' }
+          width:'300px', position:'right-top', distance:'20px',
+          borderRadius:'12px', timeout:3500, clickToClose:true,
+          cssAnimation:true, cssAnimationDuration:350, cssAnimationStyle:'zoom',
+          success: { background:'#22c55e', textColor:'#fff' }
         });
+      }
 
-        // Footer ano dinâmico
-        document.addEventListener('DOMContentLoaded', function () {
-            const y = new Date().getFullYear();
-            const els = document.querySelectorAll('.footer-description');
-            if (els.length) els[0].innerHTML = els[0].innerHTML.replace(/\b20\d{2}\b/, y);
-        });
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initNotiflix();
+      } else {
+        document.addEventListener('DOMContentLoaded', initNotiflix);
+      }
 
-        // Glow
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.btn-register, .hero-cta, .game-btn').forEach((el) => el.classList.add('glow'));
-        });
-
-        // Menu móvel (se existir)
-        function toggleMobileMenu() {
-            const mobileMenu = document.querySelector('.mobile-menu');
-            if (mobileMenu) mobileMenu.classList.toggle('active');
+      // Atualiza ano no footer se existir o seletor
+      document.addEventListener('DOMContentLoaded', function () {
+        var els = document.querySelectorAll('.footer-description');
+        if (els.length) {
+          els[0].innerHTML = els[0].innerHTML.replace(/\b20\d{2}\b/, new Date().getFullYear());
         }
-
-        // Logs
-        console.log('%c🎯 RaspaGreen - Bem-vindo!', 'color:#22c55e;font-size:16px;font-weight:bold');
-        console.log('%cSistema carregado com sucesso!', 'color:#16a34a;font-size:12px');
-
-        // Performance
-        window.addEventListener('load', function () {
-            if ('performance' in window && performance.timing) {
-                const t = performance.timing.loadEventEnd - performance.timing.navigationStart;
-                console.log(`Página carregada em ${t}ms`);
-            }
-        });
-
-        // Lazy Loading (quando tiver imagens com data-src)
-        if ('IntersectionObserver' in window) {
-            const io = new IntersectionObserver((entries) => {
-                entries.forEach((e) => {
-                    if (e.isIntersecting) {
-                        const img = e.target;
-                        img.src = img.dataset.src;
-                        img.classList.remove('lazy');
-                        io.unobserve(img);
-                    }
-                });
-            });
-            document.querySelectorAll('img[data-src]').forEach((img) => io.observe(img));
-        }
-    </script>
+      });
+    })();
+  </script>
 </body>
 </html>
