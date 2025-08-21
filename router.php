@@ -1,10 +1,17 @@
 <?php
-// Router para o servidor embutido do PHP: serve estáticos e manda o resto pro index.php
-if (php_sapi_name() === 'cli-server') {
-    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $fullPath = __DIR__ . $path;
-    if ($path !== '/' && file_exists($fullPath) && is_file($fullPath)) {
-        return false; // deixa o server embutido servir o arquivo estático real
-    }
+// Exibir erros durante o debug
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
+// Descobre o path da requisição
+$path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+$fullPath = __DIR__ . $path;
+
+// Se o path existir como arquivo físico (ex: CSS, JS, imagens), entrega direto
+if ($path !== "/" && file_exists($fullPath)) {
+    return false; // deixa o servidor embutido do PHP servir o arquivo
 }
-require __DIR__ . '/index.php';
+
+// Caso contrário, sempre carrega o index.php
+require __DIR__ . "/index.php";
