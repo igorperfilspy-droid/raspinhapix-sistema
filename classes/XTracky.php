@@ -1,93 +1,68 @@
 <?php
-class<?php XTracky<?php {
-<?php private<?php $pdo;
-<?php private<?php $apiUrl<?php =<?php 'https://api.xtracky.com/api/integrations/api';
-<?php 
-<?php public<?php function<?php __construct($pdo)<?php {
-<?php $this->pdo<?php =<?php $pdo;
+class XTracky {
+<?php private $pdo;
+<?php private $apiUrl =<?php 'https://api.xtracky.com/api/integrations/api';
+<?php public function __construct($pdo)<?php {
+<?php $this->pdo =<?php $pdo;
 <?php }
-<?php 
 <?php /**
-<?php *<?php Captura<?php e<?php salva<?php UTM<?php parameters<?php na<?php sessão
-<?php */
-<?php public<?php function<?php captureUTMs()<?php {
-<?php if<?php (!session_id())<?php {
+<?php *<?php Captura e salva UTM parameters na sessão */
+<?php public function captureUTMs()<?php {
+<?php if (!session_id())<?php {
 <?php session_start();
 <?php }
-<?php 
-<?php //<?php Capturar<?php UTMs<?php da<?php URL
-<?php $utmParams<?php =<?php [
+<?php //<?php Capturar UTMs da URL $utmParams =<?php [
 <?php 'utm_source'<?php =><?php $_GET['utm_source']<?php ??<?php null,
 <?php 'utm_medium'<?php =><?php $_GET['utm_medium']<?php ??<?php null,
 <?php 'utm_campaign'<?php =><?php $_GET['utm_campaign']<?php ??<?php null,
 <?php 'utm_term'<?php =><?php $_GET['utm_term']<?php ??<?php null,
 <?php 'utm_content'<?php =><?php $_GET['utm_content']<?php ??<?php null,
-<?php 'click_id'<?php =><?php $_GET['click_id']<?php ??<?php null
-<?php ];
-<?php 
-<?php //<?php Salvar<?php na<?php sessão<?php apenas<?php se<?php houver<?php UTMs
-<?php foreach<?php ($utmParams<?php as<?php $key<?php =><?php $value)<?php {
-<?php if<?php ($value<?php !==<?php null)<?php {
+<?php 'click_id'<?php =><?php $_GET['click_id']<?php ??<?php null ];
+<?php //<?php Salvar na sessão apenas se houver UTMs foreach ($utmParams as $key =><?php $value)<?php {
+<?php if ($value !==<?php null)<?php {
 <?php $_SESSION[$key]<?php =<?php $value;
 <?php }
 <?php }
-<?php 
-<?php return<?php $utmParams;
+<?php return $utmParams;
 <?php }
-<?php 
 <?php /**
-<?php *<?php Recupera<?php UTM<?php source<?php da<?php sessão
-<?php */
-<?php public<?php function<?php getUTMSource()<?php {
-<?php if<?php (!session_id())<?php {
+<?php *<?php Recupera UTM source da sessão */
+<?php public function getUTMSource()<?php {
+<?php if (!session_id())<?php {
 <?php session_start();
 <?php }
-<?php 
-<?php return<?php $_SESSION['utm_source']<?php ??<?php null;
+<?php return $_SESSION['utm_source']<?php ??<?php null;
 <?php }
-<?php 
 <?php /**
-<?php *<?php Recupera<?php todos<?php os<?php UTMs<?php da<?php sessão
-<?php */
-<?php public<?php function<?php getAllUTMs()<?php {
-<?php if<?php (!session_id())<?php {
+<?php *<?php Recupera todos os UTMs da sessão */
+<?php public function getAllUTMs()<?php {
+<?php if (!session_id())<?php {
 <?php session_start();
 <?php }
-<?php 
-<?php return<?php [
+<?php return [
 <?php 'utm_source'<?php =><?php $_SESSION['utm_source']<?php ??<?php null,
 <?php 'utm_medium'<?php =><?php $_SESSION['utm_medium']<?php ??<?php null,
 <?php 'utm_campaign'<?php =><?php $_SESSION['utm_campaign']<?php ??<?php null,
 <?php 'utm_term'<?php =><?php $_SESSION['utm_term']<?php ??<?php null,
 <?php 'utm_content'<?php =><?php $_SESSION['utm_content']<?php ??<?php null,
-<?php 'click_id'<?php =><?php $_SESSION['click_id']<?php ??<?php null
-<?php ];
+<?php 'click_id'<?php =><?php $_SESSION['click_id']<?php ??<?php null ];
 <?php }
-<?php 
 <?php /**
-<?php *<?php Envia<?php evento<?php para<?php xTracky<?php API
-<?php */
-<?php public<?php function<?php sendEvent($orderId,<?php $amount,<?php $status,<?php $utmSource<?php =<?php null)<?php {
-<?php try<?php {
-<?php //<?php Se<?php não<?php foi<?php fornecido<?php utm_source,<?php pegar<?php da<?php sessão
-<?php if<?php ($utmSource<?php ===<?php null)<?php {
-<?php $utmSource<?php =<?php $this->getUTMSource();
+<?php *<?php Envia evento para xTracky API */
+<?php public function sendEvent($orderId,<?php $amount,<?php $status,<?php $utmSource =<?php null)<?php {
+<?php try {
+<?php //<?php Se não foi fornecido utm_source,<?php pegar da sessão if ($utmSource ===<?php null)<?php {
+<?php $utmSource =<?php $this->getUTMSource();
 <?php }
-<?php 
-<?php //<?php Se<?php não<?php há<?php utm_source,<?php não<?php enviar<?php evento
-<?php if<?php (!$utmSource)<?php {
-<?php error_log('XTracky:<?php Nenhum<?php utm_source<?php encontrado<?php para<?php o<?php evento');
-<?php return<?php false;
+<?php //<?php Se não há<?php utm_source,<?php não enviar evento if (!$utmSource)<?php {
+<?php error_log('XTracky:<?php Nenhum utm_source encontrado para o evento');
+<?php return false;
 <?php }
-<?php 
-<?php $payload<?php =<?php [
+<?php $payload =<?php [
 <?php 'orderId'<?php =><?php $orderId,
-<?php 'amount'<?php =><?php intval($amount<?php *<?php 100),<?php //<?php Converter<?php para<?php centavos
-<?php 'status'<?php =><?php $status,<?php //<?php 'waiting_payment'<?php ou<?php 'paid'
-<?php 'utm_source'<?php =><?php $utmSource
-<?php ];
-<?php 
-<?php $ch<?php =<?php curl_init();
+<?php 'amount'<?php =><?php intval($amount *<?php 100),<?php //<?php Converter para centavos 'status'<?php =><?php $status,<?php //<?php 'waiting_payment'<?php ou 'paid'
+<?php 'utm_source'<?php =><?php $utmSource ];
+<?php $ch =<?php curl_init();
 <?php curl_setopt($ch,<?php CURLOPT_URL,<?php $this->apiUrl);
 <?php curl_setopt($ch,<?php CURLOPT_POST,<?php true);
 <?php curl_setopt($ch,<?php CURLOPT_POSTFIELDS,<?php json_encode($payload));
@@ -99,42 +74,33 @@ class<?php XTracky<?php {
 <?php curl_setopt($ch,<?php CURLOPT_TIMEOUT,<?php 10);
 <?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYPEER,<?php false);
 <?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYHOST,<?php false);
-<?php 
-<?php $response<?php =<?php curl_exec($ch);
-<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
-<?php $curlError<?php =<?php curl_error($ch);
+<?php $response =<?php curl_exec($ch);
+<?php $httpCode =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php $curlError =<?php curl_error($ch);
 <?php curl_close($ch);
-<?php 
-<?php //<?php Log<?php para<?php debug
-<?php error_log("XTracky<?php Event<?php -<?php Payload:<?php "<?php .<?php json_encode($payload));
-<?php error_log("XTracky<?php Event<?php -<?php HTTP<?php Code:<?php $httpCode");
-<?php error_log("XTracky<?php Event<?php -<?php Response:<?php $response");
-<?php error_log("XTracky<?php Event<?php -<?php Curl<?php Error:<?php $curlError");
-<?php 
-<?php if<?php ($httpCode<?php >=<?php 200<?php &&<?php $httpCode<?php <?php 300)<?php {
-<?php return<?php json_decode($response,<?php true);
-<?php }<?php else<?php {
-<?php throw<?php new<?php Exception("HTTP<?php Error:<?php $httpCode<?php -<?php $response");
+<?php //<?php Log para debug error_log("XTracky Event -<?php Payload:<?php "<?php .<?php json_encode($payload));
+<?php error_log("XTracky Event -<?php HTTP Code:<?php $httpCode");
+<?php error_log("XTracky Event -<?php Response:<?php $response");
+<?php error_log("XTracky Event -<?php Curl Error:<?php $curlError");
+<?php if ($httpCode >=<?php 200 &&<?php $httpCode <?php 300)<?php {
+<?php return json_decode($response,<?php true);
+<?php }<?php else {
+<?php throw new Exception("HTTP Error:<?php $httpCode -<?php $response");
 <?php }
-<?php 
-<?php }<?php catch<?php (Exception<?php $e)<?php {
-<?php error_log('XTracky<?php Error:<?php '<?php .<?php $e->getMessage());
-<?php return<?php false;
+<?php }<?php catch (Exception $e)<?php {
+<?php error_log('XTracky Error:<?php '<?php .<?php $e->getMessage());
+<?php return false;
 <?php }
 <?php }
-<?php 
 <?php /**
-<?php *<?php Envia<?php evento<?php de<?php venda<?php aguardando<?php pagamento
-<?php */
-<?php public<?php function<?php sendWaitingPayment($orderId,<?php $amount)<?php {
-<?php return<?php $this->sendEvent($orderId,<?php $amount,<?php 'waiting_payment');
+<?php *<?php Envia evento de venda aguardando pagamento */
+<?php public function sendWaitingPayment($orderId,<?php $amount)<?php {
+<?php return $this->sendEvent($orderId,<?php $amount,<?php 'waiting_payment');
 <?php }
-<?php 
 <?php /**
-<?php *<?php Envia<?php evento<?php de<?php venda<?php aprovada
-<?php */
-<?php public<?php function<?php sendPaid($orderId,<?php $amount)<?php {
-<?php return<?php $this->sendEvent($orderId,<?php $amount,<?php 'paid');
+<?php *<?php Envia evento de venda aprovada */
+<?php public function sendPaid($orderId,<?php $amount)<?php {
+<?php return $this->sendEvent($orderId,<?php $amount,<?php 'paid');
 <?php }
 }
 

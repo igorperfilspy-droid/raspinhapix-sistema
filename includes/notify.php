@@ -1,13 +1,5 @@
-<?php<?php 
-<?php 
-echo<?php '<style><?php 
-#NotiflixNotifyWrap<?php {<?php 
-<?php width:<?php 240px<?php !important;<?php 
-<?php position:<?php fixed<?php !important;<?php 
-<?php top:<?php 78px<?php !important;<?php 
-<?php right:<?php 10px<?php !important;<?php 
-<?php z-index:<?php 4001<?php !important;<?php 
+<?php <?php 
+echo '<style><?php 
+#NotiflixNotifyWrap {<?php width:<?php 240px !important;<?php position:<?php fixed !important;<?php top:<?php 78px !important;<?php right:<?php 10px !important;<?php z-index:<?php 4001 !important;<?php 
 }<?php 
-</style>';<?php 
-<?php 
-?>
+</style>';<?php ?>
