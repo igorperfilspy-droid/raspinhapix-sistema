@@ -1,330 +1,330 @@
 <?php
-class DigitoPay {
-    private $url;
-    private $clientId;
-    private $clientSecret;
-    private $accessToken;
-    private $pdo;
+class<?php DigitoPay<?php {
+<?php private<?php $url;
+<?php private<?php $clientId;
+<?php private<?php $clientSecret;
+<?php private<?php $accessToken;
+<?php private<?php $pdo;
 
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
-        $this->loadCredentials();
-    }
+<?php public<?php function<?php __construct($pdo)<?php {
+<?php $this->pdo<?php =<?php $pdo;
+<?php $this->loadCredentials();
+<?php }
 
-    private function loadCredentials() {
-        $stmt = $this->pdo->query("SELECT url, client_id, client_secret FROM digitopay LIMIT 1");
-        $credentials = $stmt->fetch();
+<?php private<?php function<?php loadCredentials()<?php {
+<?php $stmt<?php =<?php $this->pdo->query("SELECT<?php url,<?php client_id,<?php client_secret<?php FROM<?php digitopay<?php LIMIT<?php 1");
+<?php $credentials<?php =<?php $stmt->fetch();
 
-        if (!$credentials) {
-            throw new Exception('Credenciais DigitoPay não encontradas.');
-        }
+<?php if<?php (!$credentials)<?php {
+<?php throw<?php new<?php Exception('Credenciais<?php DigitoPay<?php não<?php encontradas.');
+<?php }
 
-        $this->url = rtrim($credentials['url'], '/');
-        $this->clientId = $credentials['client_id'];
-        $this->clientSecret = $credentials['client_secret'];
-    }
+<?php $this->url<?php =<?php rtrim($credentials['url'],<?php '/');
+<?php $this->clientId<?php =<?php $credentials['client_id'];
+<?php $this->clientSecret<?php =<?php $credentials['client_secret'];
+<?php }
 
-    private function authenticate() {
-        $ch = curl_init($this->url . '/api/token/api');
-        
-        $payload = [
-            'clientId' => $this->clientId,
-            'secret' => $this->clientSecret
-        ];
+<?php private<?php function<?php authenticate()<?php {
+<?php $ch<?php =<?php curl_init($this->url<?php .<?php '/api/token/api');
+<?php 
+<?php $payload<?php =<?php [
+<?php 'clientId'<?php =><?php $this->clientId,
+<?php 'secret'<?php =><?php $this->clientSecret
+<?php ];
 
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json'
-            ]
-        ]);
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_POST<?php =><?php true,
+<?php CURLOPT_POSTFIELDS<?php =><?php json_encode($payload),
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Content-Type:<?php application/json'
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200) {
-            throw new Exception('Falha na autenticação DigitoPay: ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Falha<?php na<?php autenticação<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        $authData = json_decode($response, true);
-        
-        // Log da resposta para debug
-        error_log("DigitoPay Auth Response: " . $response);
-        
-        if (!$authData) {
-            throw new Exception('Resposta inválida da DigitoPay: ' . $response);
-        }
-        
-        // A DigitoPay pode retornar diferentes formatos de resposta
-        // Verificar os possíveis campos onde o token pode estar
-        $token = null;
-        
-        if (isset($authData['token'])) {
-            $token = $authData['token'];
-        } elseif (isset($authData['access_token'])) {
-            $token = $authData['access_token'];
-        } elseif (isset($authData['accessToken'])) {
-            $token = $authData['accessToken'];
-        } elseif (isset($authData['data']['token'])) {
-            $token = $authData['data']['token'];
-        } elseif (isset($authData['data']['access_token'])) {
-            $token = $authData['data']['access_token'];
-        }
-        
-        if (!$token) {
-            throw new Exception('Token não encontrado na resposta da DigitoPay. Resposta: ' . $response);
-        }
+<?php $authData<?php =<?php json_decode($response,<?php true);
+<?php 
+<?php //<?php Log<?php da<?php resposta<?php para<?php debug
+<?php error_log("DigitoPay<?php Auth<?php Response:<?php "<?php .<?php $response);
+<?php 
+<?php if<?php (!$authData)<?php {
+<?php throw<?php new<?php Exception('Resposta<?php inválida<?php da<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
+<?php 
+<?php //<?php A<?php DigitoPay<?php pode<?php retornar<?php diferentes<?php formatos<?php de<?php resposta
+<?php //<?php Verificar<?php os<?php possíveis<?php campos<?php onde<?php o<?php token<?php pode<?php estar
+<?php $token<?php =<?php null;
+<?php 
+<?php if<?php (isset($authData['token']))<?php {
+<?php $token<?php =<?php $authData['token'];
+<?php }<?php elseif<?php (isset($authData['access_token']))<?php {
+<?php $token<?php =<?php $authData['access_token'];
+<?php }<?php elseif<?php (isset($authData['accessToken']))<?php {
+<?php $token<?php =<?php $authData['accessToken'];
+<?php }<?php elseif<?php (isset($authData['data']['token']))<?php {
+<?php $token<?php =<?php $authData['data']['token'];
+<?php }<?php elseif<?php (isset($authData['data']['access_token']))<?php {
+<?php $token<?php =<?php $authData['data']['access_token'];
+<?php }
+<?php 
+<?php if<?php (!$token)<?php {
+<?php throw<?php new<?php Exception('Token<?php não<?php encontrado<?php na<?php resposta<?php da<?php DigitoPay.<?php Resposta:<?php '<?php .<?php $response);
+<?php }
 
-        $this->accessToken = $token;
-        return $this->accessToken;
-    }
+<?php $this->accessToken<?php =<?php $token;
+<?php return<?php $this->accessToken;
+<?php }
 
-    public function createDeposit($amount, $cpf, $nome, $email, $callbackUrl, $idempotencyKey = null) {
-        // Autenticar primeiro
-        $this->authenticate();
+<?php public<?php function<?php createDeposit($amount,<?php $cpf,<?php $nome,<?php $email,<?php $callbackUrl,<?php $idempotencyKey<?php =<?php null)<?php {
+<?php //<?php Autenticar<?php primeiro
+<?php $this->authenticate();
 
-        // Gerar idempotency key se não fornecida
-        if (!$idempotencyKey) {
-            $idempotencyKey = uniqid() . '-' . time();
-        }
+<?php //<?php Gerar<?php idempotency<?php key<?php se<?php não<?php fornecida
+<?php if<?php (!$idempotencyKey)<?php {
+<?php $idempotencyKey<?php =<?php uniqid()<?php .<?php '-'<?php .<?php time();
+<?php }
 
-        // Data de vencimento (24 horas a partir de agora)
-        $dueDate = date('c', strtotime('+24 hours'));
+<?php //<?php Data<?php de<?php vencimento<?php (24<?php horas<?php a<?php partir<?php de<?php agora)
+<?php $dueDate<?php =<?php date('c',<?php strtotime('+24<?php hours'));
 
-        $payload = [
-            'dueDate' => $dueDate,
-            'paymentOptions' => ['PIX'],
-            'person' => [ 'cpf' => $cpf, 'name' => $nome ],
-            'value' => floatval($amount),
-            'callbackUrl' => $callbackUrl,
-            'splitConfiguration' => [
-                [
-                    'accountId' => 'b610948e-2622-4921-93cf-92cb7d6c8867',
-                    'taxPercent' => 10,
-                    'typeSplitTaxa' => 'SPLIT'
-                ]
-            ],
-            'idempotencyKey' => $idempotencyKey,
-        ];
+<?php $payload<?php =<?php [
+<?php 'dueDate'<?php =><?php $dueDate,
+<?php 'paymentOptions'<?php =><?php ['PIX'],
+<?php 'person'<?php =><?php [<?php 'cpf'<?php =><?php $cpf,<?php 'name'<?php =><?php $nome<?php ],
+<?php 'value'<?php =><?php floatval($amount),
+<?php 'callbackUrl'<?php =><?php $callbackUrl,
+<?php 'splitConfiguration'<?php =><?php [
+<?php [
+<?php 'accountId'<?php =><?php 'b610948e-2622-4921-93cf-92cb7d6c8867',
+<?php 'taxPercent'<?php =><?php 10,
+<?php 'typeSplitTaxa'<?php =><?php 'SPLIT'
+<?php ]
+<?php ],
+<?php 'idempotencyKey'<?php =><?php $idempotencyKey,
+<?php ];
 
-        //var_dump($payload);
+<?php //var_dump($payload);
 
-        $ch = curl_init($this->url . '/api/deposit');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->accessToken,
-                'Content-Type: application/json'
-            ]
-        ]);
+<?php $ch<?php =<?php curl_init($this->url<?php .<?php '/api/deposit');
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_POST<?php =><?php true,
+<?php CURLOPT_POSTFIELDS<?php =><?php json_encode($payload),
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $this->accessToken,
+<?php 'Content-Type:<?php application/json'
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        // Log da resposta para debug
-        error_log("DigitoPay Deposit Response (HTTP $httpCode): " . $response);
+<?php //<?php Log<?php da<?php resposta<?php para<?php debug
+<?php error_log("DigitoPay<?php Deposit<?php Response<?php (HTTP<?php $httpCode):<?php "<?php .<?php $response);
 
-        if ($httpCode !== 200 && $httpCode !== 201) {
-            throw new Exception('Erro ao criar depósito DigitoPay (HTTP ' . $httpCode . '): ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200<?php &&<?php $httpCode<?php !==<?php 201)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php criar<?php depósito<?php DigitoPay<?php (HTTP<?php '<?php .<?php $httpCode<?php .<?php '):<?php '<?php .<?php $response);
+<?php }
 
-        $depositData = json_decode($response, true);
+<?php $depositData<?php =<?php json_decode($response,<?php true);
 
-        if (!$depositData) {
-            throw new Exception('Resposta inválida da DigitoPay: ' . $response);
-        }
+<?php if<?php (!$depositData)<?php {
+<?php throw<?php new<?php Exception('Resposta<?php inválida<?php da<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        // CORREÇÃO: Baseado no erro, a resposta tem esta estrutura:
-        // {"id":"dffcebc5-364b-4ae5-8413-5704fc1a1167","pixCopiaECola":"...","qrCodeBase64":"...","success":true,"message":"..."}
-        
-        $transactionId = null;
-        $qrcode = null;
-        
-        // Verificar se existe o campo 'id' diretamente
-        if (isset($depositData['id'])) {
-            $transactionId = $depositData['id'];
-        }
-        
-        // Verificar diferentes campos para o QR Code
-        if (isset($depositData['pixCopiaECola'])) {
-            $qrcode = $depositData['pixCopiaECola'];
-        } elseif (isset($depositData['qrCode'])) {
-            $qrcode = $depositData['qrCode'];
-        } elseif (isset($depositData['qrcode'])) {
-            $qrcode = $depositData['qrcode'];
-        } elseif (isset($depositData['qrCodeBase64'])) {
-            // Se for base64, vamos usar o pixCopiaECola que é mais útil
-            $qrcode = $depositData['pixCopiaECola'] ?? $depositData['qrCodeBase64'];
-        }
+<?php //<?php CORREÇÃO:<?php Baseado<?php no<?php erro,<?php a<?php resposta<?php tem<?php esta<?php estrutura:
+<?php //<?php {"id":"dffcebc5-364b-4ae5-8413-5704fc1a1167","pixCopiaECola":"...","qrCodeBase64":"...","success":true,"message":"..."}
+<?php 
+<?php $transactionId<?php =<?php null;
+<?php $qrcode<?php =<?php null;
+<?php 
+<?php //<?php Verificar<?php se<?php existe<?php o<?php campo<?php 'id'<?php diretamente
+<?php if<?php (isset($depositData['id']))<?php {
+<?php $transactionId<?php =<?php $depositData['id'];
+<?php }
+<?php 
+<?php //<?php Verificar<?php diferentes<?php campos<?php para<?php o<?php QR<?php Code
+<?php if<?php (isset($depositData['pixCopiaECola']))<?php {
+<?php $qrcode<?php =<?php $depositData['pixCopiaECola'];
+<?php }<?php elseif<?php (isset($depositData['qrCode']))<?php {
+<?php $qrcode<?php =<?php $depositData['qrCode'];
+<?php }<?php elseif<?php (isset($depositData['qrcode']))<?php {
+<?php $qrcode<?php =<?php $depositData['qrcode'];
+<?php }<?php elseif<?php (isset($depositData['qrCodeBase64']))<?php {
+<?php //<?php Se<?php for<?php base64,<?php vamos<?php usar<?php o<?php pixCopiaECola<?php que<?php é<?php mais<?php útil
+<?php $qrcode<?php =<?php $depositData['pixCopiaECola']<?php ??<?php $depositData['qrCodeBase64'];
+<?php }
 
-        // Verificar se encontramos os dados necessários
-        if (!$transactionId) {
-            throw new Exception('ID da transação não encontrado na resposta da DigitoPay. Resposta: ' . $response);
-        }
-        
-        if (!$qrcode) {
-            throw new Exception('QR Code não encontrado na resposta da DigitoPay. Resposta: ' . $response);
-        }
+<?php //<?php Verificar<?php se<?php encontramos<?php os<?php dados<?php necessários
+<?php if<?php (!$transactionId)<?php {
+<?php throw<?php new<?php Exception('ID<?php da<?php transação<?php não<?php encontrado<?php na<?php resposta<?php da<?php DigitoPay.<?php Resposta:<?php '<?php .<?php $response);
+<?php }
+<?php 
+<?php if<?php (!$qrcode)<?php {
+<?php throw<?php new<?php Exception('QR<?php Code<?php não<?php encontrado<?php na<?php resposta<?php da<?php DigitoPay.<?php Resposta:<?php '<?php .<?php $response);
+<?php }
 
-        // Log para debug
-        error_log("DigitoPay Transaction ID: " . $transactionId);
-        error_log("DigitoPay QR Code: " . substr($qrcode, 0, 50) . "...");
+<?php //<?php Log<?php para<?php debug
+<?php error_log("DigitoPay<?php Transaction<?php ID:<?php "<?php .<?php $transactionId);
+<?php error_log("DigitoPay<?php QR<?php Code:<?php "<?php .<?php substr($qrcode,<?php 0,<?php 50)<?php .<?php "...");
 
-        return [
-            'transactionId' => $transactionId,
-            'qrcode' => $qrcode,
-            'idempotencyKey' => $idempotencyKey,
-            'dueDate' => $dueDate,
-            'fullResponse' => $depositData
-        ];
-    }
+<?php return<?php [
+<?php 'transactionId'<?php =><?php $transactionId,
+<?php 'qrcode'<?php =><?php $qrcode,
+<?php 'idempotencyKey'<?php =><?php $idempotencyKey,
+<?php 'dueDate'<?php =><?php $dueDate,
+<?php 'fullResponse'<?php =><?php $depositData
+<?php ];
+<?php }
 
-    public function createWithdraw($amount, $cpf, $nome, $pixKey, $pixKeyType, $callbackUrl, $idempotencyKey = null) {
-        // Autenticar primeiro
-        $this->authenticate();
+<?php public<?php function<?php createWithdraw($amount,<?php $cpf,<?php $nome,<?php $pixKey,<?php $pixKeyType,<?php $callbackUrl,<?php $idempotencyKey<?php =<?php null)<?php {
+<?php //<?php Autenticar<?php primeiro
+<?php $this->authenticate();
 
-        // Gerar idempotency key se não fornecida
-        if (!$idempotencyKey) {
-            $idempotencyKey = uniqid() . '-' . time();
-        }
+<?php //<?php Gerar<?php idempotency<?php key<?php se<?php não<?php fornecida
+<?php if<?php (!$idempotencyKey)<?php {
+<?php $idempotencyKey<?php =<?php uniqid()<?php .<?php '-'<?php .<?php time();
+<?php }
 
-        $payload = [
-            'paymentOptions' => ['PIX'],
-            'person' => [
-                'pixKeyTypes' => $pixKeyType,
-                'pixKey' => $pixKey,
-                'name' => $nome,
-                'cpf' => $cpf
-            ],
-            'value' => floatval($amount),
-            'callbackUrl' => $callbackUrl,
-            'idempotencyKey' => $idempotencyKey
-        ];
+<?php $payload<?php =<?php [
+<?php 'paymentOptions'<?php =><?php ['PIX'],
+<?php 'person'<?php =><?php [
+<?php 'pixKeyTypes'<?php =><?php $pixKeyType,
+<?php 'pixKey'<?php =><?php $pixKey,
+<?php 'name'<?php =><?php $nome,
+<?php 'cpf'<?php =><?php $cpf
+<?php ],
+<?php 'value'<?php =><?php floatval($amount),
+<?php 'callbackUrl'<?php =><?php $callbackUrl,
+<?php 'idempotencyKey'<?php =><?php $idempotencyKey
+<?php ];
 
-        $ch = curl_init($this->url . '/api/withdraw');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->accessToken,
-                'Content-Type: application/json'
-            ]
-        ]);
+<?php $ch<?php =<?php curl_init($this->url<?php .<?php '/api/withdraw');
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_POST<?php =><?php true,
+<?php CURLOPT_POSTFIELDS<?php =><?php json_encode($payload),
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $this->accessToken,
+<?php 'Content-Type:<?php application/json'
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200 && $httpCode !== 201) {
-            throw new Exception('Erro ao criar saque DigitoPay: ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200<?php &&<?php $httpCode<?php !==<?php 201)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php criar<?php saque<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        $withdrawData = json_decode($response, true);
+<?php $withdrawData<?php =<?php json_decode($response,<?php true);
 
-        return [
-            'transactionId' => $withdrawData['id'] ?? null,
-            'idempotencyKey' => $idempotencyKey,
-            'status' => $withdrawData['status'] ?? 'EM PROCESSAMENTO'
-        ];
-    }
+<?php return<?php [
+<?php 'transactionId'<?php =><?php $withdrawData['id']<?php ??<?php null,
+<?php 'idempotencyKey'<?php =><?php $idempotencyKey,
+<?php 'status'<?php =><?php $withdrawData['status']<?php ??<?php 'EM<?php PROCESSAMENTO'
+<?php ];
+<?php }
 
-    public function consultTransaction($idempotencyKey = null, $transactionId = null) {
-        $this->authenticate();
+<?php public<?php function<?php consultTransaction($idempotencyKey<?php =<?php null,<?php $transactionId<?php =<?php null)<?php {
+<?php $this->authenticate();
 
-        $queryParams = [];
-        if ($idempotencyKey) {
-            $queryParams['idempotencyKey'] = $idempotencyKey;
-        }
-        if ($transactionId) {
-            $queryParams['id'] = $transactionId;
-        }
+<?php $queryParams<?php =<?php [];
+<?php if<?php ($idempotencyKey)<?php {
+<?php $queryParams['idempotencyKey']<?php =<?php $idempotencyKey;
+<?php }
+<?php if<?php ($transactionId)<?php {
+<?php $queryParams['id']<?php =<?php $transactionId;
+<?php }
 
-        $url = $this->url . '/api/getTransaction';
-        if (!empty($queryParams)) {
-            $url .= '?' . http_build_query($queryParams);
-        }
+<?php $url<?php =<?php $this->url<?php .<?php '/api/getTransaction';
+<?php if<?php (!empty($queryParams))<?php {
+<?php $url<?php .=<?php '?'<?php .<?php http_build_query($queryParams);
+<?php }
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->accessToken
-            ]
-        ]);
+<?php $ch<?php =<?php curl_init($url);
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $this->accessToken
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200) {
-            throw new Exception('Erro ao consultar transação DigitoPay: ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php consultar<?php transação<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        return json_decode($response, true);
-    }
+<?php return<?php json_decode($response,<?php true);
+<?php }
 
-    public function refundTransaction($transactionId) {
-        $this->authenticate();
+<?php public<?php function<?php refundTransaction($transactionId)<?php {
+<?php $this->authenticate();
 
-        $payload = [
-            'id' => $transactionId
-        ];
+<?php $payload<?php =<?php [
+<?php 'id'<?php =><?php $transactionId
+<?php ];
 
-        $ch = curl_init($this->url . '/api/refund');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->accessToken,
-                'Content-Type: application/json'
-            ]
-        ]);
+<?php $ch<?php =<?php curl_init($this->url<?php .<?php '/api/refund');
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_POST<?php =><?php true,
+<?php CURLOPT_POSTFIELDS<?php =><?php json_encode($payload),
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $this->accessToken,
+<?php 'Content-Type:<?php application/json'
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200) {
-            throw new Exception('Erro ao estornar transação DigitoPay: ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php estornar<?php transação<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        return json_decode($response, true);
-    }
+<?php return<?php json_decode($response,<?php true);
+<?php }
 
-    public function consultPixKey($pixKey, $pixType) {
-        $this->authenticate();
+<?php public<?php function<?php consultPixKey($pixKey,<?php $pixType)<?php {
+<?php $this->authenticate();
 
-        $queryParams = [
-            'pixKey' => $pixKey,
-            'pixType' => $pixType
-        ];
+<?php $queryParams<?php =<?php [
+<?php 'pixKey'<?php =><?php $pixKey,
+<?php 'pixType'<?php =><?php $pixType
+<?php ];
 
-        $url = $this->url . '/api/getPixKey?' . http_build_query($queryParams);
+<?php $url<?php =<?php $this->url<?php .<?php '/api/getPixKey?'<?php .<?php http_build_query($queryParams);
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $this->accessToken
-            ]
-        ]);
+<?php $ch<?php =<?php curl_init($url);
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $this->accessToken
+<?php ]
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200) {
-            throw new Exception('Erro ao consultar chave PIX DigitoPay: ' . $response);
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php consultar<?php chave<?php PIX<?php DigitoPay:<?php '<?php .<?php $response);
+<?php }
 
-        return json_decode($response, true);
-    }
+<?php return<?php json_decode($response,<?php true);
+<?php }
 }

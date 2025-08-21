@@ -1,4 +1,4 @@
 
-       if($usuario['banido'] == 1){
-         $_SESSION = [];
-         
+<?php if($usuario['banido']<?php ==<?php 1){
+<?php $_SESSION<?php =<?php [];
+<?php 

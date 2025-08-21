@@ -1,13 +1,13 @@
+<?php<?php 
 <?php 
-
-echo '<style>
-#NotiflixNotifyWrap {
-    width: 240px !important;
-    position: fixed !important; 
-    top: 78px !important; 
-    right: 10px !important;
-    z-index: 4001 !important;
-}
-</style>';
-
+echo<?php '<style><?php 
+#NotiflixNotifyWrap<?php {<?php 
+<?php width:<?php 240px<?php !important;<?php 
+<?php position:<?php fixed<?php !important;<?php 
+<?php top:<?php 78px<?php !important;<?php 
+<?php right:<?php 10px<?php !important;<?php 
+<?php z-index:<?php 4001<?php !important;<?php 
+}<?php 
+</style>';<?php 
+<?php 
 ?>

@@ -1,648 +1,648 @@
-<?php
-@session_start();
-
-if (file_exists('./conexao.php')) {
-    include('./conexao.php');
-} elseif (file_exists('../conexao.php')) {
-    include('../conexao.php');
-} elseif (file_exists('../../conexao.php')) {
-    include('../../conexao.php');
-}
-
-if (!isset($_SESSION['usuario_id'])) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você precisa estar logado para acessar esta página!'];
-    header("Location: /login");
-    exit;
-}
-
-$usuario_id = $_SESSION['usuario_id'];
-
-try {
-    $stmt_depositos = $pdo->prepare("SELECT 
-                                    created_at, 
-                                    updated_at, 
-                                    cpf, 
-                                    valor, 
-                                    status 
-                                    FROM depositos 
-                                    WHERE user_id = :user_id
-                                    ORDER BY created_at DESC");
-    $stmt_depositos->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmt_depositos->execute();
-    $depositos = $stmt_depositos->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $depositos = [];
-    $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao carregar depósitos'];
-}
-
-try {
-    $stmt_saques = $pdo->prepare("SELECT 
-                                created_at, 
-                                updated_at, 
-                                cpf, 
-                                valor, 
-                                status 
-                                FROM saques 
-                                WHERE user_id = :user_id
-                                ORDER BY created_at DESC");
-    $stmt_saques->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmt_saques->execute();
-    $saques = $stmt_saques->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $saques = [];
-    $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao carregar saques'];
-}
-?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Minhas Transações</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-
-    <style>
-        /* Page Styles */
-        .transactions-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 200px);
-        }
-
-        .transactions-container {
-            max-width: 850px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* Header Card */
-        .header-card {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 163, 74, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 24px;
-            padding: 2rem;
-            margin-bottom: 3rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200px;
-            height: 200px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.1), transparent);
-            border-radius: 50%;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .header-card::after {
-            content: '';
-            position: absolute;
-            bottom: -50%;
-            left: -50%;
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.05), transparent);
-            border-radius: 50%;
-            animation: float 8s ease-in-out infinite reverse;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
-        }
-
-        .header-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 163, 74, 0.1));
-            border-radius: 50%;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            position: relative;
-            z-index: 2;
-        }
-
-        .header-icon i {
-            font-size: 2rem;
-            color: #22c55e;
-        }
-
-        .header-title {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 900;
-            text-align: center;
-            margin-bottom: 1rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .header-subtitle {
-            color: #e5e7eb;
-            font-size: 1.1rem;
-            text-align: center;
-            opacity: 0.8;
-            position: relative;
-            z-index: 2;
-        }
-
-        /* Tabs */
-        .tabs-container {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .tabs-header {
-            display: flex;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 16px;
-            padding: 0.5rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(34, 197, 94, 0.2);
-        }
-
-        .tab-button {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #9ca3af;
-            font-size: 1.1rem;
-            font-weight: 600;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .tab-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.1), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .tab-button:hover::before {
-            left: 100%;
-        }
-
-        .tab-button.active {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
-        }
-
-        .tab-button.active::before {
-            display: none;
-        }
-
-        /* Content Area */
-        .transactions-content {
-            display: none;
-        }
-
-        .transactions-content.active {
-            display: block;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #9ca3af;
-        }
-
-        .empty-state i {
-            font-size: 4rem;
-            color: #22c55e;
-            margin-bottom: 1.5rem;
-            opacity: 0.7;
-        }
-
-        .empty-state h3 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            color: #e5e7eb;
-        }
-
-        .empty-state p {
-            font-size: 1rem;
-            opacity: 0.8;
-        }
-
-        /* Transaction Items */
-        .transaction-item {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(34, 197, 94, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .transaction-item::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .transaction-item:hover {
-            border-color: rgba(34, 197, 94, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .transaction-item:hover::before {
-            opacity: 1;
-        }
-
-        /* Desktop Layout */
-        .transaction-header {
-            display: none;
-            grid-template-columns: 3fr 2fr 2fr 1.5fr;
-            gap: 1rem;
-            padding: 1rem 1.5rem;
-            background: rgba(34, 197, 94, 0.1);
-            border-radius: 12px;
-            margin-bottom: 1rem;
-            font-weight: 600;
-            color: #22c55e;
-            font-size: 0.9rem;
-        }
-
-        .transaction-row {
-            display: grid;
-            grid-template-columns: 3fr 2fr 2fr 1.5fr;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .transaction-date {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #e5e7eb;
-        }
-
-        .transaction-date i {
-            color: #22c55e;
-            font-size: 0.9rem;
-        }
-
-        .transaction-cpf {
-            color: #9ca3af;
-            font-family: 'Courier New', monospace;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-
-        .transaction-cpf:hover {
-            color: #22c55e;
-        }
-
-        .transaction-amount {
-            font-weight: 700;
-            color: #22c55e;
-            font-size: 1.1rem;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            justify-self: end;
-        }
-
-        .status-badge.approved {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 163, 74, 0.1));
-            color: #22c55e;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .status-badge.pending {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.1));
-            color: #fbbf24;
-            border: 1px solid rgba(251, 191, 36, 0.3);
-        }
-
-        /* Mobile Layout */
-        .transaction-mobile {
-            display: block;
-        }
-
-        .transaction-mobile-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .transaction-mobile-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Responsive */
-        @media (min-width: 768px) {
-            .transaction-header {
-                display: grid;
-            }
-            
-            .transaction-mobile {
-                display: none;
-            }
-            
-            .transaction-row {
-                display: grid;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .transactions-container {
-                padding: 0 1rem;
-            }
-            
-            .header-title {
-                font-size: 2rem;
-            }
-            
-            .tabs-container {
-                padding: 1.5rem;
-            }
-            
-            .tab-button {
-                font-size: 1rem;
-                padding: 0.8rem 1rem;
-            }
-        }
-
-        /* Loading Animation */
-        .loading-pulse {
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-    </style>
-</head>
-<body>
-    <?php include('../inc/header.php'); ?>
-
-    <section class="transactions-section">
-        <div class="transactions-container">
-            <!-- Header Card -->
-            <div class="header-card">
-                <div class="header-icon">
-                    <i class="bi bi-receipt"></i>
-                </div>
-                <h1 class="header-title">Minhas Transações</h1>
-                <p class="header-subtitle">Acompanhe seu histórico de depósitos e saques</p>
-            </div>
-
-            <!-- Tabs Container -->
-            <div class="tabs-container">
-                <div class="tabs-header">
-                    <button id="tabDepositos" class="tab-button active">
-                        <i class="bi bi-wallet2"></i>
-                        Depósitos
-                    </button>
-                    <button id="tabSaques" class="tab-button">
-                        <i class="bi bi-cash-coin"></i>
-                        Saques
-                    </button>
-                </div>
-
-                <!-- Depósitos Content -->
-                <div id="depositosContent" class="transactions-content active">
-                    <?php if (empty($depositos)): ?>
-                        <div class="empty-state">
-                            <i class="bi bi-wallet2"></i>
-                            <h3>Nenhum depósito encontrado</h3>
-                            <p>Quando você fizer um depósito, ele aparecerá aqui</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="transaction-header">
-                            <div><i class="bi bi-calendar3"></i> Data/Hora</div>
-                            <div><i class="bi bi-person-badge"></i> CPF</div>
-                            <div><i class="bi bi-currency-dollar"></i> Valor</div>
-                            <div><i class="bi bi-check-circle"></i> Status</div>
-                        </div>
-
-                        <?php foreach ($depositos as $deposito): ?>
-                            <div class="transaction-item">
-                                <div class="transaction-row">
-                                    <div class="transaction-date">
-                                        <i class="bi bi-calendar-event"></i>
-                                        <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
-                                    </div>
-                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($deposito['cpf']) ?>">
-                                        <?php= substr($deposito['cpf'], 0, 3) ?>.***.***-**
-                                    </div>
-                                    <div class="transaction-amount">
-                                        R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?>
-                                    </div>
-                                    <div class="status-badge <?php= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                        <i class="bi bi-<?php= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                        <?php= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
-                                    </div>
-                                </div>
-                                
-                                <!-- Mobile Layout -->
-                                <div class="transaction-mobile">
-                                    <div class="transaction-mobile-header">
-                                        <div class="transaction-date">
-                                            <i class="bi bi-calendar-event"></i>
-                                            <span><?php= date('d/m/Y H:i', strtotime($deposito['updated_at'])) ?></span>
-                                        </div>
-                                        <div class="transaction-amount">
-                                            R$ <?php= number_format($deposito['valor'], 2, ',', '.') ?>
-                                        </div>
-                                    </div>
-                                    <div class="transaction-mobile-footer">
-                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($deposito['cpf']) ?>">
-                                            <?php= substr($deposito['cpf'], 0, 3) ?>.***.***-**
-                                        </div>
-                                        <div class="status-badge <?php= $deposito['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                            <i class="bi bi-<?php= $deposito['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                            <?php= $deposito['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Saques Content -->
-                <div id="saquesContent" class="transactions-content">
-                    <?php if (empty($saques)): ?>
-                        <div class="empty-state">
-                            <i class="bi bi-cash-coin"></i>
-                            <h3>Nenhum saque encontrado</h3>
-                            <p>Quando você fizer um saque, ele aparecerá aqui</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="transaction-header">
-                            <div><i class="bi bi-calendar3"></i> Data/Hora</div>
-                            <div><i class="bi bi-person-badge"></i> CPF</div>
-                            <div><i class="bi bi-currency-dollar"></i> Valor</div>
-                            <div><i class="bi bi-check-circle"></i> Status</div>
-                        </div>
-
-                        <?php foreach ($saques as $saque): ?>
-                            <div class="transaction-item">
-                                <div class="transaction-row">
-                                    <div class="transaction-date">
-                                        <i class="bi bi-calendar-event"></i>
-                                        <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
-                                    </div>
-                                    <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($saque['cpf']) ?>">
-                                        <?php= substr($saque['cpf'], 0, 3) ?>.***.***-**
-                                    </div>
-                                    <div class="transaction-amount">
-                                        R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
-                                    </div>
-                                    <div class="status-badge <?php= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                        <i class="bi bi-<?php= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                        <?php= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
-                                    </div>
-                                </div>
-                                
-                                <!-- Mobile Layout -->
-                                <div class="transaction-mobile">
-                                    <div class="transaction-mobile-header">
-                                        <div class="transaction-date">
-                                            <i class="bi bi-calendar-event"></i>
-                                            <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
-                                        </div>
-                                        <div class="transaction-amount">
-                                            R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
-                                        </div>
-                                    </div>
-                                    <div class="transaction-mobile-footer">
-                                        <div class="transaction-cpf" onclick="toggleCPF(this)" data-full="<?php= htmlspecialchars($saque['cpf']) ?>">
-                                            <?php= substr($saque['cpf'], 0, 3) ?>.***.***-**
-                                        </div>
-                                        <div class="status-badge <?php= $saque['status'] === 'PAID' ? 'approved' : 'pending' ?>">
-                                            <i class="bi bi-<?php= $saque['status'] === 'PAID' ? 'check-circle-fill' : 'clock' ?>"></i>
-                                            <?php= $saque['status'] === 'PAID' ? 'Aprovado' : 'Pendente' ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <?php include('../inc/footer.php'); ?>
-    <?php include('../components/modals.php'); ?>
-
-    <script>
-        // Tab functionality
-        document.getElementById('tabDepositos').addEventListener('click', function() {
-            switchTab('depositos');
-        });
-
-        document.getElementById('tabSaques').addEventListener('click', function() {
-            switchTab('saques');
-        });
-
-        function switchTab(tabName) {
-            // Remove active class from all tabs
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.transactions-content').forEach(content => content.classList.remove('active'));
-
-            // Add active class to selected tab
-            document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.add('active');
-            document.getElementById(`${tabName}Content`).classList.add('active');
-        }
-
-        // CPF reveal functionality
-        function toggleCPF(element) {
-            const fullCPF = element.getAttribute('data-full');
-            const maskedCPF = fullCPF.substring(0, 3) + '.***.***-**';
-            
-            if (element.textContent.includes('*')) {
-                element.textContent = fullCPF;
-                element.style.color = '#22c55e';
-            } else {
-                element.textContent = maskedCPF;
-                element.style.color = '#9ca3af';
-            }
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('%c💳 Transações carregadas!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Add hover effects to transaction items
-            document.querySelectorAll('.transaction-item').forEach(item => {
-                item.addEventListener('mouseenter', function() {
-                    this.style.transform = 'translateY(-2px)';
-                });
-                
-                item.addEventListener('mouseleave', function() {
-                    this.style.transform = 'translateY(0)';
-                });
-            });
-        });
-    </script>
-</body>
+<?php<?php 
+@session_start();<?php 
+<?php 
+if<?php (file_exists('./conexao.php'))<?php {<?php 
+<?php include('./conexao.php');<?php 
+}<?php elseif<?php (file_exists('../conexao.php'))<?php {<?php 
+<?php include('../conexao.php');<?php 
+}<?php elseif<?php (file_exists('../../conexao.php'))<?php {<?php 
+<?php include('../../conexao.php');<?php 
+}<?php 
+<?php 
+if<?php (!isset($_SESSION['usuario_id']))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php precisa<?php estar<?php logado<?php para<?php acessar<?php esta<?php página!'];<?php 
+<?php header("Location:<?php /login");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$usuario_id<?php =<?php $_SESSION['usuario_id'];<?php 
+<?php 
+try<?php {<?php 
+<?php $stmt_depositos<?php =<?php $pdo->prepare("SELECT<?php 
+<?php created_at,<?php 
+<?php updated_at,<?php 
+<?php cpf,<?php 
+<?php valor,<?php 
+<?php status<?php 
+<?php FROM<?php depositos<?php 
+<?php WHERE<?php user_id<?php =<?php :user_id<?php 
+<?php ORDER<?php BY<?php created_at<?php DESC");<?php 
+<?php $stmt_depositos->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt_depositos->execute();<?php 
+<?php $depositos<?php =<?php $stmt_depositos->fetchAll(PDO::FETCH_ASSOC);<?php 
+}<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $depositos<?php =<?php [];<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php carregar<?php depósitos'];<?php 
+}<?php 
+<?php 
+try<?php {<?php 
+<?php $stmt_saques<?php =<?php $pdo->prepare("SELECT<?php 
+<?php created_at,<?php 
+<?php updated_at,<?php 
+<?php cpf,<?php 
+<?php valor,<?php 
+<?php status<?php 
+<?php FROM<?php saques<?php 
+<?php WHERE<?php user_id<?php =<?php :user_id<?php 
+<?php ORDER<?php BY<?php created_at<?php DESC");<?php 
+<?php $stmt_saques->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt_saques->execute();<?php 
+<?php $saques<?php =<?php $stmt_saques->fetchAll(PDO::FETCH_ASSOC);<?php 
+}<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $saques<?php =<?php [];<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php carregar<?php saques'];<?php 
+}<?php 
+?><?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-br"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Minhas<?php Transações</title><?php 
+<?php 
+<?php <!--<?php Fonts<?php --><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Icons<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php 
+<?php 
+<?php <!--<?php Styles<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php=<?php time();<?php ?>"><?php 
+<?php 
+<?php <!--<?php Scripts<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php /*<?php Page<?php Styles<?php */<?php 
+<?php .transactions-section<?php {<?php 
+<?php margin-top:<?php 100px;<?php 
+<?php padding:<?php 4rem<?php 0;<?php 
+<?php background:<?php #0a0a0a;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 200px);<?php 
+<?php }<?php 
+<?php 
+<?php .transactions-container<?php {<?php 
+<?php max-width:<?php 850px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php padding:<?php 0<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Header<?php Card<?php */<?php 
+<?php .header-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(16,<?php 163,<?php 74,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -50%;<?php 
+<?php right:<?php -50%;<?php 
+<?php width:<?php 200px;<?php 
+<?php height:<?php 200px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 6s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php -50%;<?php 
+<?php left:<?php -50%;<?php 
+<?php width:<?php 150px;<?php 
+<?php height:<?php 150px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.05),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 8s<?php ease-in-out<?php infinite<?php reverse;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php float<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php translateY(0)<?php rotate(0deg);<?php }<?php 
+<?php 50%<?php {<?php transform:<?php translateY(-20px)<?php rotate(180deg);<?php }<?php 
+<?php }<?php 
+<?php 
+<?php .header-icon<?php {<?php 
+<?php width:<?php 80px;<?php 
+<?php height:<?php 80px;<?php 
+<?php margin:<?php 0<?php auto<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2),<?php rgba(16,<?php 163,<?php 74,<?php 0.1));<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .header-icon<?php i<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .header-subtitle<?php {<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php text-align:<?php center;<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Tabs<?php */<?php 
+<?php .tabs-container<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php .tabs-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 0.5rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php background:<?php transparent;<?php 
+<?php border:<?php none;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php padding:<?php 1rem<?php 1.5rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php -100%;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php linear-gradient(90deg,<?php transparent,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php transition:<?php left<?php 0.5s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button:hover::before<?php {<?php 
+<?php left:<?php 100%;<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button.active<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 16px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button.active::before<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Content<?php Area<?php */<?php 
+<?php .transactions-content<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .transactions-content.active<?php {<?php 
+<?php display:<?php block;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php padding:<?php 4rem<?php 2rem;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php i<?php {<?php 
+<?php font-size:<?php 4rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php opacity:<?php 0.7;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php h3<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php p<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Transaction<?php Items<?php */<?php 
+<?php .transaction-item<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-item::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-item:hover<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 10px<?php 30px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-item:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Desktop<?php Layout<?php */<?php 
+<?php .transaction-header<?php {<?php 
+<?php display:<?php none;<?php 
+<?php grid-template-columns:<?php 3fr<?php 2fr<?php 2fr<?php 1.5fr;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php padding:<?php 1rem<?php 1.5rem;<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-row<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php 3fr<?php 2fr<?php 2fr<?php 1.5fr;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php align-items:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-date<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-date<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-cpf<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-family:<?php 'Courier<?php New',<?php monospace;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php color<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-cpf:hover<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-amount<?php {<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .status-badge<?php {<?php 
+<?php display:<?php inline-flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php padding:<?php 0.5rem<?php 1rem;<?php 
+<?php border-radius:<?php 25px;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.5px;<?php 
+<?php justify-self:<?php end;<?php 
+<?php }<?php 
+<?php 
+<?php .status-badge.approved<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2),<?php rgba(16,<?php 163,<?php 74,<?php 0.1));<?php 
+<?php color:<?php #22c55e;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .status-badge.pending<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(251,<?php 191,<?php 36,<?php 0.2),<?php rgba(245,<?php 158,<?php 11,<?php 0.1));<?php 
+<?php color:<?php #fbbf24;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(251,<?php 191,<?php 36,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Mobile<?php Layout<?php */<?php 
+<?php .transaction-mobile<?php {<?php 
+<?php display:<?php block;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-mobile-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php center;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-mobile-footer<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php center;<?php 
+<?php margin-top:<?php 1rem;<?php 
+<?php padding-top:<?php 1rem;<?php 
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Responsive<?php */<?php 
+<?php @media<?php (min-width:<?php 768px)<?php {<?php 
+<?php .transaction-header<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-mobile<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .transaction-row<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .transactions-container<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .tabs-container<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .tab-button<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php padding:<?php 0.8rem<?php 1rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Loading<?php Animation<?php */<?php 
+<?php .loading-pulse<?php {<?php 
+<?php animation:<?php pulse<?php 2s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php pulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php opacity:<?php 1;<?php }<?php 
+<?php 50%<?php {<?php opacity:<?php 0.5;<?php }<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <?php<?php include('../inc/header.php');<?php ?><?php 
+<?php 
+<?php <section<?php class="transactions-section"><?php 
+<?php <div<?php class="transactions-container"><?php 
+<?php <!--<?php Header<?php Card<?php --><?php 
+<?php <div<?php class="header-card"><?php 
+<?php <div<?php class="header-icon"><?php 
+<?php <i<?php class="bi<?php bi-receipt"></i><?php 
+<?php </div><?php 
+<?php <h1<?php class="header-title">Minhas<?php Transações</h1><?php 
+<?php <p<?php class="header-subtitle">Acompanhe<?php seu<?php histórico<?php de<?php depósitos<?php e<?php saques</p><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Tabs<?php Container<?php --><?php 
+<?php <div<?php class="tabs-container"><?php 
+<?php <div<?php class="tabs-header"><?php 
+<?php <button<?php id="tabDepositos"<?php class="tab-button<?php active"><?php 
+<?php <i<?php class="bi<?php bi-wallet2"></i><?php 
+<?php Depósitos<?php 
+<?php </button><?php 
+<?php <button<?php id="tabSaques"<?php class="tab-button"><?php 
+<?php <i<?php class="bi<?php bi-cash-coin"></i><?php 
+<?php Saques<?php 
+<?php </button><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Depósitos<?php Content<?php --><?php 
+<?php <div<?php id="depositosContent"<?php class="transactions-content<?php active"><?php 
+<?php <?php<?php if<?php (empty($depositos)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="bi<?php bi-wallet2"></i><?php 
+<?php <h3>Nenhum<?php depósito<?php encontrado</h3><?php 
+<?php <p>Quando<?php você<?php fizer<?php um<?php depósito,<?php ele<?php aparecerá<?php aqui</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <div<?php class="transaction-header"><?php 
+<?php <div><i<?php class="bi<?php bi-calendar3"></i><?php Data/Hora</div><?php 
+<?php <div><i<?php class="bi<?php bi-person-badge"></i><?php CPF</div><?php 
+<?php <div><i<?php class="bi<?php bi-currency-dollar"></i><?php Valor</div><?php 
+<?php <div><i<?php class="bi<?php bi-check-circle"></i><?php Status</div><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php foreach<?php ($depositos<?php as<?php $deposito):<?php ?><?php 
+<?php <div<?php class="transaction-item"><?php 
+<?php <div<?php class="transaction-row"><?php 
+<?php <div<?php class="transaction-date"><?php 
+<?php <i<?php class="bi<?php bi-calendar-event"></i><?php 
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($deposito['updated_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-cpf"<?php onclick="toggleCPF(this)"<?php data-full="<?php=<?php htmlspecialchars($deposito['cpf'])<?php ?>"><?php 
+<?php <?php=<?php substr($deposito['cpf'],<?php 0,<?php 3)<?php ?>.***.***-**<?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-amount"><?php 
+<?php R$<?php <?php=<?php number_format($deposito['valor'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php <div<?php class="status-badge<?php <?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'approved'<?php :<?php 'pending'<?php ?>"><?php 
+<?php <i<?php class="bi<?php bi-<?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'check-circle-fill'<?php :<?php 'clock'<?php ?>"></i><?php 
+<?php <?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'Aprovado'<?php :<?php 'Pendente'<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Mobile<?php Layout<?php --><?php 
+<?php <div<?php class="transaction-mobile"><?php 
+<?php <div<?php class="transaction-mobile-header"><?php 
+<?php <div<?php class="transaction-date"><?php 
+<?php <i<?php class="bi<?php bi-calendar-event"></i><?php 
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($deposito['updated_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-amount"><?php 
+<?php R$<?php <?php=<?php number_format($deposito['valor'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-mobile-footer"><?php 
+<?php <div<?php class="transaction-cpf"<?php onclick="toggleCPF(this)"<?php data-full="<?php=<?php htmlspecialchars($deposito['cpf'])<?php ?>"><?php 
+<?php <?php=<?php substr($deposito['cpf'],<?php 0,<?php 3)<?php ?>.***.***-**<?php 
+<?php </div><?php 
+<?php <div<?php class="status-badge<?php <?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'approved'<?php :<?php 'pending'<?php ?>"><?php 
+<?php <i<?php class="bi<?php bi-<?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'check-circle-fill'<?php :<?php 'clock'<?php ?>"></i><?php 
+<?php <?php=<?php $deposito['status']<?php ===<?php 'PAID'<?php ?<?php 'Aprovado'<?php :<?php 'Pendente'<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Saques<?php Content<?php --><?php 
+<?php <div<?php id="saquesContent"<?php class="transactions-content"><?php 
+<?php <?php<?php if<?php (empty($saques)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="bi<?php bi-cash-coin"></i><?php 
+<?php <h3>Nenhum<?php saque<?php encontrado</h3><?php 
+<?php <p>Quando<?php você<?php fizer<?php um<?php saque,<?php ele<?php aparecerá<?php aqui</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <div<?php class="transaction-header"><?php 
+<?php <div><i<?php class="bi<?php bi-calendar3"></i><?php Data/Hora</div><?php 
+<?php <div><i<?php class="bi<?php bi-person-badge"></i><?php CPF</div><?php 
+<?php <div><i<?php class="bi<?php bi-currency-dollar"></i><?php Valor</div><?php 
+<?php <div><i<?php class="bi<?php bi-check-circle"></i><?php Status</div><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php foreach<?php ($saques<?php as<?php $saque):<?php ?><?php 
+<?php <div<?php class="transaction-item"><?php 
+<?php <div<?php class="transaction-row"><?php 
+<?php <div<?php class="transaction-date"><?php 
+<?php <i<?php class="bi<?php bi-calendar-event"></i><?php 
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($saque['updated_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-cpf"<?php onclick="toggleCPF(this)"<?php data-full="<?php=<?php htmlspecialchars($saque['cpf'])<?php ?>"><?php 
+<?php <?php=<?php substr($saque['cpf'],<?php 0,<?php 3)<?php ?>.***.***-**<?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-amount"><?php 
+<?php R$<?php <?php=<?php number_format($saque['valor'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php <div<?php class="status-badge<?php <?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'approved'<?php :<?php 'pending'<?php ?>"><?php 
+<?php <i<?php class="bi<?php bi-<?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'check-circle-fill'<?php :<?php 'clock'<?php ?>"></i><?php 
+<?php <?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'Aprovado'<?php :<?php 'Pendente'<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Mobile<?php Layout<?php --><?php 
+<?php <div<?php class="transaction-mobile"><?php 
+<?php <div<?php class="transaction-mobile-header"><?php 
+<?php <div<?php class="transaction-date"><?php 
+<?php <i<?php class="bi<?php bi-calendar-event"></i><?php 
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($saque['updated_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-amount"><?php 
+<?php R$<?php <?php=<?php number_format($saque['valor'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="transaction-mobile-footer"><?php 
+<?php <div<?php class="transaction-cpf"<?php onclick="toggleCPF(this)"<?php data-full="<?php=<?php htmlspecialchars($saque['cpf'])<?php ?>"><?php 
+<?php <?php=<?php substr($saque['cpf'],<?php 0,<?php 3)<?php ?>.***.***-**<?php 
+<?php </div><?php 
+<?php <div<?php class="status-badge<?php <?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'approved'<?php :<?php 'pending'<?php ?>"><?php 
+<?php <i<?php class="bi<?php bi-<?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'check-circle-fill'<?php :<?php 'clock'<?php ?>"></i><?php 
+<?php <?php=<?php $saque['status']<?php ===<?php 'PAID'<?php ?<?php 'Aprovado'<?php :<?php 'Pendente'<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php include('../inc/footer.php');<?php ?><?php 
+<?php <?php<?php include('../components/modals.php');<?php ?><?php 
+<?php 
+<?php <script><?php 
+<?php //<?php Tab<?php functionality<?php 
+<?php document.getElementById('tabDepositos').addEventListener('click',<?php function()<?php {<?php 
+<?php switchTab('depositos');<?php 
+<?php });<?php 
+<?php 
+<?php document.getElementById('tabSaques').addEventListener('click',<?php function()<?php {<?php 
+<?php switchTab('saques');<?php 
+<?php });<?php 
+<?php 
+<?php function<?php switchTab(tabName)<?php {<?php 
+<?php //<?php Remove<?php active<?php class<?php from<?php all<?php tabs<?php 
+<?php document.querySelectorAll('.tab-button').forEach(btn<?php =><?php btn.classList.remove('active'));<?php 
+<?php document.querySelectorAll('.transactions-content').forEach(content<?php =><?php content.classList.remove('active'));<?php 
+<?php 
+<?php //<?php Add<?php active<?php class<?php to<?php selected<?php tab<?php 
+<?php document.getElementById(`tab${tabName.charAt(0).toUpperCase()<?php +<?php tabName.slice(1)}`).classList.add('active');<?php 
+<?php document.getElementById(`${tabName}Content`).classList.add('active');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php CPF<?php reveal<?php functionality<?php 
+<?php function<?php toggleCPF(element)<?php {<?php 
+<?php const<?php fullCPF<?php =<?php element.getAttribute('data-full');<?php 
+<?php const<?php maskedCPF<?php =<?php fullCPF.substring(0,<?php 3)<?php +<?php '.***.***-**';<?php 
+<?php 
+<?php if<?php (element.textContent.includes('*'))<?php {<?php 
+<?php element.textContent<?php =<?php fullCPF;<?php 
+<?php element.style.color<?php =<?php '#22c55e';<?php 
+<?php }<?php else<?php {<?php 
+<?php element.textContent<?php =<?php maskedCPF;<?php 
+<?php element.style.color<?php =<?php '#9ca3af';<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php 
+<?php console.log('%c💳<?php Transações<?php carregadas!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php 
+<?php //<?php Add<?php hover<?php effects<?php to<?php transaction<?php items<?php 
+<?php document.querySelectorAll('.transaction-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('mouseenter',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateY(-2px)';<?php 
+<?php });<?php 
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php });<?php 
+<?php });<?php 
+<?php });<?php 
+<?php </script><?php 
+</body><?php 
 </html>

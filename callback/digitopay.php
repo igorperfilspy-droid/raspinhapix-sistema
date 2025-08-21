@@ -1,313 +1,313 @@
-<?php
-header('Content-Type: application/json');
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-
-// CONFIGURAÇÃO DE LOGS - ALTERE AQUI PARA ATIVAR/DESATIVAR
-define('DEBUG_MODE', false); // true = logs ativos | false = logs desativados
-define('LOG_FILE', 'logs_digitopay.txt');
-
-// Função para gravar logs apenas se DEBUG_MODE estiver ativo
-function writeLog($message) {
-    if (DEBUG_MODE) {
-        file_put_contents(LOG_FILE, date('d/m/Y H:i:s') . " - " . $message . PHP_EOL, FILE_APPEND);
-    }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Método não permitido']);
-    exit;
-}
-
-try {
-    require_once __DIR__ . '/../conexao.php';
-    
-    // Receber dados do webhook
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true);
-    
-    writeLog("PAYLOAD DIGITOPAY: " . print_r($data, true));
-    writeLog("----------------------------------------------------------");
-    
-    if (!$data) {
-        throw new Exception('Dados inválidos recebidos');
-    }
-    
-    // Verificar se possui os campos necessários
-    if (!isset($data['id']) || !isset($data['status'])) {
-        throw new Exception('Campos obrigatórios não encontrados');
-    }
-    
-    $transactionId = $data['id'];
-    $status = strtoupper($data['status']);
-    $idempotencyKey = $data['idempotencyKey'] ?? null;
-    
-    // Mapear status da DigitoPay para o sistema
-    $statusMap = [
-        'REALIZADO' => 'PAID',
-        'CANCELADO' => 'CANCELLED',
-        'EXPIRADO' => 'CANCELLED',
-        'PENDENTE' => 'PENDING',
-        'EM PROCESSAMENTO' => 'PENDING',
-        'ANALISE' => 'PENDING',
-        'ERRO' => 'FAILED'
-    ];
-    
-    $newStatus = $statusMap[$status] ?? 'PENDING';
-    
-    writeLog("INICIANDO PROCESSO PARA TXN: " . $transactionId . " | STATUS: " . $newStatus);
-    
-    // Buscar a transação no banco
-    $stmt = $pdo->prepare("
-        SELECT id, user_id, valor, status, gateway 
-        FROM depositos 
-        WHERE transactionId = :transactionId 
-        OR idempotency_key = :idempotencyKey
-        LIMIT 1
-    ");
-    
-    $stmt->execute([
-        ':transactionId' => $transactionId,
-        ':idempotencyKey' => $idempotencyKey
-    ]);
-    
-    $deposito = $stmt->fetch();
-    
-    if (!$deposito) {
-        // Se não encontrou por transactionId ou idempotencyKey, tentar buscar apenas por transactionId
-        $stmt = $pdo->prepare("
-            SELECT id, user_id, valor, status, gateway 
-            FROM depositos 
-            WHERE transactionId = :transactionId 
-            LIMIT 1
-        ");
-        
-        $stmt->execute([':transactionId' => $transactionId]);
-        $deposito = $stmt->fetch();
-        
-        if (!$deposito) {
-            writeLog("ERRO: Depósito não encontrado para TXN: " . $transactionId);
-            throw new Exception('Transação não encontrada: ' . $transactionId);
-        }
-    }
-    
-    writeLog("DEPÓSITO ENCONTRADO: " . print_r($deposito, true));
-    
-    // Verificar se é gateway DigitoPay
-    if ($deposito['gateway'] !== 'digitopay') {
-        throw new Exception('Gateway incorreto para esta transação');
-    }
-    
-    // Se o status já foi processado, retornar sucesso
-    if ($deposito['status'] === $newStatus) {
-        echo json_encode(['status' => 'success', 'message' => 'Status já processado']);
-        exit;
-    }
-    
-    // Se a transação foi aprovada, processar com lógica completa incluindo CPA
-    if ($newStatus === 'PAID') {
-        // Verificar se o valor já não foi creditado
-        $stmt = $pdo->prepare("
-            SELECT COUNT(*) as count 
-            FROM transacoes 
-            WHERE tipo = 'DEPOSIT' 
-            AND referencia = :transactionId 
-            AND status = 'COMPLETED'
-        ");
-        
-        $stmt->execute([':transactionId' => $transactionId]);
-        $jaProcessado = $stmt->fetchColumn();
-        
-        if ($jaProcessado == 0) {
-            try {
-                $pdo->beginTransaction();
-                
-                // Atualizar status da transação
-                $stmt = $pdo->prepare("
-                    UPDATE depositos 
-                    SET status = :status, 
-                        updated_at = NOW(),
-                        webhook_data = :webhook_data
-                    WHERE id = :id
-                ");
-                
-                $result = $stmt->execute([
-                    ':status' => $newStatus,
-                    ':webhook_data' => $input,
-                    ':id' => $deposito['id']
-                ]);
-                
-                if (!$result) {
-                    throw new Exception('Erro ao atualizar status da transação');
-                }
-                
-                writeLog("DEPÓSITO ATUALIZADO PARA PAID");
-                
-                // Buscar saldo atual do usuário
-                $stmt = $pdo->prepare("SELECT saldo FROM usuarios WHERE id = :user_id");
-                $stmt->execute([':user_id' => $deposito['user_id']]);
-                $saldoAtual = $stmt->fetchColumn();
-                
-                if ($saldoAtual === false) {
-                    throw new Exception('Usuário não encontrado');
-                }
-                
-                // Atualizar saldo do usuário
-                $novoSaldo = $saldoAtual + $deposito['valor'];
-                $stmt = $pdo->prepare("
-                    UPDATE usuarios 
-                    SET saldo = :novo_saldo 
-                    WHERE id = :user_id
-                ");
-                
-                $stmt->execute([
-                    ':novo_saldo' => $novoSaldo,
-                    ':user_id' => $deposito['user_id']
-                ]);
-                
-                writeLog("SALDO CREDITADO: R$ " . $deposito['valor'] . " para usuário " . $deposito['user_id']);
-                
-                // Registrar a transação
-                $stmt = $pdo->prepare("
-                    INSERT INTO transacoes (
-                        user_id, tipo, valor, saldo_anterior, saldo_posterior, 
-                        status, referencia, gateway, descricao, created_at
-                    ) VALUES (
-                        :user_id, 'DEPOSIT', :valor, :saldo_anterior, :saldo_posterior,
-                        'COMPLETED', :referencia, 'digitopay', :descricao, NOW()
-                    )
-                ");
-                
-                $stmt->execute([
-                    ':user_id' => $deposito['user_id'],
-                    ':valor' => $deposito['valor'],
-                    ':saldo_anterior' => $saldoAtual,
-                    ':saldo_posterior' => $novoSaldo,
-                    ':referencia' => $transactionId,
-                    ':descricao' => 'Depósito via DigitoPay - ' . $transactionId
-                ]);
-                
-                // VERIFICAÇÃO PARA CPA (APENAS PRIMEIRO DEPÓSITO)
-                $stmt = $pdo->prepare("SELECT indicacao FROM usuarios WHERE id = :uid");
-                $stmt->execute([':uid' => $deposito['user_id']]);
-                $usuario = $stmt->fetch();
-                
-                writeLog("USUÁRIO DATA: " . print_r($usuario, true));
-                
-                if ($usuario && !empty($usuario['indicacao'])) {
-                    writeLog("USUÁRIO TEM INDICAÇÃO: " . $usuario['indicacao']);
-                    
-                    // Verifica se este usuário JÁ teve algum depósito aprovado anteriormente
-                    $stmt = $pdo->prepare("SELECT COUNT(*) as total_pagos FROM depositos WHERE user_id = :uid AND status = 'PAID' AND id != :current_id");
-                    $stmt->execute([
-                        ':uid' => $deposito['user_id'],
-                        ':current_id' => $deposito['id']
-                    ]);
-                    $depositosAnteriores = $stmt->fetch();
-                    
-                    writeLog("DEPÓSITOS ANTERIORES PAGOS: " . $depositosAnteriores['total_pagos']);
-                    
-                    // CPA só é pago se este for o PRIMEIRO depósito aprovado do usuário
-                    if ($depositosAnteriores['total_pagos'] == 0) {
-                        writeLog("É O PRIMEIRO DEPÓSITO, VERIFICANDO AFILIADO");
-                        
-                        $stmt = $pdo->prepare("SELECT id, comissao_cpa, banido FROM usuarios WHERE id = :afiliado_id");
-                        $stmt->execute([':afiliado_id' => $usuario['indicacao']]);
-                        $afiliado = $stmt->fetch();
-                        
-                        writeLog("AFILIADO DATA: " . print_r($afiliado, true));
-                        
-                        if ($afiliado && $afiliado['banido'] != 1 && !empty($afiliado['comissao_cpa'])) {
-                            $comissao = $afiliado['comissao_cpa'];
-                            
-                            // Credita a comissão CPA para o afiliado
-                            $stmt = $pdo->prepare("UPDATE usuarios SET saldo = saldo + :comissao WHERE id = :afiliado_id");
-                            $stmt->execute([
-                                ':comissao' => $comissao,
-                                ':afiliado_id' => $afiliado['id']
-                            ]);
-                            
-                            // Tenta inserir na tabela transacoes_afiliados
-                            try {
-                                $stmt = $pdo->prepare("INSERT INTO transacoes_afiliados
-                                                      (afiliado_id, usuario_id, deposito_id, valor, created_at)
-                                                      VALUES (:afiliado_id, :usuario_id, :deposito_id, :valor, NOW())");
-                                $stmt->execute([
-                                    ':afiliado_id' => $afiliado['id'],
-                                    ':usuario_id' => $deposito['user_id'],
-                                    ':deposito_id' => $deposito['id'],
-                                    ':valor' => $comissao
-                                ]);
-                            } catch (Exception $insertError) {
-                                writeLog("ERRO AO INSERIR TRANSAÇÃO AFILIADO: " . $insertError->getMessage());
-                            }
-                            
-                            writeLog("CPA PAGO: Afiliado {$afiliado['id']} recebeu R$ {$comissao} pelo primeiro depósito do usuário {$deposito['user_id']}");
-                        } else {
-                            writeLog("CPA NÃO PAGO: Afiliado inválido ou sem comissão");
-                        }
-                    } else {
-                        writeLog("CPA NÃO PAGO: Usuário {$deposito['user_id']} já teve {$depositosAnteriores['total_pagos']} depósito(s) pago(s) anteriormente");
-                    }
-                } else {
-                    writeLog("USUÁRIO SEM INDICAÇÃO");
-                }
-                
-                $pdo->commit();
-                writeLog("TRANSAÇÃO FINALIZADA COM SUCESSO");
-                
-            } catch (Exception $e) {
-                $pdo->rollback();
-                writeLog("ERRO GERAL: " . $e->getMessage());
-                writeLog("STACK TRACE: " . $e->getTraceAsString());
-                throw new Exception('Erro ao processar aprovação: ' . $e->getMessage());
-            }
-        } else {
-            writeLog("TRANSAÇÃO JÁ PROCESSADA ANTERIORMENTE");
-        }
-    } else {
-        // Para outros status que não são APPROVED, apenas atualizar o status
-        $stmt = $pdo->prepare("
-            UPDATE depositos 
-            SET status = :status, 
-                updated_at = NOW(),
-                webhook_data = :webhook_data
-            WHERE id = :id
-        ");
-        
-        $result = $stmt->execute([
-            ':status' => $newStatus,
-            ':webhook_data' => $input,
-            ':id' => $deposito['id']
-        ]);
-        
-        if (!$result) {
-            throw new Exception('Erro ao atualizar status da transação');
-        }
-        
-        writeLog("STATUS ATUALIZADO PARA: " . $newStatus);
-    }
-    
-    // Resposta de sucesso
-    echo json_encode([
-        'status' => 'success', 
-        'message' => 'Webhook processado com sucesso',
-        'transaction_id' => $transactionId,
-        'new_status' => $newStatus
-    ]);
-    
-} catch (Exception $e) {
-    writeLog("ERRO GERAL: " . $e->getMessage());
-    http_response_code(400);
-    echo json_encode([
-        'status' => 'error', 
-        'message' => $e->getMessage()
-    ]);
+<?php<?php 
+header('Content-Type:<?php application/json');<?php 
+header("Access-Control-Allow-Origin:<?php *");<?php 
+header("Access-Control-Allow-Methods:<?php POST,<?php OPTIONS");<?php 
+header("Access-Control-Allow-Headers:<?php Content-Type");<?php 
+<?php 
+//<?php CONFIGURAÇÃO<?php DE<?php LOGS<?php -<?php ALTERE<?php AQUI<?php PARA<?php ATIVAR/DESATIVAR<?php 
+define('DEBUG_MODE',<?php false);<?php //<?php true<?php =<?php logs<?php ativos<?php |<?php false<?php =<?php logs<?php desativados<?php 
+define('LOG_FILE',<?php 'logs_digitopay.txt');<?php 
+<?php 
+//<?php Função<?php para<?php gravar<?php logs<?php apenas<?php se<?php DEBUG_MODE<?php estiver<?php ativo<?php 
+function<?php writeLog($message)<?php {<?php 
+<?php if<?php (DEBUG_MODE)<?php {<?php 
+<?php file_put_contents(LOG_FILE,<?php date('d/m/Y<?php H:i:s')<?php .<?php "<?php -<?php "<?php .<?php $message<?php .<?php PHP_EOL,<?php FILE_APPEND);<?php 
+<?php }<?php 
+}<?php 
+<?php 
+if<?php ($_SERVER['REQUEST_METHOD']<?php ===<?php 'OPTIONS')<?php {<?php 
+<?php http_response_code(200);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php ($_SERVER['REQUEST_METHOD']<?php !==<?php 'POST')<?php {<?php 
+<?php http_response_code(405);<?php 
+<?php echo<?php json_encode(['error'<?php =><?php 'Método<?php não<?php permitido']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+try<?php {<?php 
+<?php require_once<?php __DIR__<?php .<?php '/../conexao.php';<?php 
+<?php 
+<?php //<?php Receber<?php dados<?php do<?php webhook<?php 
+<?php $input<?php =<?php file_get_contents('php://input');<?php 
+<?php $data<?php =<?php json_decode($input,<?php true);<?php 
+<?php 
+<?php writeLog("PAYLOAD<?php DIGITOPAY:<?php "<?php .<?php print_r($data,<?php true));<?php 
+<?php writeLog("----------------------------------------------------------");<?php 
+<?php 
+<?php if<?php (!$data)<?php {<?php 
+<?php throw<?php new<?php Exception('Dados<?php inválidos<?php recebidos');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Verificar<?php se<?php possui<?php os<?php campos<?php necessários<?php 
+<?php if<?php (!isset($data['id'])<?php ||<?php !isset($data['status']))<?php {<?php 
+<?php throw<?php new<?php Exception('Campos<?php obrigatórios<?php não<?php encontrados');<?php 
+<?php }<?php 
+<?php 
+<?php $transactionId<?php =<?php $data['id'];<?php 
+<?php $status<?php =<?php strtoupper($data['status']);<?php 
+<?php $idempotencyKey<?php =<?php $data['idempotencyKey']<?php ??<?php null;<?php 
+<?php 
+<?php //<?php Mapear<?php status<?php da<?php DigitoPay<?php para<?php o<?php sistema<?php 
+<?php $statusMap<?php =<?php [<?php 
+<?php 'REALIZADO'<?php =><?php 'PAID',<?php 
+<?php 'CANCELADO'<?php =><?php 'CANCELLED',<?php 
+<?php 'EXPIRADO'<?php =><?php 'CANCELLED',<?php 
+<?php 'PENDENTE'<?php =><?php 'PENDING',<?php 
+<?php 'EM<?php PROCESSAMENTO'<?php =><?php 'PENDING',<?php 
+<?php 'ANALISE'<?php =><?php 'PENDING',<?php 
+<?php 'ERRO'<?php =><?php 'FAILED'<?php 
+<?php ];<?php 
+<?php 
+<?php $newStatus<?php =<?php $statusMap[$status]<?php ??<?php 'PENDING';<?php 
+<?php 
+<?php writeLog("INICIANDO<?php PROCESSO<?php PARA<?php TXN:<?php "<?php .<?php $transactionId<?php .<?php "<?php |<?php STATUS:<?php "<?php .<?php $newStatus);<?php 
+<?php 
+<?php //<?php Buscar<?php a<?php transação<?php no<?php banco<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php id,<?php user_id,<?php valor,<?php status,<?php gateway<?php 
+<?php FROM<?php depositos<?php 
+<?php WHERE<?php transactionId<?php =<?php :transactionId<?php 
+<?php OR<?php idempotency_key<?php =<?php :idempotencyKey<?php 
+<?php LIMIT<?php 1<?php 
+<?php ");<?php 
+<?php 
+<?php $stmt->execute([<?php 
+<?php ':transactionId'<?php =><?php $transactionId,<?php 
+<?php ':idempotencyKey'<?php =><?php $idempotencyKey<?php 
+<?php ]);<?php 
+<?php 
+<?php $deposito<?php =<?php $stmt->fetch();<?php 
+<?php 
+<?php if<?php (!$deposito)<?php {<?php 
+<?php //<?php Se<?php não<?php encontrou<?php por<?php transactionId<?php ou<?php idempotencyKey,<?php tentar<?php buscar<?php apenas<?php por<?php transactionId<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php id,<?php user_id,<?php valor,<?php status,<?php gateway<?php 
+<?php FROM<?php depositos<?php 
+<?php WHERE<?php transactionId<?php =<?php :transactionId<?php 
+<?php LIMIT<?php 1<?php 
+<?php ");<?php 
+<?php 
+<?php $stmt->execute([':transactionId'<?php =><?php $transactionId]);<?php 
+<?php $deposito<?php =<?php $stmt->fetch();<?php 
+<?php 
+<?php if<?php (!$deposito)<?php {<?php 
+<?php writeLog("ERRO:<?php Depósito<?php não<?php encontrado<?php para<?php TXN:<?php "<?php .<?php $transactionId);<?php 
+<?php throw<?php new<?php Exception('Transação<?php não<?php encontrada:<?php '<?php .<?php $transactionId);<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("DEPÓSITO<?php ENCONTRADO:<?php "<?php .<?php print_r($deposito,<?php true));<?php 
+<?php 
+<?php //<?php Verificar<?php se<?php é<?php gateway<?php DigitoPay<?php 
+<?php if<?php ($deposito['gateway']<?php !==<?php 'digitopay')<?php {<?php 
+<?php throw<?php new<?php Exception('Gateway<?php incorreto<?php para<?php esta<?php transação');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Se<?php o<?php status<?php já<?php foi<?php processado,<?php retornar<?php sucesso<?php 
+<?php if<?php ($deposito['status']<?php ===<?php $newStatus)<?php {<?php 
+<?php echo<?php json_encode(['status'<?php =><?php 'success',<?php 'message'<?php =><?php 'Status<?php já<?php processado']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Se<?php a<?php transação<?php foi<?php aprovada,<?php processar<?php com<?php lógica<?php completa<?php incluindo<?php CPA<?php 
+<?php if<?php ($newStatus<?php ===<?php 'PAID')<?php {<?php 
+<?php //<?php Verificar<?php se<?php o<?php valor<?php já<?php não<?php foi<?php creditado<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php COUNT(*)<?php as<?php count<?php 
+<?php FROM<?php transacoes<?php 
+<?php WHERE<?php tipo<?php =<?php 'DEPOSIT'<?php 
+<?php AND<?php referencia<?php =<?php :transactionId<?php 
+<?php AND<?php status<?php =<?php 'COMPLETED'<?php 
+<?php ");<?php 
+<?php 
+<?php $stmt->execute([':transactionId'<?php =><?php $transactionId]);<?php 
+<?php $jaProcessado<?php =<?php $stmt->fetchColumn();<?php 
+<?php 
+<?php if<?php ($jaProcessado<?php ==<?php 0)<?php {<?php 
+<?php try<?php {<?php 
+<?php $pdo->beginTransaction();<?php 
+<?php 
+<?php //<?php Atualizar<?php status<?php da<?php transação<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php UPDATE<?php depositos<?php 
+<?php SET<?php status<?php =<?php :status,<?php 
+<?php updated_at<?php =<?php NOW(),<?php 
+<?php webhook_data<?php =<?php :webhook_data<?php 
+<?php WHERE<?php id<?php =<?php :id<?php 
+<?php ");<?php 
+<?php 
+<?php $result<?php =<?php $stmt->execute([<?php 
+<?php ':status'<?php =><?php $newStatus,<?php 
+<?php ':webhook_data'<?php =><?php $input,<?php 
+<?php ':id'<?php =><?php $deposito['id']<?php 
+<?php ]);<?php 
+<?php 
+<?php if<?php (!$result)<?php {<?php 
+<?php throw<?php new<?php Exception('Erro<?php ao<?php atualizar<?php status<?php da<?php transação');<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("DEPÓSITO<?php ATUALIZADO<?php PARA<?php PAID");<?php 
+<?php 
+<?php //<?php Buscar<?php saldo<?php atual<?php do<?php usuário<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php saldo<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php :user_id");<?php 
+<?php $stmt->execute([':user_id'<?php =><?php $deposito['user_id']]);<?php 
+<?php $saldoAtual<?php =<?php $stmt->fetchColumn();<?php 
+<?php 
+<?php if<?php ($saldoAtual<?php ===<?php false)<?php {<?php 
+<?php throw<?php new<?php Exception('Usuário<?php não<?php encontrado');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Atualizar<?php saldo<?php do<?php usuário<?php 
+<?php $novoSaldo<?php =<?php $saldoAtual<?php +<?php $deposito['valor'];<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php UPDATE<?php usuarios<?php 
+<?php SET<?php saldo<?php =<?php :novo_saldo<?php 
+<?php WHERE<?php id<?php =<?php :user_id<?php 
+<?php ");<?php 
+<?php 
+<?php $stmt->execute([<?php 
+<?php ':novo_saldo'<?php =><?php $novoSaldo,<?php 
+<?php ':user_id'<?php =><?php $deposito['user_id']<?php 
+<?php ]);<?php 
+<?php 
+<?php writeLog("SALDO<?php CREDITADO:<?php R$<?php "<?php .<?php $deposito['valor']<?php .<?php "<?php para<?php usuário<?php "<?php .<?php $deposito['user_id']);<?php 
+<?php 
+<?php //<?php Registrar<?php a<?php transação<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php INSERT<?php INTO<?php transacoes<?php (<?php 
+<?php user_id,<?php tipo,<?php valor,<?php saldo_anterior,<?php saldo_posterior,<?php 
+<?php status,<?php referencia,<?php gateway,<?php descricao,<?php created_at<?php 
+<?php )<?php VALUES<?php (<?php 
+<?php :user_id,<?php 'DEPOSIT',<?php :valor,<?php :saldo_anterior,<?php :saldo_posterior,<?php 
+<?php 'COMPLETED',<?php :referencia,<?php 'digitopay',<?php :descricao,<?php NOW()<?php 
+<?php )<?php 
+<?php ");<?php 
+<?php 
+<?php $stmt->execute([<?php 
+<?php ':user_id'<?php =><?php $deposito['user_id'],<?php 
+<?php ':valor'<?php =><?php $deposito['valor'],<?php 
+<?php ':saldo_anterior'<?php =><?php $saldoAtual,<?php 
+<?php ':saldo_posterior'<?php =><?php $novoSaldo,<?php 
+<?php ':referencia'<?php =><?php $transactionId,<?php 
+<?php ':descricao'<?php =><?php 'Depósito<?php via<?php DigitoPay<?php -<?php '<?php .<?php $transactionId<?php 
+<?php ]);<?php 
+<?php 
+<?php //<?php VERIFICAÇÃO<?php PARA<?php CPA<?php (APENAS<?php PRIMEIRO<?php DEPÓSITO)<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php indicacao<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php :uid");<?php 
+<?php $stmt->execute([':uid'<?php =><?php $deposito['user_id']]);<?php 
+<?php $usuario<?php =<?php $stmt->fetch();<?php 
+<?php 
+<?php writeLog("USUÁRIO<?php DATA:<?php "<?php .<?php print_r($usuario,<?php true));<?php 
+<?php 
+<?php if<?php ($usuario<?php &&<?php !empty($usuario['indicacao']))<?php {<?php 
+<?php writeLog("USUÁRIO<?php TEM<?php INDICAÇÃO:<?php "<?php .<?php $usuario['indicacao']);<?php 
+<?php 
+<?php //<?php Verifica<?php se<?php este<?php usuário<?php JÁ<?php teve<?php algum<?php depósito<?php aprovado<?php anteriormente<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php COUNT(*)<?php as<?php total_pagos<?php FROM<?php depositos<?php WHERE<?php user_id<?php =<?php :uid<?php AND<?php status<?php =<?php 'PAID'<?php AND<?php id<?php !=<?php :current_id");<?php 
+<?php $stmt->execute([<?php 
+<?php ':uid'<?php =><?php $deposito['user_id'],<?php 
+<?php ':current_id'<?php =><?php $deposito['id']<?php 
+<?php ]);<?php 
+<?php $depositosAnteriores<?php =<?php $stmt->fetch();<?php 
+<?php 
+<?php writeLog("DEPÓSITOS<?php ANTERIORES<?php PAGOS:<?php "<?php .<?php $depositosAnteriores['total_pagos']);<?php 
+<?php 
+<?php //<?php CPA<?php só<?php é<?php pago<?php se<?php este<?php for<?php o<?php PRIMEIRO<?php depósito<?php aprovado<?php do<?php usuário<?php 
+<?php if<?php ($depositosAnteriores['total_pagos']<?php ==<?php 0)<?php {<?php 
+<?php writeLog("É<?php O<?php PRIMEIRO<?php DEPÓSITO,<?php VERIFICANDO<?php AFILIADO");<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php id,<?php comissao_cpa,<?php banido<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php :afiliado_id");<?php 
+<?php $stmt->execute([':afiliado_id'<?php =><?php $usuario['indicacao']]);<?php 
+<?php $afiliado<?php =<?php $stmt->fetch();<?php 
+<?php 
+<?php writeLog("AFILIADO<?php DATA:<?php "<?php .<?php print_r($afiliado,<?php true));<?php 
+<?php 
+<?php if<?php ($afiliado<?php &&<?php $afiliado['banido']<?php !=<?php 1<?php &&<?php !empty($afiliado['comissao_cpa']))<?php {<?php 
+<?php $comissao<?php =<?php $afiliado['comissao_cpa'];<?php 
+<?php 
+<?php //<?php Credita<?php a<?php comissão<?php CPA<?php para<?php o<?php afiliado<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php usuarios<?php SET<?php saldo<?php =<?php saldo<?php +<?php :comissao<?php WHERE<?php id<?php =<?php :afiliado_id");<?php 
+<?php $stmt->execute([<?php 
+<?php ':comissao'<?php =><?php $comissao,<?php 
+<?php ':afiliado_id'<?php =><?php $afiliado['id']<?php 
+<?php ]);<?php 
+<?php 
+<?php //<?php Tenta<?php inserir<?php na<?php tabela<?php transacoes_afiliados<?php 
+<?php try<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("INSERT<?php INTO<?php transacoes_afiliados<?php 
+<?php (afiliado_id,<?php usuario_id,<?php deposito_id,<?php valor,<?php created_at)<?php 
+<?php VALUES<?php (:afiliado_id,<?php :usuario_id,<?php :deposito_id,<?php :valor,<?php NOW())");<?php 
+<?php $stmt->execute([<?php 
+<?php ':afiliado_id'<?php =><?php $afiliado['id'],<?php 
+<?php ':usuario_id'<?php =><?php $deposito['user_id'],<?php 
+<?php ':deposito_id'<?php =><?php $deposito['id'],<?php 
+<?php ':valor'<?php =><?php $comissao<?php 
+<?php ]);<?php 
+<?php }<?php catch<?php (Exception<?php $insertError)<?php {<?php 
+<?php writeLog("ERRO<?php AO<?php INSERIR<?php TRANSAÇÃO<?php AFILIADO:<?php "<?php .<?php $insertError->getMessage());<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("CPA<?php PAGO:<?php Afiliado<?php {$afiliado['id']}<?php recebeu<?php R$<?php {$comissao}<?php pelo<?php primeiro<?php depósito<?php do<?php usuário<?php {$deposito['user_id']}");<?php 
+<?php }<?php else<?php {<?php 
+<?php writeLog("CPA<?php NÃO<?php PAGO:<?php Afiliado<?php inválido<?php ou<?php sem<?php comissão");<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php writeLog("CPA<?php NÃO<?php PAGO:<?php Usuário<?php {$deposito['user_id']}<?php já<?php teve<?php {$depositosAnteriores['total_pagos']}<?php depósito(s)<?php pago(s)<?php anteriormente");<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php writeLog("USUÁRIO<?php SEM<?php INDICAÇÃO");<?php 
+<?php }<?php 
+<?php 
+<?php $pdo->commit();<?php 
+<?php writeLog("TRANSAÇÃO<?php FINALIZADA<?php COM<?php SUCESSO");<?php 
+<?php 
+<?php }<?php catch<?php (Exception<?php $e)<?php {<?php 
+<?php $pdo->rollback();<?php 
+<?php writeLog("ERRO<?php GERAL:<?php "<?php .<?php $e->getMessage());<?php 
+<?php writeLog("STACK<?php TRACE:<?php "<?php .<?php $e->getTraceAsString());<?php 
+<?php throw<?php new<?php Exception('Erro<?php ao<?php processar<?php aprovação:<?php '<?php .<?php $e->getMessage());<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php writeLog("TRANSAÇÃO<?php JÁ<?php PROCESSADA<?php ANTERIORMENTE");<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php //<?php Para<?php outros<?php status<?php que<?php não<?php são<?php APPROVED,<?php apenas<?php atualizar<?php o<?php status<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php UPDATE<?php depositos<?php 
+<?php SET<?php status<?php =<?php :status,<?php 
+<?php updated_at<?php =<?php NOW(),<?php 
+<?php webhook_data<?php =<?php :webhook_data<?php 
+<?php WHERE<?php id<?php =<?php :id<?php 
+<?php ");<?php 
+<?php 
+<?php $result<?php =<?php $stmt->execute([<?php 
+<?php ':status'<?php =><?php $newStatus,<?php 
+<?php ':webhook_data'<?php =><?php $input,<?php 
+<?php ':id'<?php =><?php $deposito['id']<?php 
+<?php ]);<?php 
+<?php 
+<?php if<?php (!$result)<?php {<?php 
+<?php throw<?php new<?php Exception('Erro<?php ao<?php atualizar<?php status<?php da<?php transação');<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("STATUS<?php ATUALIZADO<?php PARA:<?php "<?php .<?php $newStatus);<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Resposta<?php de<?php sucesso<?php 
+<?php echo<?php json_encode([<?php 
+<?php 'status'<?php =><?php 'success',<?php 
+<?php 'message'<?php =><?php 'Webhook<?php processado<?php com<?php sucesso',<?php 
+<?php 'transaction_id'<?php =><?php $transactionId,<?php 
+<?php 'new_status'<?php =><?php $newStatus<?php 
+<?php ]);<?php 
+<?php 
+}<?php catch<?php (Exception<?php $e)<?php {<?php 
+<?php writeLog("ERRO<?php GERAL:<?php "<?php .<?php $e->getMessage());<?php 
+<?php http_response_code(400);<?php 
+<?php echo<?php json_encode([<?php 
+<?php 'status'<?php =><?php 'error',<?php 
+<?php 'message'<?php =><?php $e->getMessage()<?php 
+<?php ]);<?php 
 }

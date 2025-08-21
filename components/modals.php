@@ -1,49 +1,49 @@
-<div id="backdrop2" class="modal-backdrop"></div>
+<div<?php id="backdrop2"<?php class="modal-backdrop"></div>
 
-<!-- Deposit Modal -->
-<section id="depositModal" class="modal-container">
-    <div class="modal-wrapper">
-        <div class="modal-card">
-            <button id="closeDepositModal" class="modal-close">
-                <i class="bi bi-x"></i>
-            </button>
+<!--<?php Deposit<?php Modal<?php -->
+<section<?php id="depositModal"<?php class="modal-container">
+<?php <div<?php class="modal-wrapper">
+<?php <div<?php class="modal-card">
+<?php <button<?php id="closeDepositModal"<?php class="modal-close">
+<?php <i<?php class="bi<?php bi-x"></i>
+<?php </button>
 
-            <div class="modal-icon">
-                <i class="bi bi-credit-card"></i>
-            </div>
+<?php <div<?php class="modal-icon">
+<?php <i<?php class="bi<?php bi-credit-card"></i>
+<?php </div>
 
-            <h2 class="modal-title">Depósito</h2>
+<?php <h2<?php class="modal-title">Depósito</h2>
 
-            <form id="depositForm" class="modal-form">
-                <div class="form-group">
-                    <div class="input-icon">
-                        <i class="bi bi-cash-stack"></i>
-                    </div>
-                    <input type="text" name="amount" id="amountInput" required
-                           class="form-input"
-                           placeholder="Digite o valor do depósito" inputmode="numeric">
-                </div>
+<?php <form<?php id="depositForm"<?php class="modal-form">
+<?php <div<?php class="form-group">
+<?php <div<?php class="input-icon">
+<?php <i<?php class="bi<?php bi-cash-stack"></i>
+<?php </div>
+<?php <input<?php type="text"<?php name="amount"<?php id="amountInput"<?php required
+<?php class="form-input"
+<?php placeholder="Digite<?php o<?php valor<?php do<?php depósito"<?php inputmode="numeric">
+<?php </div>
 
-                <div class="quick-amounts">
-                    <button type="button" data-value="20" class="quick-amount">R$ 20</button>
-                    <button type="button" data-value="50" class="quick-amount">R$ 50</button>
-                    <button type="button" data-value="100" class="quick-amount">R$ 100</button>
-                    <button type="button" data-value="200" class="quick-amount">R$ 200</button>
-                </div>
+<?php <div<?php class="quick-amounts">
+<?php <button<?php type="button"<?php data-value="20"<?php class="quick-amount">R$<?php 20</button>
+<?php <button<?php type="button"<?php data-value="50"<?php class="quick-amount">R$<?php 50</button>
+<?php <button<?php type="button"<?php data-value="100"<?php class="quick-amount">R$<?php 100</button>
+<?php <button<?php type="button"<?php data-value="200"<?php class="quick-amount">R$<?php 200</button>
+<?php </div>
 
-                <div class="form-group">
-                    <div class="input-icon">
-                        <i class="bi bi-person-vcard"></i>
-                    </div>
-                    <input type="text" name="cpf" id="cpfInput" required
-                           class="form-input"
-                           placeholder="CPF (000.000.000-00)" maxlength="14">
-                </div>
+<?php <div<?php class="form-group">
+<?php <div<?php class="input-icon">
+<?php <i<?php class="bi<?php bi-person-vcard"></i>
+<?php </div>
+<?php <input<?php type="text"<?php name="cpf"<?php id="cpfInput"<?php required
+<?php class="form-input"
+<?php placeholder="CPF<?php (000.000.000-00)"<?php maxlength="14">
+<?php </div>
 
-                <button type="submit" class="submit-btn">
-                    <i class="bi bi-check-circle"></i>
-                    Depositar
-                </button>
-            </form>
+<?php <button<?php type="submit"<?php class="submit-btn">
+<?php <i<?php class="bi<?php bi-check-circle"></i>
+<?php Depositar
+<?php </button>
+<?php </form>
 
-            <div id="qrArea" class="qr-area">
+<?php <div<?php id="qrArea"<?php class="qr-area">

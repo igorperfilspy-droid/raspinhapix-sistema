@@ -1,1048 +1,1048 @@
-<?php
-@session_start();
-require_once '../conexao.php';
-
-if (!isset($_SESSION['usuario_id'])) {
-  $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você precisa estar logado para acessar esta página!'];
-  header("Location: /login");
-  exit;
-}
-
-$id = (int)($_GET['id'] ?? 0);
-$stmt = $pdo->prepare("SELECT * FROM raspadinhas WHERE id = ?");
-$stmt->execute([$id]);
-$cartela = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$cartela) {
-    $_SESSION['message'] = ['type' => 'failure', 'text' => 'Cartela não encontrada.'];
-    header("Location: /raspadinhas");
-    exit;
-}
-
-$premios = $pdo->prepare("SELECT * FROM raspadinha_premios WHERE raspadinha_id = ? ORDER BY valor DESC");
-$premios->execute([$id]);
-$premios = $premios->fetchAll(PDO::FETCH_ASSOC);
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - <?php= htmlspecialchars($cartela['nome']); ?></title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
-
-    <style>
-        /* Page Styles */
-        .raspadinha-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 200px);
-        }
-
-        .raspadinha-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* Header Card */
-        .header-card {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 163, 74, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 24px;
-            padding: 2rem;
-            margin-bottom: 3rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200px;
-            height: 200px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.1), transparent);
-            border-radius: 50%;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .header-card::after {
-            content: '';
-            position: absolute;
-            bottom: -50%;
-            left: -50%;
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.05), transparent);
-            border-radius: 50%;
-            animation: float 8s ease-in-out infinite reverse;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
-        }
-
-        .cartela-banner {
-            width: 100%;
-            height: 200px;
-            border-radius: 20px;
-            overflow: hidden;
-            position: relative;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-
-        .cartela-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .cartela-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(45deg, rgba(0, 0, 0, 0.3), rgba(34, 197, 94, 0.1));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .cartela-title {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 900;
-            text-align: center;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            padding: 0 1rem;
-        }
-
-        .price-badge {
-            position: absolute;
-            bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-        }
-
-        /* Instructions */
-        .instructions {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            text-align: center;
-        }
-
-        .instructions h3 {
-            color: #22c55e;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-
-        .instructions-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            color: #e5e7eb;
-        }
-
-        .instruction-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .instruction-icon {
-            color: #22c55e;
-            font-size: 1.1rem;
-        }
-
-        /* Prizes Section */
-        .prizes-section {
-            background: rgba(10, 10, 10, 0.6);
-            border: 1px solid rgba(34, 197, 94, 0.1);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-top: 2rem;
-        }
-
-        .prizes-title {
-            color: #ffffff;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .prizes-title i {
-            color: #22c55e;
-            font-size: 1.2rem;
-        }
-
-        .prizes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 1rem;
-            max-height: 320px;
-            overflow-y: auto;
-            padding: 0.5rem;
-        }
-
-        /* Custom scrollbar for prizes grid */
-        .prizes-grid::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .prizes-grid::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 3px;
-        }
-
-        .prizes-grid::-webkit-scrollbar-thumb {
-            background: #22c55e;
-            border-radius: 3px;
-        }
-
-        .prizes-grid::-webkit-scrollbar-thumb:hover {
-            background: #16a34a;
-        }
-
-        .prize-card {
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 12px;
-            padding: 1rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .prize-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .prize-card:hover::before {
-            opacity: 1;
-        }
-
-        .prize-card:hover {
-            border-color: rgba(34, 197, 94, 0.4);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.15);
-        }
-
-        .prize-image {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            position: relative;
-            z-index: 2;
-        }
-
-        .prize-image img {
-            width: 48px;
-            height: 48px;
-            object-fit: contain;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-        }
-
-        .prize-info {
-            position: relative;
-            z-index: 2;
-        }
-
-        .prize-name {
-            color: #e5e7eb;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-            line-height: 1.2;
-        }
-
-        .prize-value {
-            color: #22c55e;
-            font-size: 0.9rem;
-            font-weight: 700;
-        }
-
-        /* Game Container */
-        .game-container {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            position: relative;
-        }
-
-        .game-title {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        /* Scratch Container */
-        #scratch-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            aspect-ratio: 1 / 1;
-            margin: 0 auto 2rem;
-            border-radius: 20px;
-            user-select: none;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-
-        #prizes-grid {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 8px;
-            padding: 12px;
-            background: linear-gradient(135deg, #1f2937, #374151);
-            color: white;
-            border-radius: 20px;
-            z-index: 1;
-        }
-
-        #prizes-grid > div {
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        #prizes-grid > div::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.1), transparent);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        #prizes-grid > div:hover::before {
-            opacity: 1;
-        }
-
-        #prizes-grid img {
-            width: 48px;
-            height: 48px;
-            object-fit: contain;
-            margin-bottom: 6px;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-        }
-
-        #scratch-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 20px;
-            z-index: 10;
-            touch-action: none;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        #btn-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(4px);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #fff;
-            z-index: 30;
-            border-radius: 20px;
-            text-align: center;
-            gap: 1rem;
-        }
-
-        .overlay-icon {
-            font-size: 3rem;
-            color: #22c55e;
-            margin-bottom: 1rem;
-        }
-
-        /* Buy Button */
-        .buy-button {
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 16px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .buy-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(34, 197, 94, 0.5);
-        }
-
-        .buy-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .buy-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .buy-button:hover::before {
-            left: 100%;
-        }
-
-        /* Result Message */
-        #result-msg {
-            margin-top: 2rem;
-            font-weight: 700;
-            text-align: center;
-            min-height: 2rem;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        /* Loading States */
-        .loading-pulse {
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Prize animations */
-        .prize-reveal {
-            animation: prizeReveal 0.5s ease-out forwards;
-        }
-
-        @keyframes prizeReveal {
-            0% {
-                transform: scale(0.8);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.1);
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        /* Success animations */
-        .win-animation {
-            animation: winPulse 1s ease-in-out infinite;
-        }
-
-        @keyframes winPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .raspadinha-container {
-                padding: 0 1rem;
-            }
-            
-            .cartela-title {
-                font-size: 2rem;
-            }
-            
-            .game-container {
-                padding: 1.5rem;
-            }
-            
-            .instructions-list {
-                grid-template-columns: 1fr;
-            }
-
-            .prizes-section {
-                padding: 1.5rem;
-                margin-top: 1.5rem;
-            }
-
-            .prizes-grid {
-                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-                gap: 0.75rem;
-                max-height: 280px;
-            }
-
-            .prize-card {
-                padding: 0.75rem;
-            }
-
-            .prize-image {
-                width: 56px;
-                height: 56px;
-                margin-bottom: 0.5rem;
-            }
-
-            .prize-image img {
-                width: 40px;
-                height: 40px;
-            }
-
-            .prize-name {
-                font-size: 0.75rem;
-            }
-
-            .prize-value {
-                font-size: 0.8rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .cartela-title {
-                font-size: 1.5rem;
-            }
-            
-            #scratch-container {
-                max-width: 300px;
-            }
-
-            .prizes-section {
-                padding: 1rem;
-            }
-
-            .prizes-grid {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                gap: 0.5rem;
-                max-height: 240px;
-            }
-
-            .prize-card {
-                padding: 0.5rem;
-            }
-
-            .prize-image {
-                width: 48px;
-                height: 48px;
-                margin-bottom: 0.5rem;
-            }
-
-            .prize-image img {
-                width: 32px;
-                height: 32px;
-            }
-
-            .prize-name {
-                font-size: 0.7rem;
-            }
-
-            .prize-value {
-                font-size: 0.75rem;
-            }
-
-            .prizes-title {
-                font-size: 1rem;
-                margin-bottom: 1rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <?php include('../inc/header.php'); ?>
-    <?php include('../components/modals.php'); ?>
-
-    <section class="raspadinha-section">
-        <div class="raspadinha-container">
-            <!-- Header Card -->
-            <div class="header-card">
-                <div class="cartela-banner">
-                    <img src="<?php= htmlspecialchars($cartela['banner']); ?>" 
-                         class="cartela-image" 
-                         alt="Banner <?php= htmlspecialchars($cartela['nome']); ?>">
-                    
-                    <div class="cartela-overlay">
-                        <h1 class="cartela-title"><?php= htmlspecialchars($cartela['nome']); ?></h1>
-                    </div>
-                    
-                    <div class="price-badge">
-                        <i class="bi bi-tag-fill"></i>
-                        R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>
-                    </div>
-                </div>
-
-                <!-- Instructions -->
-                <div class="instructions">
-                    <h3><i class="bi bi-info-circle"></i> Como Jogar</h3>
-                    <div class="instructions-list">
-                        <div class="instruction-item">
-                            <i class="bi bi-1-circle instruction-icon"></i>
-                            <span>Clique em "Comprar e Raspar"</span>
-                        </div>
-                        <div class="instruction-item">
-                            <i class="bi bi-2-circle instruction-icon"></i>
-                            <span>Raspe a cartela com o mouse/dedo</span>
-                        </div>
-                        <div class="instruction-item">
-                            <i class="bi bi-3-circle instruction-icon"></i>
-                            <span>Descubra se você ganhou!</span>
-                        </div>
-                        <div class="instruction-item">
-                            <i class="bi bi-4-circle instruction-icon"></i>
-                            <span>Prêmios são creditados na hora</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Prizes Section -->
-                <?php if (!empty($premios)): ?>
-                <div class="prizes-section">
-                    <h3 class="prizes-title">
-                        <i class="bi bi-gift-fill"></i>
-                        CONTEÚDO DESSA RASPADINHA:
-                    </h3>
-                    
-                    <div class="prizes-grid">
-                        <?php foreach ($premios as $premio): ?>
-                            <div class="prize-card">
-                                <div class="prize-image">
-                                    <img src="<?php= htmlspecialchars($premio['icone']); ?>" 
-                                         alt="<?php= htmlspecialchars($premio['nome']); ?>"
-                                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMyMmM1NWUiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0id2hpdGUiPgo8cGF0aCBkPSJNMTYgOGMwLTQuNDExIDMuNTg5LTggOC04czggMy41ODkgOCA4djJjMCAxLjEwNS0uODk1IDItMiAySDJjLTEuMTA1IDAtMi0uODk1LTItMlY4eiIvPgo8L3N2Zz4KPC9zdmc+'">
-                                </div>
-                                <div class="prize-info">
-                                    <div class="prize-name"><?php= htmlspecialchars($premio['nome']); ?></div>
-                                    <div class="prize-value">R$ <?php= number_format($premio['valor'], 2, ',', '.'); ?></div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Game Container -->
-            <div class="game-container">
-                <h2 class="game-title">
-                    <i class="bi bi-diamond-fill"></i>
-                    Sua Raspadinha
-                </h2>
-
-                <div id="scratch-container">
-                    <div id="prizes-grid"></div>
-                    <canvas id="scratch-canvas"></canvas>
-                    <div id="btn-overlay">
-                        <i class="bi bi-play-circle overlay-icon"></i>
-                        <div>Clique em "Comprar" para jogar</div>
-                        <div style="font-size: 0.9rem; opacity: 0.8;">Boa sorte! 🍀</div>
-                    </div>
-                </div>
-
-                <button id="btn-buy" class="buy-button">
-                    <i class="bi bi-credit-card"></i>
-                    Comprar e Raspar (R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>)
-                </button>
-
-                <div id="result-msg"></div>
-            </div>
-        </div>
-    </section>
-
-    <?php include('../inc/footer.php'); ?>
-
-    <script>
-        let container = document.getElementById('scratch-container');
-        let canvas = document.getElementById('scratch-canvas');
-        let ctx = canvas.getContext('2d');
-        let prizesGrid = document.getElementById('prizes-grid');
-        let btnBuy = document.getElementById('btn-buy');
-        let resultMsg = document.getElementById('result-msg');
-        let overlay = document.getElementById('btn-overlay');
-        let scratchImage = new Image();
-        scratchImage.src = '/assets/img/raspe.png?id=122';
-
-        let orderId = null;
-        let brushRadius = 55;
-        let isDrawing = false;
-        let scratchedPercentage = 0;
-        let isScratchEnabled = false;
-
-        function ajustarCanvas() {
-            const size = container.clientWidth;
-            canvas.width = size;
-            canvas.height = size;
-            drawScratchImage();
-        }
-
-        function resetCanvas() {
-            if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
-
-            const newCanvas = document.createElement('canvas');
-            newCanvas.id = 'scratch-canvas';
-            newCanvas.className = canvas.className;    
-            container.appendChild(newCanvas);
-
-            canvas = newCanvas;
-            ctx = newCanvas.getContext('2d');
-
-            ajustarCanvas();
-            addCanvasListeners();
-        }
-
-        function addCanvasListeners() {
-            canvas.replaceWith(canvas.cloneNode(true));
-            canvas = document.getElementById('scratch-canvas');
-            ctx = canvas.getContext('2d');
-
-            canvas.addEventListener('mousedown', handleStart);
-            canvas.addEventListener('mousemove', handleMove);
-            canvas.addEventListener('mouseup', handleEnd);
-            canvas.addEventListener('mouseleave', handleEnd);
-            canvas.addEventListener('touchstart', handleStart, {passive:false});
-            canvas.addEventListener('touchmove', handleMove, {passive:false});
-            canvas.addEventListener('touchend', handleEnd);
-            canvas.addEventListener('touchcancel', handleEnd);
-        }
-
-        window.addEventListener('resize', ajustarCanvas);
-        scratchImage.onload = () => {
-            ajustarCanvas();
-        };
-
-        function drawScratchImage() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.drawImage(scratchImage, 0, 0, canvas.width, canvas.height);
-        }
-
-        function scratch(x, y) {
-            if (!isScratchEnabled) return;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(x, y, brushRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        function getScratchedPercentage() {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const pixels = imageData.data;
-            let transparentPixels = 0;
-
-            for (let i = 3; i < pixels.length; i += 4) {
-                if (pixels[i] === 0) transparentPixels++;
-            }
-            return (transparentPixels / (canvas.width * canvas.height)) * 100;
-        }
-
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            if (e.touches) {
-                return {
-                    x: e.touches[0].clientX - rect.left,
-                    y: e.touches[0].clientY - rect.top
-                };
-            } else {
-                return {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                };
-            }
-        }
-
-        function handleStart(e) {
-            if (!isScratchEnabled) return;
-            isDrawing = true;
-            const pos = getMousePos(e);
-            scratch(pos.x, pos.y);
-        }
-
-        function handleMove(e) {
-            if (!isDrawing || !isScratchEnabled) return;
-            const pos = getMousePos(e);
-            scratch(pos.x, pos.y);
-            scratchedPercentage = getScratchedPercentage();
-            if (scratchedPercentage > 75) {
-                autoFinishScratch();
-            }
-        }
-
-        function handleEnd() {
-            isDrawing = false;
-        }
-
-        function buildCell(prize) {
-            return `
-                <div class="prize-reveal">
-                    <img src="${prize.icone}" alt="${prize.nome}" />
-                    <span>${prize.valor > 0 ? 'R$ ' + prize.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : prize.nome}</span>
-                </div>
-            `;
-        }
-
-        let fadeInterval = null;
-
-        async function autoFinishScratch() {
-            isScratchEnabled = false;
-            fadeInterval = setInterval(() => {
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.fillStyle = 'rgba(0,0,0,0.1)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }, 50);
-
-            setTimeout(() => {
-                clearInterval(fadeInterval);
-                fadeInterval = null;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }, 500);
-
-            finishScratch();
-        }
-
-        async function finishScratch() {
-            resultMsg.innerHTML = '<i class="bi bi-hourglass-split loading-pulse"></i> Verificando resultado...';
-            
-            const fd = new FormData();
-            fd.append('order_id', orderId);
-            const response = await fetch('/raspadinhas/finish.php', { method: 'POST', body: fd });
-            const json = await response.json();
-
-            if (!json.success) {
-                Notiflix.Notify.failure('Erro ao finalizar.');
-                return;
-            }
-
-            const jsConfetti = new JSConfetti();
-            
-            if (json.valor === 0 || json.resultado === 'lose') {
-                resultMsg.innerHTML = `
-                    <div style="color: #ef4444;">
-                        <i class="bi bi-emoji-frown"></i>
-                        Não foi dessa vez. Tente novamente!
-                    </div>
-                `;
-                Notiflix.Notify.info('Não foi dessa vez. 😢');
-                clearInterval(fadeInterval);
-                fadeInterval = 0;
-                await atualizarSaldoUsuario();
-            } else {
-                container.classList.add('win-animation');
-                resultMsg.innerHTML = `
-                    <div style="color: #22c55e;">
-                        <i class="bi bi-trophy-fill"></i>
-                        🎉 Parabéns! Você ganhou R$ ${json.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}!
-                    </div>
-                `;
-                Notiflix.Notify.success(`🎉 Você ganhou R$ ${json.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}!`);
-                clearInterval(fadeInterval);
-                fadeInterval = 0;
-
-                jsConfetti.addConfetti({
-                    emojis: ['🎉', '✨', '🎊', '🥳', '💰', '🍀'],
-                    emojiSize: 20,
-                    confettiNumber: 300,
-                    confettiRadius: 6,
-                    confettiColors: ['#22c55e', '#16a34a', '#15803d', '#166534', '#14532d']
-                });
-
-                await atualizarSaldoUsuario();
-            }
-
-            btnBuy.style.opacity = '1';
-            btnBuy.disabled = false;
-            btnBuy.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Jogar Novamente';
-        }
-
-        function reiniciarJogo() {
-            if (fadeInterval) { 
-                clearInterval(fadeInterval); 
-                fadeInterval = null; 
-            }
-
-            container.classList.remove('win-animation');
-            prizesGrid.innerHTML = '';
-            resultMsg.innerHTML = '';
-            overlay.style.display = 'flex';
-            orderId = null;
-            scratchedPercentage = 0;
-            isScratchEnabled = false;
-            isDrawing = false;
-            ctx.globalCompositeOperation = 'source-over';
-            ajustarCanvas();
-            resetCanvas();
-            btnBuy.disabled = false;
-            btnBuy.innerHTML = '<i class="bi bi-credit-card"></i> Comprar e Raspar (R$ <?php= number_format($cartela['valor'], 2, ',', '.'); ?>)';
-            btnBuy.style.opacity = '1';
-        }
-
-        btnBuy.addEventListener('click', async () => {
-            if (btnBuy.innerHTML.includes('Jogar Novamente')) {
-                reiniciarJogo();
-                setTimeout(() => btnBuy.click(), 100);
-                return;
-            }
-
-            btnBuy.disabled = true;
-            btnBuy.innerHTML = '<i class="bi bi-hourglass-split loading-pulse"></i> Gerando...';
-            resultMsg.innerHTML = '';
-            prizesGrid.innerHTML = '';
-            overlay.style.display = 'none';
-
-            const fd = new FormData();
-            fd.append('raspadinha_id', <?php= $cartela['id']; ?>);
-            const res = await fetch('/raspadinhas/buy.php', { method: 'POST', body: fd });
-            const json = await res.json();
-
-            if (!json.success) {
-                Notiflix.Notify.failure(json.error);
-                btnBuy.disabled = false;
-                btnBuy.innerHTML = '<i class="bi bi-credit-card"></i> Comprar e Raspar';
-                overlay.style.display = 'flex';
-                return;
-            }
-
-            orderId = json.order_id;
-            const premiosRes = await fetch('/raspadinhas/prizes.php?ids=' + json.grid.join(','));
-            const premios = await premiosRes.json();
-
-            prizesGrid.innerHTML = premios.map(buildCell).join('');
-            drawScratchImage();
-            isScratchEnabled = true;
-            btnBuy.style.opacity = '0.6';
-            btnBuy.innerHTML = '<i class="bi bi-hand-index"></i> Raspe a cartela!';
-        });
-
-        // Canvas event listeners
-        canvas.addEventListener('mousedown', handleStart);
-        canvas.addEventListener('mousemove', handleMove);
-        canvas.addEventListener('mouseup', handleEnd);
-        canvas.addEventListener('mouseleave', handleEnd);
-        canvas.addEventListener('touchstart', handleStart);
-        canvas.addEventListener('touchmove', handleMove);
-        canvas.addEventListener('touchend', handleEnd);
-        canvas.addEventListener('touchcancel', handleEnd);
-
-        async function atualizarSaldoUsuario() {
-            try {
-                const res = await fetch('/api/get_saldo.php');
-                const json = await res.json();
-
-                if (json.success) {
-                    const saldoFormatado = 'R$ ' + json.saldo.toFixed(2).replace('.', ',');
-                    const el = document.getElementById('headerSaldo');
-                    if (el) {
-                        el.textContent = saldoFormatado;
-                    }
-                } else {
-                    console.warn('Erro ao buscar saldo:', json.error);
-                }
-            } catch (e) {
-                console.error('Erro na requisição de saldo:', e);
-            }
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('%c🎮 Raspadinha carregada!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            console.log(`Cartela: ${<?php= json_encode($cartela['nome']); ?>}`);
-        });
-    </script>
-</body>
+<?php<?php 
+@session_start();<?php 
+require_once<?php '../conexao.php';<?php 
+<?php 
+if<?php (!isset($_SESSION['usuario_id']))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php precisa<?php estar<?php logado<?php para<?php acessar<?php esta<?php página!'];<?php 
+<?php header("Location:<?php /login");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$id<?php =<?php (int)($_GET['id']<?php ??<?php 0);<?php 
+$stmt<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?");<?php 
+$stmt->execute([$id]);<?php 
+$cartela<?php =<?php $stmt->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+if<?php (!$cartela)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Cartela<?php não<?php encontrada.'];<?php 
+<?php header("Location:<?php /raspadinhas");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$premios<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinha_premios<?php WHERE<?php raspadinha_id<?php =<?php ?<?php ORDER<?php BY<?php valor<?php DESC");<?php 
+$premios->execute([$id]);<?php 
+$premios<?php =<?php $premios->fetchAll(PDO::FETCH_ASSOC);<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php <?php=<?php htmlspecialchars($cartela['nome']);<?php ?></title><?php 
+<?php 
+<?php <!--<?php Fonts<?php --><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Icons<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php 
+<?php 
+<?php <!--<?php Styles<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php=<?php time();<?php ?>"><?php 
+<?php 
+<?php <!--<?php Scripts<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script><?php 
+<?php 
+<?php <style><?php 
+<?php /*<?php Page<?php Styles<?php */<?php 
+<?php .raspadinha-section<?php {<?php 
+<?php margin-top:<?php 100px;<?php 
+<?php padding:<?php 4rem<?php 0;<?php 
+<?php background:<?php #0a0a0a;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 200px);<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-container<?php {<?php 
+<?php max-width:<?php 800px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php padding:<?php 0<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Header<?php Card<?php */<?php 
+<?php .header-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(16,<?php 163,<?php 74,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -50%;<?php 
+<?php right:<?php -50%;<?php 
+<?php width:<?php 200px;<?php 
+<?php height:<?php 200px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 6s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php -50%;<?php 
+<?php left:<?php -50%;<?php 
+<?php width:<?php 150px;<?php 
+<?php height:<?php 150px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.05),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 8s<?php ease-in-out<?php infinite<?php reverse;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php float<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php translateY(0)<?php rotate(0deg);<?php }<?php 
+<?php 50%<?php {<?php transform:<?php translateY(-20px)<?php rotate(180deg);<?php }<?php 
+<?php }<?php 
+<?php 
+<?php .cartela-banner<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 200px;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php position:<?php relative;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php box-shadow:<?php 0<?php 10px<?php 40px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .cartela-image<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php object-fit:<?php cover;<?php 
+<?php }<?php 
+<?php 
+<?php .cartela-overlay<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php inset:<?php 0;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(0,<?php 0,<?php 0,<?php 0.3),<?php rgba(34,<?php 197,<?php 94,<?php 0.1));<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .cartela-title<?php {<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php text-align:<?php center;<?php 
+<?php text-shadow:<?php 2px<?php 2px<?php 4px<?php rgba(0,<?php 0,<?php 0,<?php 0.7);<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .price-badge<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php 1rem;<?php 
+<?php left:<?php 50%;<?php 
+<?php transform:<?php translateX(-50%);<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php padding:<?php 0.5rem<?php 1.5rem;<?php 
+<?php border-radius:<?php 25px;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 16px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Instructions<?php */<?php 
+<?php .instructions<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .instructions<?php h3<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .instructions-list<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(200px,<?php 1fr));<?php 
+<?php gap:<?php 1rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php }<?php 
+<?php 
+<?php .instruction-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .instruction-icon<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Prizes<?php Section<?php */<?php 
+<?php .prizes-section<?php {<?php 
+<?php background:<?php rgba(10,<?php 10,<?php 10,<?php 0.6);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-top:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-title<?php {<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.5px;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-title<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(140px,<?php 1fr));<?php 
+<?php gap:<?php 1rem;<?php 
+<?php max-height:<?php 320px;<?php 
+<?php overflow-y:<?php auto;<?php 
+<?php padding:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Custom<?php scrollbar<?php for<?php prizes<?php grid<?php */<?php 
+<?php .prizes-grid::-webkit-scrollbar<?php {<?php 
+<?php width:<?php 6px;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid::-webkit-scrollbar-track<?php {<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border-radius:<?php 3px;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid::-webkit-scrollbar-thumb<?php {<?php 
+<?php background:<?php #22c55e;<?php 
+<?php border-radius:<?php 3px;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid::-webkit-scrollbar-thumb:hover<?php {<?php 
+<?php background:<?php #16a34a;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.6);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php text-align:<?php center;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php bottom:<?php 0;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card:hover<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(34,<?php 197,<?php 94,<?php 0.15);<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php {<?php 
+<?php width:<?php 64px;<?php 
+<?php height:<?php 64px;<?php 
+<?php margin:<?php 0<?php auto<?php 0.75rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php img<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php object-fit:<?php contain;<?php 
+<?php filter:<?php drop-shadow(0<?php 2px<?php 4px<?php rgba(0,<?php 0,<?php 0,<?php 0.3));<?php 
+<?php }<?php 
+<?php 
+<?php .prize-info<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-name<?php {<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-value<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Game<?php Container<?php */<?php 
+<?php .game-container<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .game-title<?php {<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Scratch<?php Container<?php */<?php 
+<?php #scratch-container<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php width:<?php 100%;<?php 
+<?php max-width:<?php 500px;<?php 
+<?php aspect-ratio:<?php 1<?php /<?php 1;<?php 
+<?php margin:<?php 0<?php auto<?php 2rem;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php user-select:<?php none;<?php 
+<?php box-shadow:<?php 0<?php 10px<?php 40px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php #prizes-grid<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(3,<?php 1fr);<?php 
+<?php grid-template-rows:<?php repeat(3,<?php 1fr);<?php 
+<?php gap:<?php 8px;<?php 
+<?php padding:<?php 12px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #1f2937,<?php #374151);<?php 
+<?php color:<?php white;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php z-index:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php #prizes-grid<?php ><?php div<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php justify-content:<?php center;<?php 
+<?php align-items:<?php center;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 0.85rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php #prizes-grid<?php ><?php div::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php inset:<?php 0;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php #prizes-grid<?php ><?php div:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php #prizes-grid<?php img<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php object-fit:<?php contain;<?php 
+<?php margin-bottom:<?php 6px;<?php 
+<?php filter:<?php drop-shadow(0<?php 2px<?php 4px<?php rgba(0,<?php 0,<?php 0,<?php 0.3));<?php 
+<?php }<?php 
+<?php 
+<?php #scratch-canvas<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php z-index:<?php 10;<?php 
+<?php touch-action:<?php none;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php user-select:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php #btn-overlay<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.8);<?php 
+<?php backdrop-filter:<?php blur(4px);<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php justify-content:<?php center;<?php 
+<?php align-items:<?php center;<?php 
+<?php font-size:<?php 1.2rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #fff;<?php 
+<?php z-index:<?php 30;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php text-align:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .overlay-icon<?php {<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Buy<?php Button<?php */<?php 
+<?php .buy-button<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php max-width:<?php 500px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border:<?php none;<?php 
+<?php padding:<?php 1rem<?php 2rem;<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 30px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .buy-button:hover<?php {<?php 
+<?php transform:<?php translateY(-3px);<?php 
+<?php box-shadow:<?php 0<?php 12px<?php 40px<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php .buy-button:disabled<?php {<?php 
+<?php opacity:<?php 0.6;<?php 
+<?php cursor:<?php not-allowed;<?php 
+<?php transform:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .buy-button::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php -100%;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php linear-gradient(90deg,<?php transparent,<?php rgba(255,<?php 255,<?php 255,<?php 0.2),<?php transparent);<?php 
+<?php transition:<?php left<?php 0.5s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .buy-button:hover::before<?php {<?php 
+<?php left:<?php 100%;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Result<?php Message<?php */<?php 
+<?php #result-msg<?php {<?php 
+<?php margin-top:<?php 2rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php text-align:<?php center;<?php 
+<?php min-height:<?php 2rem;<?php 
+<?php font-size:<?php 1.2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Loading<?php States<?php */<?php 
+<?php .loading-pulse<?php {<?php 
+<?php animation:<?php pulse<?php 2s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php pulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php opacity:<?php 1;<?php }<?php 
+<?php 50%<?php {<?php opacity:<?php 0.5;<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Prize<?php animations<?php */<?php 
+<?php .prize-reveal<?php {<?php 
+<?php animation:<?php prizeReveal<?php 0.5s<?php ease-out<?php forwards;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php prizeReveal<?php {<?php 
+<?php 0%<?php {<?php 
+<?php transform:<?php scale(0.8);<?php 
+<?php opacity:<?php 0;<?php 
+<?php }<?php 
+<?php 50%<?php {<?php 
+<?php transform:<?php scale(1.1);<?php 
+<?php }<?php 
+<?php 100%<?php {<?php 
+<?php transform:<?php scale(1);<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Success<?php animations<?php */<?php 
+<?php .win-animation<?php {<?php 
+<?php animation:<?php winPulse<?php 1s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php winPulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php scale(1);<?php }<?php 
+<?php 50%<?php {<?php transform:<?php scale(1.05);<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Responsive<?php */<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .raspadinha-container<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .cartela-title<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .game-container<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .instructions-list<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-section<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-top:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid<?php {<?php 
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(120px,<?php 1fr));<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php max-height:<?php 280px;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card<?php {<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php {<?php 
+<?php width:<?php 56px;<?php 
+<?php height:<?php 56px;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php img<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-name<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-value<?php {<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .cartela-title<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php #scratch-container<?php {<?php 
+<?php max-width:<?php 300px;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-section<?php {<?php 
+<?php padding:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-grid<?php {<?php 
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(100px,<?php 1fr));<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php max-height:<?php 240px;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card<?php {<?php 
+<?php padding:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-image<?php img<?php {<?php 
+<?php width:<?php 32px;<?php 
+<?php height:<?php 32px;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-name<?php {<?php 
+<?php font-size:<?php 0.7rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-value<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prizes-title<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <?php<?php include('../inc/header.php');<?php ?><?php 
+<?php <?php<?php include('../components/modals.php');<?php ?><?php 
+<?php 
+<?php <section<?php class="raspadinha-section"><?php 
+<?php <div<?php class="raspadinha-container"><?php 
+<?php <!--<?php Header<?php Card<?php --><?php 
+<?php <div<?php class="header-card"><?php 
+<?php <div<?php class="cartela-banner"><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($cartela['banner']);<?php ?>"<?php 
+<?php class="cartela-image"<?php 
+<?php alt="Banner<?php <?php=<?php htmlspecialchars($cartela['nome']);<?php ?>"><?php 
+<?php 
+<?php <div<?php class="cartela-overlay"><?php 
+<?php <h1<?php class="cartela-title"><?php=<?php htmlspecialchars($cartela['nome']);<?php ?></h1><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="price-badge"><?php 
+<?php <i<?php class="bi<?php bi-tag-fill"></i><?php 
+<?php R$<?php <?php=<?php number_format($cartela['valor'],<?php 2,<?php ',',<?php '.');<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Instructions<?php --><?php 
+<?php <div<?php class="instructions"><?php 
+<?php <h3><i<?php class="bi<?php bi-info-circle"></i><?php Como<?php Jogar</h3><?php 
+<?php <div<?php class="instructions-list"><?php 
+<?php <div<?php class="instruction-item"><?php 
+<?php <i<?php class="bi<?php bi-1-circle<?php instruction-icon"></i><?php 
+<?php <span>Clique<?php em<?php "Comprar<?php e<?php Raspar"</span><?php 
+<?php </div><?php 
+<?php <div<?php class="instruction-item"><?php 
+<?php <i<?php class="bi<?php bi-2-circle<?php instruction-icon"></i><?php 
+<?php <span>Raspe<?php a<?php cartela<?php com<?php o<?php mouse/dedo</span><?php 
+<?php </div><?php 
+<?php <div<?php class="instruction-item"><?php 
+<?php <i<?php class="bi<?php bi-3-circle<?php instruction-icon"></i><?php 
+<?php <span>Descubra<?php se<?php você<?php ganhou!</span><?php 
+<?php </div><?php 
+<?php <div<?php class="instruction-item"><?php 
+<?php <i<?php class="bi<?php bi-4-circle<?php instruction-icon"></i><?php 
+<?php <span>Prêmios<?php são<?php creditados<?php na<?php hora</span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Prizes<?php Section<?php --><?php 
+<?php <?php<?php if<?php (!empty($premios)):<?php ?><?php 
+<?php <div<?php class="prizes-section"><?php 
+<?php <h3<?php class="prizes-title"><?php 
+<?php <i<?php class="bi<?php bi-gift-fill"></i><?php 
+<?php CONTEÚDO<?php DESSA<?php RASPADINHA:<?php 
+<?php </h3><?php 
+<?php 
+<?php <div<?php class="prizes-grid"><?php 
+<?php <?php<?php foreach<?php ($premios<?php as<?php $premio):<?php ?><?php 
+<?php <div<?php class="prize-card"><?php 
+<?php <div<?php class="prize-image"><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($premio['icone']);<?php ?>"<?php 
+<?php alt="<?php=<?php htmlspecialchars($premio['nome']);<?php ?>"<?php 
+<?php onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMyMmM1NWUiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0id2hpdGUiPgo8cGF0aCBkPSJNMTYgOGMwLTQuNDExIDMuNTg5LTggOC04czggMy41ODkgOCA4djJjMCAxLjEwNS0uODk1IDItMiAySDJjLTEuMTA1IDAtMi0uODk1LTItMlY4eiIvPgo8L3N2Zz4KPC9zdmc+'"><?php 
+<?php </div><?php 
+<?php <div<?php class="prize-info"><?php 
+<?php <div<?php class="prize-name"><?php=<?php htmlspecialchars($premio['nome']);<?php ?></div><?php 
+<?php <div<?php class="prize-value">R$<?php <?php=<?php number_format($premio['valor'],<?php 2,<?php ',',<?php '.');<?php ?></div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Game<?php Container<?php --><?php 
+<?php <div<?php class="game-container"><?php 
+<?php <h2<?php class="game-title"><?php 
+<?php <i<?php class="bi<?php bi-diamond-fill"></i><?php 
+<?php Sua<?php Raspadinha<?php 
+<?php </h2><?php 
+<?php 
+<?php <div<?php id="scratch-container"><?php 
+<?php <div<?php id="prizes-grid"></div><?php 
+<?php <canvas<?php id="scratch-canvas"></canvas><?php 
+<?php <div<?php id="btn-overlay"><?php 
+<?php <i<?php class="bi<?php bi-play-circle<?php overlay-icon"></i><?php 
+<?php <div>Clique<?php em<?php "Comprar"<?php para<?php jogar</div><?php 
+<?php <div<?php style="font-size:<?php 0.9rem;<?php opacity:<?php 0.8;">Boa<?php sorte!<?php 🍀</div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <button<?php id="btn-buy"<?php class="buy-button"><?php 
+<?php <i<?php class="bi<?php bi-credit-card"></i><?php 
+<?php Comprar<?php e<?php Raspar<?php (R$<?php <?php=<?php number_format($cartela['valor'],<?php 2,<?php ',',<?php '.');<?php ?>)<?php 
+<?php </button><?php 
+<?php 
+<?php <div<?php id="result-msg"></div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php include('../inc/footer.php');<?php ?><?php 
+<?php 
+<?php <script><?php 
+<?php let<?php container<?php =<?php document.getElementById('scratch-container');<?php 
+<?php let<?php canvas<?php =<?php document.getElementById('scratch-canvas');<?php 
+<?php let<?php ctx<?php =<?php canvas.getContext('2d');<?php 
+<?php let<?php prizesGrid<?php =<?php document.getElementById('prizes-grid');<?php 
+<?php let<?php btnBuy<?php =<?php document.getElementById('btn-buy');<?php 
+<?php let<?php resultMsg<?php =<?php document.getElementById('result-msg');<?php 
+<?php let<?php overlay<?php =<?php document.getElementById('btn-overlay');<?php 
+<?php let<?php scratchImage<?php =<?php new<?php Image();<?php 
+<?php scratchImage.src<?php =<?php '/assets/img/raspe.png?id=122';<?php 
+<?php 
+<?php let<?php orderId<?php =<?php null;<?php 
+<?php let<?php brushRadius<?php =<?php 55;<?php 
+<?php let<?php isDrawing<?php =<?php false;<?php 
+<?php let<?php scratchedPercentage<?php =<?php 0;<?php 
+<?php let<?php isScratchEnabled<?php =<?php false;<?php 
+<?php 
+<?php function<?php ajustarCanvas()<?php {<?php 
+<?php const<?php size<?php =<?php container.clientWidth;<?php 
+<?php canvas.width<?php =<?php size;<?php 
+<?php canvas.height<?php =<?php size;<?php 
+<?php drawScratchImage();<?php 
+<?php }<?php 
+<?php 
+<?php function<?php resetCanvas()<?php {<?php 
+<?php if<?php (canvas<?php &&<?php canvas.parentNode)<?php canvas.parentNode.removeChild(canvas);<?php 
+<?php 
+<?php const<?php newCanvas<?php =<?php document.createElement('canvas');<?php 
+<?php newCanvas.id<?php =<?php 'scratch-canvas';<?php 
+<?php newCanvas.className<?php =<?php canvas.className;<?php 
+<?php container.appendChild(newCanvas);<?php 
+<?php 
+<?php canvas<?php =<?php newCanvas;<?php 
+<?php ctx<?php =<?php newCanvas.getContext('2d');<?php 
+<?php 
+<?php ajustarCanvas();<?php 
+<?php addCanvasListeners();<?php 
+<?php }<?php 
+<?php 
+<?php function<?php addCanvasListeners()<?php {<?php 
+<?php canvas.replaceWith(canvas.cloneNode(true));<?php 
+<?php canvas<?php =<?php document.getElementById('scratch-canvas');<?php 
+<?php ctx<?php =<?php canvas.getContext('2d');<?php 
+<?php 
+<?php canvas.addEventListener('mousedown',<?php handleStart);<?php 
+<?php canvas.addEventListener('mousemove',<?php handleMove);<?php 
+<?php canvas.addEventListener('mouseup',<?php handleEnd);<?php 
+<?php canvas.addEventListener('mouseleave',<?php handleEnd);<?php 
+<?php canvas.addEventListener('touchstart',<?php handleStart,<?php {passive:false});<?php 
+<?php canvas.addEventListener('touchmove',<?php handleMove,<?php {passive:false});<?php 
+<?php canvas.addEventListener('touchend',<?php handleEnd);<?php 
+<?php canvas.addEventListener('touchcancel',<?php handleEnd);<?php 
+<?php }<?php 
+<?php 
+<?php window.addEventListener('resize',<?php ajustarCanvas);<?php 
+<?php scratchImage.onload<?php =<?php ()<?php =><?php {<?php 
+<?php ajustarCanvas();<?php 
+<?php };<?php 
+<?php 
+<?php function<?php drawScratchImage()<?php {<?php 
+<?php ctx.clearRect(0,<?php 0,<?php canvas.width,<?php canvas.height);<?php 
+<?php ctx.globalCompositeOperation<?php =<?php 'source-over';<?php 
+<?php ctx.drawImage(scratchImage,<?php 0,<?php 0,<?php canvas.width,<?php canvas.height);<?php 
+<?php }<?php 
+<?php 
+<?php function<?php scratch(x,<?php y)<?php {<?php 
+<?php if<?php (!isScratchEnabled)<?php return;<?php 
+<?php ctx.globalCompositeOperation<?php =<?php 'destination-out';<?php 
+<?php ctx.beginPath();<?php 
+<?php ctx.arc(x,<?php y,<?php brushRadius,<?php 0,<?php Math.PI<?php *<?php 2);<?php 
+<?php ctx.fill();<?php 
+<?php }<?php 
+<?php 
+<?php function<?php getScratchedPercentage()<?php {<?php 
+<?php const<?php imageData<?php =<?php ctx.getImageData(0,<?php 0,<?php canvas.width,<?php canvas.height);<?php 
+<?php const<?php pixels<?php =<?php imageData.data;<?php 
+<?php let<?php transparentPixels<?php =<?php 0;<?php 
+<?php 
+<?php for<?php (let<?php i<?php =<?php 3;<?php i<?php <?php pixels.length;<?php i<?php +=<?php 4)<?php {<?php 
+<?php if<?php (pixels[i]<?php ===<?php 0)<?php transparentPixels++;<?php 
+<?php }<?php 
+<?php return<?php (transparentPixels<?php /<?php (canvas.width<?php *<?php canvas.height))<?php *<?php 100;<?php 
+<?php }<?php 
+<?php 
+<?php function<?php getMousePos(e)<?php {<?php 
+<?php const<?php rect<?php =<?php canvas.getBoundingClientRect();<?php 
+<?php if<?php (e.touches)<?php {<?php 
+<?php return<?php {<?php 
+<?php x:<?php e.touches[0].clientX<?php -<?php rect.left,<?php 
+<?php y:<?php e.touches[0].clientY<?php -<?php rect.top<?php 
+<?php };<?php 
+<?php }<?php else<?php {<?php 
+<?php return<?php {<?php 
+<?php x:<?php e.clientX<?php -<?php rect.left,<?php 
+<?php y:<?php e.clientY<?php -<?php rect.top<?php 
+<?php };<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php function<?php handleStart(e)<?php {<?php 
+<?php if<?php (!isScratchEnabled)<?php return;<?php 
+<?php isDrawing<?php =<?php true;<?php 
+<?php const<?php pos<?php =<?php getMousePos(e);<?php 
+<?php scratch(pos.x,<?php pos.y);<?php 
+<?php }<?php 
+<?php 
+<?php function<?php handleMove(e)<?php {<?php 
+<?php if<?php (!isDrawing<?php ||<?php !isScratchEnabled)<?php return;<?php 
+<?php const<?php pos<?php =<?php getMousePos(e);<?php 
+<?php scratch(pos.x,<?php pos.y);<?php 
+<?php scratchedPercentage<?php =<?php getScratchedPercentage();<?php 
+<?php if<?php (scratchedPercentage<?php ><?php 75)<?php {<?php 
+<?php autoFinishScratch();<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php function<?php handleEnd()<?php {<?php 
+<?php isDrawing<?php =<?php false;<?php 
+<?php }<?php 
+<?php 
+<?php function<?php buildCell(prize)<?php {<?php 
+<?php return<?php `<?php 
+<?php <div<?php class="prize-reveal"><?php 
+<?php <img<?php src="${prize.icone}"<?php alt="${prize.nome}"<?php /><?php 
+<?php <span>${prize.valor<?php ><?php 0<?php ?<?php 'R$<?php '<?php +<?php prize.valor.toLocaleString('pt-BR',<?php {<?php minimumFractionDigits:<?php 2<?php })<?php :<?php prize.nome}</span><?php 
+<?php </div><?php 
+<?php `;<?php 
+<?php }<?php 
+<?php 
+<?php let<?php fadeInterval<?php =<?php null;<?php 
+<?php 
+<?php async<?php function<?php autoFinishScratch()<?php {<?php 
+<?php isScratchEnabled<?php =<?php false;<?php 
+<?php fadeInterval<?php =<?php setInterval(()<?php =><?php {<?php 
+<?php ctx.globalCompositeOperation<?php =<?php 'destination-out';<?php 
+<?php ctx.fillStyle<?php =<?php 'rgba(0,0,0,0.1)';<?php 
+<?php ctx.fillRect(0,<?php 0,<?php canvas.width,<?php canvas.height);<?php 
+<?php },<?php 50);<?php 
+<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php clearInterval(fadeInterval);<?php 
+<?php fadeInterval<?php =<?php null;<?php 
+<?php ctx.clearRect(0,<?php 0,<?php canvas.width,<?php canvas.height);<?php 
+<?php },<?php 500);<?php 
+<?php 
+<?php finishScratch();<?php 
+<?php }<?php 
+<?php 
+<?php async<?php function<?php finishScratch()<?php {<?php 
+<?php resultMsg.innerHTML<?php =<?php '<i<?php class="bi<?php bi-hourglass-split<?php loading-pulse"></i><?php Verificando<?php resultado...';<?php 
+<?php 
+<?php const<?php fd<?php =<?php new<?php FormData();<?php 
+<?php fd.append('order_id',<?php orderId);<?php 
+<?php const<?php response<?php =<?php await<?php fetch('/raspadinhas/finish.php',<?php {<?php method:<?php 'POST',<?php body:<?php fd<?php });<?php 
+<?php const<?php json<?php =<?php await<?php response.json();<?php 
+<?php 
+<?php if<?php (!json.success)<?php {<?php 
+<?php Notiflix.Notify.failure('Erro<?php ao<?php finalizar.');<?php 
+<?php return;<?php 
+<?php }<?php 
+<?php 
+<?php const<?php jsConfetti<?php =<?php new<?php JSConfetti();<?php 
+<?php 
+<?php if<?php (json.valor<?php ===<?php 0<?php ||<?php json.resultado<?php ===<?php 'lose')<?php {<?php 
+<?php resultMsg.innerHTML<?php =<?php `<?php 
+<?php <div<?php style="color:<?php #ef4444;"><?php 
+<?php <i<?php class="bi<?php bi-emoji-frown"></i><?php 
+<?php Não<?php foi<?php dessa<?php vez.<?php Tente<?php novamente!<?php 
+<?php </div><?php 
+<?php `;<?php 
+<?php Notiflix.Notify.info('Não<?php foi<?php dessa<?php vez.<?php 😢');<?php 
+<?php clearInterval(fadeInterval);<?php 
+<?php fadeInterval<?php =<?php 0;<?php 
+<?php await<?php atualizarSaldoUsuario();<?php 
+<?php }<?php else<?php {<?php 
+<?php container.classList.add('win-animation');<?php 
+<?php resultMsg.innerHTML<?php =<?php `<?php 
+<?php <div<?php style="color:<?php #22c55e;"><?php 
+<?php <i<?php class="bi<?php bi-trophy-fill"></i><?php 
+<?php 🎉<?php Parabéns!<?php Você<?php ganhou<?php R$<?php ${json.valor.toLocaleString('pt-BR',<?php {<?php minimumFractionDigits:<?php 2<?php })}!<?php 
+<?php </div><?php 
+<?php `;<?php 
+<?php Notiflix.Notify.success(`🎉<?php Você<?php ganhou<?php R$<?php ${json.valor.toLocaleString('pt-BR',<?php {<?php minimumFractionDigits:<?php 2<?php })}!`);<?php 
+<?php clearInterval(fadeInterval);<?php 
+<?php fadeInterval<?php =<?php 0;<?php 
+<?php 
+<?php jsConfetti.addConfetti({<?php 
+<?php emojis:<?php ['🎉',<?php '✨',<?php '🎊',<?php '🥳',<?php '💰',<?php '🍀'],<?php 
+<?php emojiSize:<?php 20,<?php 
+<?php confettiNumber:<?php 300,<?php 
+<?php confettiRadius:<?php 6,<?php 
+<?php confettiColors:<?php ['#22c55e',<?php '#16a34a',<?php '#15803d',<?php '#166534',<?php '#14532d']<?php 
+<?php });<?php 
+<?php 
+<?php await<?php atualizarSaldoUsuario();<?php 
+<?php }<?php 
+<?php 
+<?php btnBuy.style.opacity<?php =<?php '1';<?php 
+<?php btnBuy.disabled<?php =<?php false;<?php 
+<?php btnBuy.innerHTML<?php =<?php '<i<?php class="bi<?php bi-arrow-clockwise"></i><?php Jogar<?php Novamente';<?php 
+<?php }<?php 
+<?php 
+<?php function<?php reiniciarJogo()<?php {<?php 
+<?php if<?php (fadeInterval)<?php {<?php 
+<?php clearInterval(fadeInterval);<?php 
+<?php fadeInterval<?php =<?php null;<?php 
+<?php }<?php 
+<?php 
+<?php container.classList.remove('win-animation');<?php 
+<?php prizesGrid.innerHTML<?php =<?php '';<?php 
+<?php resultMsg.innerHTML<?php =<?php '';<?php 
+<?php overlay.style.display<?php =<?php 'flex';<?php 
+<?php orderId<?php =<?php null;<?php 
+<?php scratchedPercentage<?php =<?php 0;<?php 
+<?php isScratchEnabled<?php =<?php false;<?php 
+<?php isDrawing<?php =<?php false;<?php 
+<?php ctx.globalCompositeOperation<?php =<?php 'source-over';<?php 
+<?php ajustarCanvas();<?php 
+<?php resetCanvas();<?php 
+<?php btnBuy.disabled<?php =<?php false;<?php 
+<?php btnBuy.innerHTML<?php =<?php '<i<?php class="bi<?php bi-credit-card"></i><?php Comprar<?php e<?php Raspar<?php (R$<?php <?php=<?php number_format($cartela['valor'],<?php 2,<?php ',',<?php '.');<?php ?>)';<?php 
+<?php btnBuy.style.opacity<?php =<?php '1';<?php 
+<?php }<?php 
+<?php 
+<?php btnBuy.addEventListener('click',<?php async<?php ()<?php =><?php {<?php 
+<?php if<?php (btnBuy.innerHTML.includes('Jogar<?php Novamente'))<?php {<?php 
+<?php reiniciarJogo();<?php 
+<?php setTimeout(()<?php =><?php btnBuy.click(),<?php 100);<?php 
+<?php return;<?php 
+<?php }<?php 
+<?php 
+<?php btnBuy.disabled<?php =<?php true;<?php 
+<?php btnBuy.innerHTML<?php =<?php '<i<?php class="bi<?php bi-hourglass-split<?php loading-pulse"></i><?php Gerando...';<?php 
+<?php resultMsg.innerHTML<?php =<?php '';<?php 
+<?php prizesGrid.innerHTML<?php =<?php '';<?php 
+<?php overlay.style.display<?php =<?php 'none';<?php 
+<?php 
+<?php const<?php fd<?php =<?php new<?php FormData();<?php 
+<?php fd.append('raspadinha_id',<?php <?php=<?php $cartela['id'];<?php ?>);<?php 
+<?php const<?php res<?php =<?php await<?php fetch('/raspadinhas/buy.php',<?php {<?php method:<?php 'POST',<?php body:<?php fd<?php });<?php 
+<?php const<?php json<?php =<?php await<?php res.json();<?php 
+<?php 
+<?php if<?php (!json.success)<?php {<?php 
+<?php Notiflix.Notify.failure(json.error);<?php 
+<?php btnBuy.disabled<?php =<?php false;<?php 
+<?php btnBuy.innerHTML<?php =<?php '<i<?php class="bi<?php bi-credit-card"></i><?php Comprar<?php e<?php Raspar';<?php 
+<?php overlay.style.display<?php =<?php 'flex';<?php 
+<?php return;<?php 
+<?php }<?php 
+<?php 
+<?php orderId<?php =<?php json.order_id;<?php 
+<?php const<?php premiosRes<?php =<?php await<?php fetch('/raspadinhas/prizes.php?ids='<?php +<?php json.grid.join(','));<?php 
+<?php const<?php premios<?php =<?php await<?php premiosRes.json();<?php 
+<?php 
+<?php prizesGrid.innerHTML<?php =<?php premios.map(buildCell).join('');<?php 
+<?php drawScratchImage();<?php 
+<?php isScratchEnabled<?php =<?php true;<?php 
+<?php btnBuy.style.opacity<?php =<?php '0.6';<?php 
+<?php btnBuy.innerHTML<?php =<?php '<i<?php class="bi<?php bi-hand-index"></i><?php Raspe<?php a<?php cartela!';<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Canvas<?php event<?php listeners<?php 
+<?php canvas.addEventListener('mousedown',<?php handleStart);<?php 
+<?php canvas.addEventListener('mousemove',<?php handleMove);<?php 
+<?php canvas.addEventListener('mouseup',<?php handleEnd);<?php 
+<?php canvas.addEventListener('mouseleave',<?php handleEnd);<?php 
+<?php canvas.addEventListener('touchstart',<?php handleStart);<?php 
+<?php canvas.addEventListener('touchmove',<?php handleMove);<?php 
+<?php canvas.addEventListener('touchend',<?php handleEnd);<?php 
+<?php canvas.addEventListener('touchcancel',<?php handleEnd);<?php 
+<?php 
+<?php async<?php function<?php atualizarSaldoUsuario()<?php {<?php 
+<?php try<?php {<?php 
+<?php const<?php res<?php =<?php await<?php fetch('/api/get_saldo.php');<?php 
+<?php const<?php json<?php =<?php await<?php res.json();<?php 
+<?php 
+<?php if<?php (json.success)<?php {<?php 
+<?php const<?php saldoFormatado<?php =<?php 'R$<?php '<?php +<?php json.saldo.toFixed(2).replace('.',<?php ',');<?php 
+<?php const<?php el<?php =<?php document.getElementById('headerSaldo');<?php 
+<?php if<?php (el)<?php {<?php 
+<?php el.textContent<?php =<?php saldoFormatado;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php console.warn('Erro<?php ao<?php buscar<?php saldo:',<?php json.error);<?php 
+<?php }<?php 
+<?php }<?php catch<?php (e)<?php {<?php 
+<?php console.error('Erro<?php na<?php requisição<?php de<?php saldo:',<?php e);<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php 
+<?php console.log('%c🎮<?php Raspadinha<?php carregada!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php console.log(`Cartela:<?php ${<?php=<?php json_encode($cartela['nome']);<?php ?>}`);<?php 
+<?php });<?php 
+<?php </script><?php 
+</body><?php 
 </html>

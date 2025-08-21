@@ -1,1024 +1,1024 @@
-<?php
-@session_start();
-
-if (file_exists('./conexao.php')) {
-    include('./conexao.php');
-} elseif (file_exists('../conexao.php')) {
-    include('../conexao.php');
-} elseif (file_exists('../../conexao.php')) {
-    include('../../conexao.php');
-}
-
-if (!isset($_SESSION['usuario_id'])) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você precisa estar logado para acessar esta página!'];
-    header("Location: /login");
-    exit;
-}
-
-$usuario_id = $_SESSION['usuario_id'];
-
-try {
-    $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = :id LIMIT 1");
-    $stmt->bindParam(':id', $usuario_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$usuario) {
-        $_SESSION['message'] = ['type' => 'failure', 'text' => 'Usuário não encontrado!'];
-        header("Location: /login");
-        exit;
-    }
-
-    $stmt_depositos = $pdo->prepare("SELECT SUM(valor) as total_depositado FROM depositos WHERE user_id = :user_id AND status = 'PAID'");
-    $stmt_depositos->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmt_depositos->execute();
-    $total_depositado = $stmt_depositos->fetch(PDO::FETCH_ASSOC)['total_depositado'] ?? 0;
-
-    $stmt_saques = $pdo->prepare("SELECT SUM(valor) as total_sacado FROM saques WHERE user_id = :user_id AND status = 'PAID'");
-    $stmt_saques->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmt_saques->execute();
-    $total_sacado = $stmt_saques->fetch(PDO::FETCH_ASSOC)['total_sacado'] ?? 0;
-
-} catch (PDOException $e) {
-    $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao carregar dados do usuário!'];
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $senha_atual = $_POST['senha_atual'] ?? '';
-    $nome = trim($_POST['nome'] ?? '');
-    $telefone = trim($_POST['telefone'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $nova_senha = $_POST['nova_senha'] ?? '';
-    $confirmar_senha = $_POST['confirmar_senha'] ?? '';
-
-    if (!password_verify($senha_atual, $usuario['senha'])) {
-        $_SESSION['message'] = ['type' => 'failure', 'text' => 'Senha atual incorreta!'];
-    } else {
-        try {
-            $dados = [
-                'id' => $usuario_id,
-                'nome' => $nome,
-                'telefone' => $telefone,
-                'email' => $email
-            ];
-
-            if (!empty($nova_senha)) {
-                if ($nova_senha === $confirmar_senha) {
-                    $dados['senha'] = password_hash($nova_senha, PASSWORD_BCRYPT);
-                } else {
-                    $_SESSION['message'] = ['type' => 'failure', 'text' => 'As novas senhas não coincidem!'];
-                    header("Location: /perfil");
-                    exit;
-                }
-            }
-
-            $setParts = [];
-            foreach ($dados as $key => $value) {
-                if ($key !== 'id') {
-                    $setParts[] = "$key = :$key";
-                }
-            }
-
-            $query = "UPDATE usuarios SET " . implode(', ', $setParts) . " WHERE id = :id";
-            $stmt = $pdo->prepare($query);
-
-            if ($stmt->execute($dados)) {
-                $_SESSION['message'] = ['type' => 'success', 'text' => 'Perfil atualizado com sucesso!'];
-                header("Location: /perfil");
-                exit;
-            } else {
-                $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao atualizar perfil!'];
-            }
-
-        } catch (PDOException $e) {
-            $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao atualizar perfil: ' . $e->getMessage()];
-        }
-    }
-}
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Meu Perfil</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-
-    <style>
-        /* Page Styles */
-        .perfil-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 200px);
-        }
-
-        .perfil-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* Header */
-        .page-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        .page-title {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: white;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #ffffff, #9ca3af);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .page-subtitle {
-            font-size: 1.1rem;
-            color: #6b7280;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-
-        /* User Avatar */
-        .user-avatar {
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 50%;
-            margin: 0 auto 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 800;
-            box-shadow: 0 8px 32px rgba(34, 197, 94, 0.3);
-            position: relative;
-        }
-
-        .user-avatar::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 50%;
-            z-index: -1;
-            opacity: 0.3;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.1); opacity: 0.1; }
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-/* Ajustes específicos para os cards de estatísticas */
-
-.stat-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 2rem;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    min-height: 140px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(34, 197, 94, 0.3);
-    box-shadow: 0 10px 40px rgba(34, 197, 94, 0.1);
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: var(--accent-color);
-}
-
-.stat-card.saldo::before { 
-    background: linear-gradient(180deg, #22c55e, #16a34a); 
-}
-
-.stat-card.depositos::before { 
-    background: linear-gradient(180deg, #3b82f6, #2563eb); 
-}
-
-.stat-card.saques::before { 
-    background: linear-gradient(180deg, #f59e0b, #d97706); 
-}
-
-.stat-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    gap: 1.25rem;
-}
-
-.stat-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.stat-info h3 {
-    color: #9ca3af;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 1rem;
-    line-height: 1.2;
-}
-
-.stat-value {
-    font-size: 2rem;
-    font-weight: 900;
-    color: white;
-    line-height: 1.1;
-    margin-bottom: 0.5rem;
-}
-
-.stat-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    flex-shrink: 0;
-    margin-top: 0.25rem;
-}
-
-.stat-icon.saldo { 
-    background: rgba(34, 197, 94, 0.15); 
-    color: #22c55e;
-    border: 1px solid rgba(34, 197, 94, 0.2);
-}
-
-.stat-icon.depositos { 
-    background: rgba(59, 130, 246, 0.15); 
-    color: #3b82f6;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.stat-icon.saques { 
-    background: rgba(245, 158, 11, 0.15); 
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.2);
-}
-
-.stat-footer {
-    color: #6b7280;
-    font-size: 0.8rem;
-    margin-top: auto;
-    padding-top: 0.75rem;
-}
-
-/* Ajustes responsivos melhorados */
-@media (max-width: 768px) {
-    .stat-card {
-        padding: 1.75rem;
-        min-height: 120px;
-    }
-    
-    .stat-header {
-        gap: 1rem;
-        margin-bottom: 0.25rem;
-    }
-    
-    .stat-info h3 {
-        font-size: 0.75rem;
-        margin-bottom: 0.75rem;
-    }
-    
-    .stat-value {
-        font-size: 1.7rem;
-        margin-bottom: 0.25rem;
-    }
-    
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        font-size: 1.2rem;
-    }
-    
-    .stat-footer {
-        font-size: 0.75rem;
-        padding-top: 0.5rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .stat-card {
-        padding: 1.5rem;
-        min-height: 110px;
-    }
-    
-    .stat-header {
-        gap: 0.75rem;
-    }
-    
-    .stat-value {
-        font-size: 1.5rem;
-    }
-    
-    .stat-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 1.1rem;
-        margin-top: 0;
-    }
-}
-
-/* Melhorias no grid das estatísticas */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 3rem;
-}
-
-@media (max-width: 900px) {
-    .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.25rem;
-    }
-}
-
-@media (max-width: 768px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-}
-
-/* Animações melhoradas */
-.stat-card {
-    opacity: 0;
-    animation: slideInUp 0.6s ease-out forwards;
-}
-
-.stat-card:nth-child(1) { animation-delay: 0.1s; }
-.stat-card:nth-child(2) { animation-delay: 0.2s; }
-.stat-card:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes slideInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-        /* Main Form Card */
-        .form-card {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 3rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .form-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent);
-            border-radius: 50%;
-            transform: translate(50%, -50%);
-        }
-
-        .form-header {
-            text-align: center;
-            margin-bottom: 3rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .form-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 16px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.3);
-        }
-
-        .form-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 0.5rem;
-        }
-
-        .form-description {
-            color: #9ca3af;
-            font-size: 1rem;
-        }
-
-        /* Form Styles */
-        .form-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .form-group {
-            position: relative;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 1rem 1rem 1rem 3rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: white;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #22c55e;
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-        }
-
-        .form-input::placeholder {
-            color: #6b7280;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6b7280;
-            font-size: 1rem;
-            transition: color 0.3s ease;
-        }
-
-        .form-group:focus-within .input-icon {
-            color: #22c55e;
-        }
-
-        /* Password Toggle */
-        .password-toggle {
-            background: none;
-            border: none;
-            color: #22c55e;
-            cursor: pointer;
-            padding: 0.5rem 0;
-            font-size: 0.9rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: color 0.3s ease;
-            margin: 1rem 0;
-        }
-
-        .password-toggle:hover {
-            color: #16a34a;
-        }
-
-        .password-fields {
-            display: none;
-            flex-direction: column;
-            gap: 1.5rem;
-            margin: 1.5rem 0;
-            padding: 1.5rem;
-            background: rgba(34, 197, 94, 0.05);
-            border: 1px solid rgba(34, 197, 94, 0.1);
-            border-radius: 16px;
-        }
-
-        .password-fields.active {
-            display: flex;
-        }
-
-        .password-fields-title {
-            color: #22c55e;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Submit Button */
-        .submit-btn {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
-            margin-top: 1rem;
-        }
-
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4);
-        }
-
-        .submit-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Success Message */
-        .success-message {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            padding: 1rem;
-            color: #22c55e;
-            text-align: center;
-            margin-bottom: 2rem;
-            display: none;
-        }
-
-        .success-message.active {
-            display: block;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Security Tips */
-        .security-tips {
-            background: rgba(59, 130, 246, 0.05);
-            border: 1px solid rgba(59, 130, 246, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .security-title {
-            color: #3b82f6;
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .security-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .security-list li {
-            color: #9ca3af;
-            font-size: 0.85rem;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .security-list i {
-            color: #3b82f6;
-            font-size: 0.75rem;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .perfil-container {
-                padding: 0 1rem;
-            }
-            
-            .page-title {
-                font-size: 2rem;
-            }
-            
-            .form-card {
-                padding: 2rem 1.5rem;
-                border-radius: 20px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-            
-            .stat-card {
-                padding: 1.5rem;
-            }
-            
-            .stat-header {
-                align-items: flex-start;
-                gap: 0.75rem;
-            }
-            
-            .stat-value {
-                font-size: 1.5rem;
-                line-height: 1.3;
-            }
-            
-            .stat-icon {
-                width: 45px;
-                height: 45px;
-                font-size: 1.1rem;
-            }
-            
-            .user-avatar {
-                width: 80px;
-                height: 80px;
-                font-size: 2rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .form-card {
-                padding: 1.5rem 1rem;
-            }
-            
-            .form-input {
-                padding: 0.8rem 0.8rem 0.8rem 2.5rem;
-            }
-            
-            .input-icon {
-                left: 0.8rem;
-            }
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .loading .submit-btn {
-            background: #6b7280;
-        }
-
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
-</head>
-<body>
-    <?php include('../inc/header.php'); ?>
-    <?php include('../components/modals.php'); ?>
-
-    <section class="perfil-section">
-        <div class="perfil-container">
-            <!-- Page Header -->
-            <div class="page-header fade-in">
-                <div class="user-avatar">
-                    <?php= strtoupper(substr($usuario['nome'], 0, 2)) ?>
-                </div>
-                <h1 class="page-title">Meu Perfil</h1>
-                <p class="page-subtitle">
-                    Gerencie suas informações pessoais e configurações da conta
-                </p>
-            </div>
-
-            <!-- Stats Grid -->
-            <div class="stats-grid">
-                <div class="stat-card saldo">
-                    <div class="stat-header">
-                        <div class="stat-info">
-                            <h3>Saldo Atual</h3>
-                            <div class="stat-value">R$ <?php= number_format($usuario['saldo'] ?? 0, 2, ',', '.') ?></div>
-                        </div>
-                        <div class="stat-icon saldo">
-                            <i class="bi bi-wallet2"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stat-card depositos">
-                    <div class="stat-header">
-                        <div class="stat-info">
-                            <h3>Total Depositado</h3>
-                            <div class="stat-value">R$ <?php= number_format($total_depositado, 2, ',', '.') ?></div>
-                        </div>
-                        <div class="stat-icon depositos">
-                            <i class="bi bi-arrow-down-circle"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stat-card saques">
-                    <div class="stat-header">
-                        <div class="stat-info">
-                            <h3>Total Sacado</h3>
-                            <div class="stat-value">R$ <?php= number_format($total_sacado, 2, ',', '.') ?></div>
-                        </div>
-                        <div class="stat-icon saques">
-                            <i class="bi bi-arrow-up-circle"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Form Card -->
-            <div class="form-card">
-                <div class="form-header">
-                    <div class="form-icon">
-                        <i class="bi bi-person-gear"></i>
-                    </div>
-                    <h2 class="form-title">Editar Perfil</h2>
-                    <p class="form-description">
-                        Atualize suas informações pessoais com segurança
-                    </p>
-                </div>
-
-                <form method="POST" class="form-grid" id="perfilForm">
-                    <div class="form-group">
-                        <div class="input-icon">
-                            <i class="bi bi-person"></i>
-                        </div>
-                        <input type="text" 
-                               name="nome" 
-                               class="form-input"
-                               value="<?php= htmlspecialchars($usuario['nome'] ?? '') ?>" 
-                               placeholder="Nome completo" 
-                               required>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="input-icon">
-                            <i class="bi bi-telephone"></i>
-                        </div>
-                        <input type="text" 
-                               id="telefone" 
-                               name="telefone" 
-                               class="form-input"
-                               value="<?php= htmlspecialchars($usuario['telefone'] ?? '') ?>" 
-                               placeholder="(11) 99999-9999" 
-                               required>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="input-icon">
-                            <i class="bi bi-envelope"></i>
-                        </div>
-                        <input type="email" 
-                               name="email" 
-                               class="form-input"
-                               value="<?php= htmlspecialchars($usuario['email'] ?? '') ?>" 
-                               placeholder="seu@email.com" 
-                               required>
-                    </div>
-
-                    <!-- Password Toggle -->
-                    <button type="button" class="password-toggle" id="toggleSenha">
-                        <i class="bi bi-key"></i>
-                        Alterar senha
-                    </button>
-
-                    <!-- Password Fields -->
-                    <div class="password-fields" id="camposSenha">
-                        <div class="password-fields-title">
-                            <i class="bi bi-shield-lock"></i>
-                            Nova Senha
-                        </div>
-                        
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-lock"></i>
-                            </div>
-                            <input type="password" 
-                                   name="nova_senha" 
-                                   class="form-input"
-                                   placeholder="Digite a nova senha">
-                        </div>
-
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-lock-fill"></i>
-                            </div>
-                            <input type="password" 
-                                   name="confirmar_senha" 
-                                   class="form-input"
-                                   placeholder="Confirme a nova senha">
-                        </div>
-                    </div>
-
-                    <!-- Current Password -->
-                    <div class="form-group">
-                        <div class="input-icon">
-                            <i class="bi bi-shield-check"></i>
-                        </div>
-                        <input type="password" 
-                               name="senha_atual" 
-                               class="form-input"
-                               placeholder="Senha atual (para confirmar alterações)" 
-                               required>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <button type="submit" class="submit-btn" id="submitBtn">
-                        <i class="bi bi-check-circle"></i>
-                        Atualizar Perfil
-                    </button>
-                </form>
-
-                <!-- Security Tips -->
-                <div class="security-tips">
-                    <div class="security-title">
-                        <i class="bi bi-info-circle"></i>
-                        Dicas de Segurança
-                    </div>
-                    <ul class="security-list">
-                        <li>
-                            <i class="bi bi-check"></i>
-                            Use uma senha forte com pelo menos 8 caracteres
-                        </li>
-                        <li>
-                            <i class="bi bi-check"></i>
-                            Nunca compartilhe sua senha com terceiros
-                        </li>
-                        <li>
-                            <i class="bi bi-check"></i>
-                            Mantenha seus dados sempre atualizados
-                        </li>
-                        <li>
-                            <i class="bi bi-check"></i>
-                            Use um e-mail válido para recuperação da conta
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <?php include('../inc/footer.php'); ?>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Phone mask
-            const telefoneInput = document.getElementById('telefone');
-            telefoneInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length > 11) value = value.slice(0, 11);
-
-                let formatted = '';
-                if (value.length > 0) {
-                    formatted += '(' + value.substring(0, 2);
-                }
-                if (value.length >= 3) {
-                    formatted += ') ' + value.substring(2, 7);
-                }
-                if (value.length >= 8) {
-                    formatted += '-' + value.substring(7);
-                }
-                e.target.value = formatted;
-            });
-
-            // Password toggle
-            const toggleSenha = document.getElementById('toggleSenha');
-            const camposSenha = document.getElementById('camposSenha');
-
-            toggleSenha.addEventListener('click', function() {
-                camposSenha.classList.toggle('active');
-                
-                const icon = this.querySelector('i');
-                const text = camposSenha.classList.contains('active') ? 'Cancelar' : 'Alterar senha';
-                const iconClass = camposSenha.classList.contains('active') ? 'bi-x-circle' : 'bi-key';
-                
-                icon.className = `bi ${iconClass}`;
-                this.innerHTML = `<i class="bi ${iconClass}"></i> ${text}`;
-            });
-
-            // Form submission
-            const perfilForm = document.getElementById('perfilForm');
-            const submitBtn = document.getElementById('submitBtn');
-
-            perfilForm.addEventListener('submit', function(e) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite;"></i> Atualizando...';
-                perfilForm.classList.add('loading');
-            });
-
-            // Add spin animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `;
-            document.head.appendChild(style);
-        });
-
-        // Notiflix configuration
-        Notiflix.Notify.init({
-            width: '300px',
-            position: 'right-top',
-            distance: '20px',
-            opacity: 1,
-            borderRadius: '12px',
-            timeout: 4000,
-            success: {
-                background: '#22c55e',
-                textColor: '#fff',
-            },
-            failure: {
-                background: '#ef4444',
-                textColor: '#fff',
-            }
-        });
-
-        // Show messages if any
-        <?php if (isset($_SESSION['message'])): ?>
-            Notiflix.Notify.<?php echo $_SESSION['message']['type']; ?>('<?php echo $_SESSION['message']['text']; ?>');
-            <?php unset($_SESSION['message']); ?>
-        <?php endif; ?>
-
-        console.log('%c👤 Perfil do usuário carregado!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-    </script>
-</body>
+<?php<?php 
+@session_start();<?php 
+<?php 
+if<?php (file_exists('./conexao.php'))<?php {<?php 
+<?php include('./conexao.php');<?php 
+}<?php elseif<?php (file_exists('../conexao.php'))<?php {<?php 
+<?php include('../conexao.php');<?php 
+}<?php elseif<?php (file_exists('../../conexao.php'))<?php {<?php 
+<?php include('../../conexao.php');<?php 
+}<?php 
+<?php 
+if<?php (!isset($_SESSION['usuario_id']))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php precisa<?php estar<?php logado<?php para<?php acessar<?php esta<?php página!'];<?php 
+<?php header("Location:<?php /login");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$usuario_id<?php =<?php $_SESSION['usuario_id'];<?php 
+<?php 
+try<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php :id<?php LIMIT<?php 1");<?php 
+<?php $stmt->bindParam(':id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt->execute();<?php 
+<?php $usuario<?php =<?php $stmt->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+<?php if<?php (!$usuario)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Usuário<?php não<?php encontrado!'];<?php 
+<?php header("Location:<?php /login");<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php 
+<?php $stmt_depositos<?php =<?php $pdo->prepare("SELECT<?php SUM(valor)<?php as<?php total_depositado<?php FROM<?php depositos<?php WHERE<?php user_id<?php =<?php :user_id<?php AND<?php status<?php =<?php 'PAID'");<?php 
+<?php $stmt_depositos->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt_depositos->execute();<?php 
+<?php $total_depositado<?php =<?php $stmt_depositos->fetch(PDO::FETCH_ASSOC)['total_depositado']<?php ??<?php 0;<?php 
+<?php 
+<?php $stmt_saques<?php =<?php $pdo->prepare("SELECT<?php SUM(valor)<?php as<?php total_sacado<?php FROM<?php saques<?php WHERE<?php user_id<?php =<?php :user_id<?php AND<?php status<?php =<?php 'PAID'");<?php 
+<?php $stmt_saques->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt_saques->execute();<?php 
+<?php $total_sacado<?php =<?php $stmt_saques->fetch(PDO::FETCH_ASSOC)['total_sacado']<?php ??<?php 0;<?php 
+<?php 
+}<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php carregar<?php dados<?php do<?php usuário!'];<?php 
+}<?php 
+<?php 
+if<?php ($_SERVER['REQUEST_METHOD']<?php ===<?php 'POST')<?php {<?php 
+<?php $senha_atual<?php =<?php $_POST['senha_atual']<?php ??<?php '';<?php 
+<?php $nome<?php =<?php trim($_POST['nome']<?php ??<?php '');<?php 
+<?php $telefone<?php =<?php trim($_POST['telefone']<?php ??<?php '');<?php 
+<?php $email<?php =<?php trim($_POST['email']<?php ??<?php '');<?php 
+<?php $nova_senha<?php =<?php $_POST['nova_senha']<?php ??<?php '';<?php 
+<?php $confirmar_senha<?php =<?php $_POST['confirmar_senha']<?php ??<?php '';<?php 
+<?php 
+<?php if<?php (!password_verify($senha_atual,<?php $usuario['senha']))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Senha<?php atual<?php incorreta!'];<?php 
+<?php }<?php else<?php {<?php 
+<?php try<?php {<?php 
+<?php $dados<?php =<?php [<?php 
+<?php 'id'<?php =><?php $usuario_id,<?php 
+<?php 'nome'<?php =><?php $nome,<?php 
+<?php 'telefone'<?php =><?php $telefone,<?php 
+<?php 'email'<?php =><?php $email<?php 
+<?php ];<?php 
+<?php 
+<?php if<?php (!empty($nova_senha))<?php {<?php 
+<?php if<?php ($nova_senha<?php ===<?php $confirmar_senha)<?php {<?php 
+<?php $dados['senha']<?php =<?php password_hash($nova_senha,<?php PASSWORD_BCRYPT);<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'As<?php novas<?php senhas<?php não<?php coincidem!'];<?php 
+<?php header("Location:<?php /perfil");<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $setParts<?php =<?php [];<?php 
+<?php foreach<?php ($dados<?php as<?php $key<?php =><?php $value)<?php {<?php 
+<?php if<?php ($key<?php !==<?php 'id')<?php {<?php 
+<?php $setParts[]<?php =<?php "$key<?php =<?php :$key";<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $query<?php =<?php "UPDATE<?php usuarios<?php SET<?php "<?php .<?php implode(',<?php ',<?php $setParts)<?php .<?php "<?php WHERE<?php id<?php =<?php :id";<?php 
+<?php $stmt<?php =<?php $pdo->prepare($query);<?php 
+<?php 
+<?php if<?php ($stmt->execute($dados))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'success',<?php 'text'<?php =><?php 'Perfil<?php atualizado<?php com<?php sucesso!'];<?php 
+<?php header("Location:<?php /perfil");<?php 
+<?php exit;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php atualizar<?php perfil!'];<?php 
+<?php }<?php 
+<?php 
+<?php }<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php atualizar<?php perfil:<?php '<?php .<?php $e->getMessage()];<?php 
+<?php }<?php 
+<?php }<?php 
+}<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Meu<?php Perfil</title><?php 
+<?php 
+<?php <!--<?php Fonts<?php --><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Icons<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php 
+<?php 
+<?php <!--<?php Styles<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php=<?php time();<?php ?>"><?php 
+<?php 
+<?php <!--<?php Scripts<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php /*<?php Page<?php Styles<?php */<?php 
+<?php .perfil-section<?php {<?php 
+<?php margin-top:<?php 100px;<?php 
+<?php padding:<?php 4rem<?php 0;<?php 
+<?php background:<?php #0a0a0a;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 200px);<?php 
+<?php }<?php 
+<?php 
+<?php .perfil-container<?php {<?php 
+<?php max-width:<?php 900px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php padding:<?php 0<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Header<?php */<?php 
+<?php .page-header<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-title<?php {<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #9ca3af);<?php 
+<?php background-clip:<?php text;<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php }<?php 
+<?php 
+<?php .page-subtitle<?php {<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php max-width:<?php 500px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php User<?php Avatar<?php */<?php 
+<?php .user-avatar<?php {<?php 
+<?php width:<?php 100px;<?php 
+<?php height:<?php 100px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php margin:<?php 0<?php auto<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 32px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .user-avatar::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php inset:<?php -4px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php z-index:<?php -1;<?php 
+<?php opacity:<?php 0.3;<?php 
+<?php animation:<?php pulse<?php 2s<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php pulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php scale(1);<?php opacity:<?php 0.3;<?php }<?php 
+<?php 50%<?php {<?php transform:<?php scale(1.1);<?php opacity:<?php 0.1;<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Stats<?php Cards<?php */<?php 
+<?php .stats-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(250px,<?php 1fr));<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+/*<?php Ajustes<?php específicos<?php para<?php os<?php cards<?php de<?php estatísticas<?php */<?php 
+<?php 
+.stat-card<?php {<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.02);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php min-height:<?php 140px;<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php justify-content:<?php space-between;<?php 
+}<?php 
+<?php 
+.stat-card:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php box-shadow:<?php 0<?php 10px<?php 40px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+}<?php 
+<?php 
+.stat-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php var(--accent-color);<?php 
+}<?php 
+<?php 
+.stat-card.saldo::before<?php {<?php 
+<?php background:<?php linear-gradient(180deg,<?php #22c55e,<?php #16a34a);<?php 
+}<?php 
+<?php 
+.stat-card.depositos::before<?php {<?php 
+<?php background:<?php linear-gradient(180deg,<?php #3b82f6,<?php #2563eb);<?php 
+}<?php 
+<?php 
+.stat-card.saques::before<?php {<?php 
+<?php background:<?php linear-gradient(180deg,<?php #f59e0b,<?php #d97706);<?php 
+}<?php 
+<?php 
+.stat-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php gap:<?php 1.25rem;<?php 
+}<?php 
+<?php 
+.stat-info<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php min-width:<?php 0;<?php 
+}<?php 
+<?php 
+.stat-info<?php h3<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.1em;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php line-height:<?php 1.2;<?php 
+}<?php 
+<?php 
+.stat-value<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php color:<?php white;<?php 
+<?php line-height:<?php 1.1;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+}<?php 
+<?php 
+.stat-icon<?php {<?php 
+<?php width:<?php 52px;<?php 
+<?php height:<?php 52px;<?php 
+<?php border-radius:<?php 14px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1.3rem;<?php 
+<?php flex-shrink:<?php 0;<?php 
+<?php margin-top:<?php 0.25rem;<?php 
+}<?php 
+<?php 
+.stat-icon.saldo<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.15);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+}<?php 
+<?php 
+.stat-icon.depositos<?php {<?php 
+<?php background:<?php rgba(59,<?php 130,<?php 246,<?php 0.15);<?php 
+<?php color:<?php #3b82f6;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(59,<?php 130,<?php 246,<?php 0.2);<?php 
+}<?php 
+<?php 
+.stat-icon.saques<?php {<?php 
+<?php background:<?php rgba(245,<?php 158,<?php 11,<?php 0.15);<?php 
+<?php color:<?php #f59e0b;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(245,<?php 158,<?php 11,<?php 0.2);<?php 
+}<?php 
+<?php 
+.stat-footer<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php margin-top:<?php auto;<?php 
+<?php padding-top:<?php 0.75rem;<?php 
+}<?php 
+<?php 
+/*<?php Ajustes<?php responsivos<?php melhorados<?php */<?php 
+@media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .stat-card<?php {<?php 
+<?php padding:<?php 1.75rem;<?php 
+<?php min-height:<?php 120px;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-header<?php {<?php 
+<?php gap:<?php 1rem;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-info<?php h3<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-value<?php {<?php 
+<?php font-size:<?php 1.7rem;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-icon<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php font-size:<?php 1.2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-footer<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php padding-top:<?php 0.5rem;<?php 
+<?php }<?php 
+}<?php 
+<?php 
+@media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .stat-card<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php min-height:<?php 110px;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-header<?php {<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-value<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-icon<?php {<?php 
+<?php width:<?php 44px;<?php 
+<?php height:<?php 44px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php margin-top:<?php 0;<?php 
+<?php }<?php 
+}<?php 
+<?php 
+/*<?php Melhorias<?php no<?php grid<?php das<?php estatísticas<?php */<?php 
+.stats-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(280px,<?php 1fr));<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+}<?php 
+<?php 
+@media<?php (max-width:<?php 900px)<?php {<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(250px,<?php 1fr));<?php 
+<?php gap:<?php 1.25rem;<?php 
+<?php }<?php 
+}<?php 
+<?php 
+@media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+}<?php 
+<?php 
+/*<?php Animações<?php melhoradas<?php */<?php 
+.stat-card<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php animation:<?php slideInUp<?php 0.6s<?php ease-out<?php forwards;<?php 
+}<?php 
+<?php 
+.stat-card:nth-child(1)<?php {<?php animation-delay:<?php 0.1s;<?php }<?php 
+.stat-card:nth-child(2)<?php {<?php animation-delay:<?php 0.2s;<?php }<?php 
+.stat-card:nth-child(3)<?php {<?php animation-delay:<?php 0.3s;<?php }<?php 
+<?php 
+@keyframes<?php slideInUp<?php {<?php 
+<?php from<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php transform:<?php translateY(30px);<?php 
+<?php }<?php 
+<?php to<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php transform:<?php translateY(0);<?php 
+<?php }<?php 
+}<?php 
+<?php 
+<?php /*<?php Main<?php Form<?php Card<?php */<?php 
+<?php .form-card<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 3rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .form-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php width:<?php 150px;<?php 
+<?php height:<?php 150px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php transform:<?php translate(50%,<?php -50%);<?php 
+<?php }<?php 
+<?php 
+<?php .form-header<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .form-icon<?php {<?php 
+<?php width:<?php 60px;<?php 
+<?php height:<?php 60px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php margin:<?php 0<?php auto<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 24px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .form-title<?php {<?php 
+<?php font-size:<?php 1.8rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-description<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Form<?php Styles<?php */<?php 
+<?php .form-grid<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php padding:<?php 1rem<?php 1rem<?php 1rem<?php 3rem;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php #22c55e;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.08);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .form-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .input-icon<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 1rem;<?php 
+<?php top:<?php 50%;<?php 
+<?php transform:<?php translateY(-50%);<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php color<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group:focus-within<?php .input-icon<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Password<?php Toggle<?php */<?php 
+<?php .password-toggle<?php {<?php 
+<?php background:<?php none;<?php 
+<?php border:<?php none;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php padding:<?php 0.5rem<?php 0;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php transition:<?php color<?php 0.3s<?php ease;<?php 
+<?php margin:<?php 1rem<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .password-toggle:hover<?php {<?php 
+<?php color:<?php #16a34a;<?php 
+<?php }<?php 
+<?php 
+<?php .password-fields<?php {<?php 
+<?php display:<?php none;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin:<?php 1.5rem<?php 0;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.05);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php }<?php 
+<?php 
+<?php .password-fields.active<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php }<?php 
+<?php 
+<?php .password-fields-title<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.05em;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Submit<?php Button<?php */<?php 
+<?php .submit-btn<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border:<?php none;<?php 
+<?php padding:<?php 1rem<?php 2rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php margin-top:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn:hover<?php {<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 30px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn:disabled<?php {<?php 
+<?php opacity:<?php 0.6;<?php 
+<?php cursor:<?php not-allowed;<?php 
+<?php transform:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Success<?php Message<?php */<?php 
+<?php .success-message<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .success-message.active<?php {<?php 
+<?php display:<?php block;<?php 
+<?php animation:<?php slideIn<?php 0.3s<?php ease-out;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php slideIn<?php {<?php 
+<?php from<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php transform:<?php translateY(-10px);<?php 
+<?php }<?php 
+<?php to<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php transform:<?php translateY(0);<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Security<?php Tips<?php */<?php 
+<?php .security-tips<?php {<?php 
+<?php background:<?php rgba(59,<?php 130,<?php 246,<?php 0.05);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(59,<?php 130,<?php 246,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-top:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .security-title<?php {<?php 
+<?php color:<?php #3b82f6;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .security-list<?php {<?php 
+<?php list-style:<?php none;<?php 
+<?php padding:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .security-list<?php li<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.85rem;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .security-list<?php i<?php {<?php 
+<?php color:<?php #3b82f6;<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Responsive<?php */<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .perfil-container<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-title<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-card<?php {<?php 
+<?php padding:<?php 2rem<?php 1.5rem;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php }<?php 
+<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-card<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-header<?php {<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-value<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php line-height:<?php 1.3;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-icon<?php {<?php 
+<?php width:<?php 45px;<?php 
+<?php height:<?php 45px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-avatar<?php {<?php 
+<?php width:<?php 80px;<?php 
+<?php height:<?php 80px;<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .form-card<?php {<?php 
+<?php padding:<?php 1.5rem<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php padding:<?php 0.8rem<?php 0.8rem<?php 0.8rem<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .input-icon<?php {<?php 
+<?php left:<?php 0.8rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Loading<?php States<?php */<?php 
+<?php .loading<?php {<?php 
+<?php opacity:<?php 0.7;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .loading<?php .submit-btn<?php {<?php 
+<?php background:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Animations<?php */<?php 
+<?php .fade-in<?php {<?php 
+<?php animation:<?php fadeIn<?php 0.6s<?php ease-out<?php forwards;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php fadeIn<?php {<?php 
+<?php from<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php transform:<?php translateY(20px);<?php 
+<?php }<?php 
+<?php to<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php transform:<?php translateY(0);<?php 
+<?php }<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <?php<?php include('../inc/header.php');<?php ?><?php 
+<?php <?php<?php include('../components/modals.php');<?php ?><?php 
+<?php 
+<?php <section<?php class="perfil-section"><?php 
+<?php <div<?php class="perfil-container"><?php 
+<?php <!--<?php Page<?php Header<?php --><?php 
+<?php <div<?php class="page-header<?php fade-in"><?php 
+<?php <div<?php class="user-avatar"><?php 
+<?php <?php=<?php strtoupper(substr($usuario['nome'],<?php 0,<?php 2))<?php ?><?php 
+<?php </div><?php 
+<?php <h1<?php class="page-title">Meu<?php Perfil</h1><?php 
+<?php <p<?php class="page-subtitle"><?php 
+<?php Gerencie<?php suas<?php informações<?php pessoais<?php e<?php configurações<?php da<?php conta<?php 
+<?php </p><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Stats<?php Grid<?php --><?php 
+<?php <div<?php class="stats-grid"><?php 
+<?php <div<?php class="stat-card<?php saldo"><?php 
+<?php <div<?php class="stat-header"><?php 
+<?php <div<?php class="stat-info"><?php 
+<?php <h3>Saldo<?php Atual</h3><?php 
+<?php <div<?php class="stat-value">R$<?php <?php=<?php number_format($usuario['saldo']<?php ??<?php 0,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-icon<?php saldo"><?php 
+<?php <i<?php class="bi<?php bi-wallet2"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="stat-card<?php depositos"><?php 
+<?php <div<?php class="stat-header"><?php 
+<?php <div<?php class="stat-info"><?php 
+<?php <h3>Total<?php Depositado</h3><?php 
+<?php <div<?php class="stat-value">R$<?php <?php=<?php number_format($total_depositado,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-icon<?php depositos"><?php 
+<?php <i<?php class="bi<?php bi-arrow-down-circle"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="stat-card<?php saques"><?php 
+<?php <div<?php class="stat-header"><?php 
+<?php <div<?php class="stat-info"><?php 
+<?php <h3>Total<?php Sacado</h3><?php 
+<?php <div<?php class="stat-value">R$<?php <?php=<?php number_format($total_sacado,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-icon<?php saques"><?php 
+<?php <i<?php class="bi<?php bi-arrow-up-circle"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Form<?php Card<?php --><?php 
+<?php <div<?php class="form-card"><?php 
+<?php <div<?php class="form-header"><?php 
+<?php <div<?php class="form-icon"><?php 
+<?php <i<?php class="bi<?php bi-person-gear"></i><?php 
+<?php </div><?php 
+<?php <h2<?php class="form-title">Editar<?php Perfil</h2><?php 
+<?php <p<?php class="form-description"><?php 
+<?php Atualize<?php suas<?php informações<?php pessoais<?php com<?php segurança<?php 
+<?php </p><?php 
+<?php </div><?php 
+<?php 
+<?php <form<?php method="POST"<?php class="form-grid"<?php id="perfilForm"><?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-person"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="text"<?php 
+<?php name="nome"<?php 
+<?php class="form-input"<?php 
+<?php value="<?php=<?php htmlspecialchars($usuario['nome']<?php ??<?php '')<?php ?>"<?php 
+<?php placeholder="Nome<?php completo"<?php 
+<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-telephone"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="text"<?php 
+<?php id="telefone"<?php 
+<?php name="telefone"<?php 
+<?php class="form-input"<?php 
+<?php value="<?php=<?php htmlspecialchars($usuario['telefone']<?php ??<?php '')<?php ?>"<?php 
+<?php placeholder="(11)<?php 99999-9999"<?php 
+<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-envelope"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="email"<?php 
+<?php name="email"<?php 
+<?php class="form-input"<?php 
+<?php value="<?php=<?php htmlspecialchars($usuario['email']<?php ??<?php '')<?php ?>"<?php 
+<?php placeholder="seu@email.com"<?php 
+<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Password<?php Toggle<?php --><?php 
+<?php <button<?php type="button"<?php class="password-toggle"<?php id="toggleSenha"><?php 
+<?php <i<?php class="bi<?php bi-key"></i><?php 
+<?php Alterar<?php senha<?php 
+<?php </button><?php 
+<?php 
+<?php <!--<?php Password<?php Fields<?php --><?php 
+<?php <div<?php class="password-fields"<?php id="camposSenha"><?php 
+<?php <div<?php class="password-fields-title"><?php 
+<?php <i<?php class="bi<?php bi-shield-lock"></i><?php 
+<?php Nova<?php Senha<?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-lock"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="password"<?php 
+<?php name="nova_senha"<?php 
+<?php class="form-input"<?php 
+<?php placeholder="Digite<?php a<?php nova<?php senha"><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-lock-fill"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="password"<?php 
+<?php name="confirmar_senha"<?php 
+<?php class="form-input"<?php 
+<?php placeholder="Confirme<?php a<?php nova<?php senha"><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Current<?php Password<?php --><?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-shield-check"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="password"<?php 
+<?php name="senha_atual"<?php 
+<?php class="form-input"<?php 
+<?php placeholder="Senha<?php atual<?php (para<?php confirmar<?php alterações)"<?php 
+<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Submit<?php Button<?php --><?php 
+<?php <button<?php type="submit"<?php class="submit-btn"<?php id="submitBtn"><?php 
+<?php <i<?php class="bi<?php bi-check-circle"></i><?php 
+<?php Atualizar<?php Perfil<?php 
+<?php </button><?php 
+<?php </form><?php 
+<?php 
+<?php <!--<?php Security<?php Tips<?php --><?php 
+<?php <div<?php class="security-tips"><?php 
+<?php <div<?php class="security-title"><?php 
+<?php <i<?php class="bi<?php bi-info-circle"></i><?php 
+<?php Dicas<?php de<?php Segurança<?php 
+<?php </div><?php 
+<?php <ul<?php class="security-list"><?php 
+<?php <li><?php 
+<?php <i<?php class="bi<?php bi-check"></i><?php 
+<?php Use<?php uma<?php senha<?php forte<?php com<?php pelo<?php menos<?php 8<?php caracteres<?php 
+<?php </li><?php 
+<?php <li><?php 
+<?php <i<?php class="bi<?php bi-check"></i><?php 
+<?php Nunca<?php compartilhe<?php sua<?php senha<?php com<?php terceiros<?php 
+<?php </li><?php 
+<?php <li><?php 
+<?php <i<?php class="bi<?php bi-check"></i><?php 
+<?php Mantenha<?php seus<?php dados<?php sempre<?php atualizados<?php 
+<?php </li><?php 
+<?php <li><?php 
+<?php <i<?php class="bi<?php bi-check"></i><?php 
+<?php Use<?php um<?php e-mail<?php válido<?php para<?php recuperação<?php da<?php conta<?php 
+<?php </li><?php 
+<?php </ul><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php include('../inc/footer.php');<?php ?><?php 
+<?php 
+<?php <script><?php 
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php 
+<?php //<?php Phone<?php mask<?php 
+<?php const<?php telefoneInput<?php =<?php document.getElementById('telefone');<?php 
+<?php telefoneInput.addEventListener('input',<?php function(e)<?php {<?php 
+<?php let<?php value<?php =<?php e.target.value.replace(/\D/g,<?php '');<?php 
+<?php if<?php (value.length<?php ><?php 11)<?php value<?php =<?php value.slice(0,<?php 11);<?php 
+<?php 
+<?php let<?php formatted<?php =<?php '';<?php 
+<?php if<?php (value.length<?php ><?php 0)<?php {<?php 
+<?php formatted<?php +=<?php '('<?php +<?php value.substring(0,<?php 2);<?php 
+<?php }<?php 
+<?php if<?php (value.length<?php >=<?php 3)<?php {<?php 
+<?php formatted<?php +=<?php ')<?php '<?php +<?php value.substring(2,<?php 7);<?php 
+<?php }<?php 
+<?php if<?php (value.length<?php >=<?php 8)<?php {<?php 
+<?php formatted<?php +=<?php '-'<?php +<?php value.substring(7);<?php 
+<?php }<?php 
+<?php e.target.value<?php =<?php formatted;<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Password<?php toggle<?php 
+<?php const<?php toggleSenha<?php =<?php document.getElementById('toggleSenha');<?php 
+<?php const<?php camposSenha<?php =<?php document.getElementById('camposSenha');<?php 
+<?php 
+<?php toggleSenha.addEventListener('click',<?php function()<?php {<?php 
+<?php camposSenha.classList.toggle('active');<?php 
+<?php 
+<?php const<?php icon<?php =<?php this.querySelector('i');<?php 
+<?php const<?php text<?php =<?php camposSenha.classList.contains('active')<?php ?<?php 'Cancelar'<?php :<?php 'Alterar<?php senha';<?php 
+<?php const<?php iconClass<?php =<?php camposSenha.classList.contains('active')<?php ?<?php 'bi-x-circle'<?php :<?php 'bi-key';<?php 
+<?php 
+<?php icon.className<?php =<?php `bi<?php ${iconClass}`;<?php 
+<?php this.innerHTML<?php =<?php `<i<?php class="bi<?php ${iconClass}"></i><?php ${text}`;<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Form<?php submission<?php 
+<?php const<?php perfilForm<?php =<?php document.getElementById('perfilForm');<?php 
+<?php const<?php submitBtn<?php =<?php document.getElementById('submitBtn');<?php 
+<?php 
+<?php perfilForm.addEventListener('submit',<?php function(e)<?php {<?php 
+<?php submitBtn.disabled<?php =<?php true;<?php 
+<?php submitBtn.innerHTML<?php =<?php '<i<?php class="bi<?php bi-arrow-repeat"<?php style="animation:<?php spin<?php 1s<?php linear<?php infinite;"></i><?php Atualizando...';<?php 
+<?php perfilForm.classList.add('loading');<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Add<?php spin<?php animation<?php 
+<?php const<?php style<?php =<?php document.createElement('style');<?php 
+<?php style.textContent<?php =<?php `<?php 
+<?php @keyframes<?php spin<?php {<?php 
+<?php 0%<?php {<?php transform:<?php rotate(0deg);<?php }<?php 
+<?php 100%<?php {<?php transform:<?php rotate(360deg);<?php }<?php 
+<?php }<?php 
+<?php `;<?php 
+<?php document.head.appendChild(style);<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Notiflix<?php configuration<?php 
+<?php Notiflix.Notify.init({<?php 
+<?php width:<?php '300px',<?php 
+<?php position:<?php 'right-top',<?php 
+<?php distance:<?php '20px',<?php 
+<?php opacity:<?php 1,<?php 
+<?php borderRadius:<?php '12px',<?php 
+<?php timeout:<?php 4000,<?php 
+<?php success:<?php {<?php 
+<?php background:<?php '#22c55e',<?php 
+<?php textColor:<?php '#fff',<?php 
+<?php },<?php 
+<?php failure:<?php {<?php 
+<?php background:<?php '#ef4444',<?php 
+<?php textColor:<?php '#fff',<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Show<?php messages<?php if<?php any<?php 
+<?php <?php<?php if<?php (isset($_SESSION['message'])):<?php ?><?php 
+<?php Notiflix.Notify.<?php<?php echo<?php $_SESSION['message']['type'];<?php ?>('<?php<?php echo<?php $_SESSION['message']['text'];<?php ?>');<?php 
+<?php <?php<?php unset($_SESSION['message']);<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php console.log('%c👤<?php Perfil<?php do<?php usuário<?php carregado!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php </script><?php 
+</body><?php 
 </html>

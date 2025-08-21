@@ -1,189 +1,189 @@
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@2.0.46/css/materialdesignicons.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
-<style>
-    /* Subtle Dark Theme for Admin */
-    .admin-header {
-        background: rgba(20, 20, 20, 0.95) !important;
-        backdrop-filter: blur(20px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    }
-    
-    .admin-sidebar {
-        background: rgba(20, 20, 20, 0.95) !important;
-        backdrop-filter: blur(20px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-    }
-    
-    .nav-item-enhanced {
-        padding: 12px 20px;
-        margin: 4px 0;
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-        font-weight: 500;
-        color: #e5e7eb !important;
-    }
-    
-    .nav-item-enhanced::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-        transition: left 0.5s ease;
-    }
-    
-    .nav-item-enhanced:hover::before {
-        left: 100%;
-    }
-    
-    .nav-item-enhanced:hover {
-        background: rgba(255, 255, 255, 0.05);
-        transform: translateX(2px);
-        color: #f3f4f6 !important;
-    }
-    
-    .nav-item-enhanced.active {
-        background: rgba(34, 197, 94, 0.15) !important;
-        color: #22c55e !important;
-        border: 1px solid rgba(34, 197, 94, 0.3);
-        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
-    }
-    
-    .nav-item-enhanced.active::before {
-        display: none;
-    }
-    
-    .nav-item-enhanced i {
-        font-size: 1.1rem;
-        width: 24px;
-        text-align: center;
-        margin-right: 12px;
-        transition: transform 0.3s ease;
-    }
-    
-    .nav-item-enhanced:hover i {
-        transform: scale(1.05);
-    }
-    
-    .menu-toggle {
-        transition: all 0.3s ease;
-        padding: 8px;
-        border-radius: 8px;
-    }
-    
-    .menu-toggle:hover {
-        background: rgba(255, 255, 255, 0.1);
-        transform: scale(1.05);
-    }
-    
-    /* Special colors for specific items */
-    .nav-item-enhanced.text-blue-300 {
-        color: #93c5fd !important;
-    }
-    
-    .nav-item-enhanced.text-red-600 {
-        color: #f87171 !important;
-    }
-    
-    .nav-item-enhanced.text-blue-300:hover {
-        color: #60a5fa !important;
-        background: rgba(59, 130, 246, 0.1) !important;
-    }
-    
-    .nav-item-enhanced.text-red-600:hover {
-        color: #ef4444 !important;
-        background: rgba(239, 68, 68, 0.1) !important;
-    }
-    
-    /* Logo styling */
-    .admin-logo {
-        filter: brightness(1.1);
-        transition: transform 0.3s ease;
-    }
-    
-    .admin-logo:hover {
-        transform: scale(1.02);
-    }
-</style>
-
-<header class="admin-header fixed lg:hidden w-full h-20 top-0 z-[9998] flex justify-between items-center px-5">
-    <i class="fa-solid fa-bars text-white text-2xl cursor-pointer menu-toggle" id="menu-toggle"></i>
-    <div></div>
-</header>
-
-<aside id="aside" class="admin-sidebar fixed w-full lg:w-[280px] h-[calc(100vh-80px)] lg:h-full z-[9999] top-20 lg:top-0 left-0 flex flex-col justify-start gap-6 text-xl text-gray-300 px-8 hidden lg:flex" style="padding: 20px 16px !important;">
-    
-    <nav class="flex flex-col gap-2">
-        <p onclick="window.location.href='/admin'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-chart-line"></i> Dashboard
-        </p>
-        <p onclick="window.location.href='config.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-gear"></i> Configurações
-        </p>
-        <p onclick="window.location.href='gateway.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-landmark"></i> Gateway
-        </p>
-        <p onclick="window.location.href='usuarios.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-users"></i> Usuários
-        </p>
-        <p onclick="window.location.href='afiliados.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-people-arrows"></i> Afiliados
-        </p>
-        <p onclick="window.location.href='cartelas.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-gem"></i> Raspadinhas
-        </p>
-        <p onclick="window.location.href='depositos.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-plus-circle"></i> Depósitos
-        </p>
-        <p onclick="window.location.href='saques.php'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-minus-circle"></i> Saques
-        </p>
-        
-        <div class="my-4 border-t border-gray-600"></div>
-        
-        <p onclick="window.location.href='/'" class="nav-item-enhanced flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-globe"></i> Plataforma
-        </p>
-        <p onclick="window.open('https://wa.me/+5584999591257', '_blank')" class="nav-item-enhanced text-blue-300 flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-life-ring"></i> Suporte
-        </p>
-        <p onclick="window.location.href='/logout'" class="nav-item-enhanced text-red-600 flex items-center gap-4 cursor-pointer" style="padding-left: 16px;"> 
-            <i class="fa-solid fa-sign-out-alt"></i> Sair
-        </p>
-    </nav>
-</aside>
-
-<script>
-    const menuToggle = document.getElementById("menu-toggle");
-    const aside = document.getElementById("aside");
-
-    menuToggle.addEventListener("click", () => {
-        if (aside.classList.contains("hidden")) {
-            aside.classList.remove("hidden");
-        } else {
-            aside.classList.add("hidden");
-        }
-    });
-
-    // Auto-hide sidebar on mobile when clicking outside
-    document.addEventListener('click', function(event) {
-        if (window.innerWidth <= 1024 && 
-            !aside.contains(event.target) && 
-            !menuToggle.contains(event.target) && 
-            !aside.classList.contains('hidden')) {
-            aside.classList.add('hidden');
-        }
-    });
+<link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/@mdi/font@2.0.46/css/materialdesignicons.min.css"><?php 
+<link<?php rel="stylesheet"<?php href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><?php 
+<link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<script<?php src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script><?php 
+<?php 
+<style><?php 
+<?php /*<?php Subtle<?php Dark<?php Theme<?php for<?php Admin<?php */<?php 
+<?php .admin-header<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.95)<?php !important;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 10px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .admin-sidebar<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.95)<?php !important;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-right:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php box-shadow:<?php 2px<?php 0<?php 10px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced<?php {<?php 
+<?php padding:<?php 12px<?php 20px;<?php 
+<?php margin:<?php 4px<?php 0;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php color:<?php #e5e7eb<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php -100%;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php linear-gradient(90deg,<?php transparent,<?php rgba(255,<?php 255,<?php 255,<?php 0.05),<?php transparent);<?php 
+<?php transition:<?php left<?php 0.5s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced:hover::before<?php {<?php 
+<?php left:<?php 100%;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced:hover<?php {<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php transform:<?php translateX(2px);<?php 
+<?php color:<?php #f3f4f6<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced.active<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php !important;<?php 
+<?php color:<?php #22c55e<?php !important;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced.active::before<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced<?php i<?php {<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php width:<?php 24px;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-right:<?php 12px;<?php 
+<?php transition:<?php transform<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced:hover<?php i<?php {<?php 
+<?php transform:<?php scale(1.05);<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php padding:<?php 8px;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle:hover<?php {<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php transform:<?php scale(1.05);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Special<?php colors<?php for<?php specific<?php items<?php */<?php 
+<?php .nav-item-enhanced.text-blue-300<?php {<?php 
+<?php color:<?php #93c5fd<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced.text-red-600<?php {<?php 
+<?php color:<?php #f87171<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced.text-blue-300:hover<?php {<?php 
+<?php color:<?php #60a5fa<?php !important;<?php 
+<?php background:<?php rgba(59,<?php 130,<?php 246,<?php 0.1)<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item-enhanced.text-red-600:hover<?php {<?php 
+<?php color:<?php #ef4444<?php !important;<?php 
+<?php background:<?php rgba(239,<?php 68,<?php 68,<?php 0.1)<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Logo<?php styling<?php */<?php 
+<?php .admin-logo<?php {<?php 
+<?php filter:<?php brightness(1.1);<?php 
+<?php transition:<?php transform<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .admin-logo:hover<?php {<?php 
+<?php transform:<?php scale(1.02);<?php 
+<?php }<?php 
+</style><?php 
+<?php 
+<header<?php class="admin-header<?php fixed<?php lg:hidden<?php w-full<?php h-20<?php top-0<?php z-[9998]<?php flex<?php justify-between<?php items-center<?php px-5"><?php 
+<?php <i<?php class="fa-solid<?php fa-bars<?php text-white<?php text-2xl<?php cursor-pointer<?php menu-toggle"<?php id="menu-toggle"></i><?php 
+<?php <div></div><?php 
+</header><?php 
+<?php 
+<aside<?php id="aside"<?php class="admin-sidebar<?php fixed<?php w-full<?php lg:w-[280px]<?php h-[calc(100vh-80px)]<?php lg:h-full<?php z-[9999]<?php top-20<?php lg:top-0<?php left-0<?php flex<?php flex-col<?php justify-start<?php gap-6<?php text-xl<?php text-gray-300<?php px-8<?php hidden<?php lg:flex"<?php style="padding:<?php 20px<?php 16px<?php !important;"><?php 
+<?php 
+<?php <nav<?php class="flex<?php flex-col<?php gap-2"><?php 
+<?php <p<?php onclick="window.location.href='/admin'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-chart-line"></i><?php Dashboard<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='config.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-gear"></i><?php Configurações<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='gateway.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-landmark"></i><?php Gateway<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='usuarios.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-users"></i><?php Usuários<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='afiliados.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-people-arrows"></i><?php Afiliados<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='cartelas.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-gem"></i><?php Raspadinhas<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='depositos.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-plus-circle"></i><?php Depósitos<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='saques.php'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-minus-circle"></i><?php Saques<?php 
+<?php </p><?php 
+<?php 
+<?php <div<?php class="my-4<?php border-t<?php border-gray-600"></div><?php 
+<?php 
+<?php <p<?php onclick="window.location.href='/'"<?php class="nav-item-enhanced<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-globe"></i><?php Plataforma<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.open('https://wa.me/+5584999591257',<?php '_blank')"<?php class="nav-item-enhanced<?php text-blue-300<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-life-ring"></i><?php Suporte<?php 
+<?php </p><?php 
+<?php <p<?php onclick="window.location.href='/logout'"<?php class="nav-item-enhanced<?php text-red-600<?php flex<?php items-center<?php gap-4<?php cursor-pointer"<?php style="padding-left:<?php 16px;"><?php 
+<?php <i<?php class="fa-solid<?php fa-sign-out-alt"></i><?php Sair<?php 
+<?php </p><?php 
+<?php </nav><?php 
+</aside><?php 
+<?php 
+<script><?php 
+<?php const<?php menuToggle<?php =<?php document.getElementById("menu-toggle");<?php 
+<?php const<?php aside<?php =<?php document.getElementById("aside");<?php 
+<?php 
+<?php menuToggle.addEventListener("click",<?php ()<?php =><?php {<?php 
+<?php if<?php (aside.classList.contains("hidden"))<?php {<?php 
+<?php aside.classList.remove("hidden");<?php 
+<?php }<?php else<?php {<?php 
+<?php aside.classList.add("hidden");<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Auto-hide<?php sidebar<?php on<?php mobile<?php when<?php clicking<?php outside<?php 
+<?php document.addEventListener('click',<?php function(event)<?php {<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024<?php &&<?php 
+<?php !aside.contains(event.target)<?php &&<?php 
+<?php !menuToggle.contains(event.target)<?php &&<?php 
+<?php !aside.classList.contains('hidden'))<?php {<?php 
+<?php aside.classList.add('hidden');<?php 
+<?php }<?php 
+<?php });<?php 
 </script>

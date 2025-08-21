@@ -1,895 +1,895 @@
-<?php
-session_start();
-
-if(isset($_SESSION['usuario_id'])){
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você já está logado!'];
-    header("Location: /");
-    exit;
-}
-
-require_once '../conexao.php'; 
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nome = trim($_POST['nome']);
-    $telefone = trim($_POST['telefone']);
-    $email = trim($_POST['email']);
-    $senha = password_hash($_POST['senha'], PASSWORD_DEFAULT);
-    $ref = $_POST['ref'] ?? null;
-
-    try {
-        $stmt_config = $pdo->query("SELECT cpa_padrao, revshare_padrao FROM config LIMIT 1");
-        $config = $stmt_config->fetch(PDO::FETCH_ASSOC);
-        
-        $cpa_padrao = $config['cpa_padrao'] ?? 0.00;
-        $revshare_padrao = $config['revshare_padrao'] ?? 0.00;
-    } catch (PDOException $e) {
-        $cpa_padrao = 0.00;
-        $revshare_padrao = 0.00;
-    }
-
-    $stmt = $pdo->prepare("INSERT INTO usuarios 
-                          (nome, telefone, email, senha, saldo, indicacao, banido, comissao_cpa, comissao_revshare, created_at, updated_at) 
-                          VALUES (?, ?, ?, ?, 0, ?, 0, ?, ?, NOW(), NOW())");
-
-    try {
-        $stmt->execute([$nome, $telefone, $email, $senha, $ref, $cpa_padrao, $revshare_padrao]);
-        
-        $usuarioId = $pdo->lastInsertId();
-        $_SESSION['usuario_id'] = $usuarioId;
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Cadastro realizado com sucesso!'];
-        
-        header("Location: /");
-        exit;
-    } catch (PDOException $e) {
-        error_log("Erro ao cadastrar: " . $e->getMessage());
-        $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao realizar cadastro!'];
-        header("Location: /cadastro");
-        exit;
-    }
-}
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-
-    <!-- xTracky Integration -->
-    <script 
-        src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
-        data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
-        data-click-id-param="click_id">
-    </script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Cadastro</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php echo time();?>"/>
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-
-    <style>
-        /* Page Styles */
-        .cadastro-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 100px);
-            position: relative;
-        }
-
-        .cadastro-container {
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-            min-height: calc(100vh - 200px);
-        }
-
-        /* Left Section */
-        .left-section {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-        }
-
-        .brand-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .brand-logo {
-            width: 120px;
-            height: 120px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 24px;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            color: white;
-            font-weight: 900;
-            box-shadow: 0 20px 40px rgba(34, 197, 94, 0.3);
-            position: relative;
-        }
-
-        .brand-logo::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 28px;
-            z-index: -1;
-            opacity: 0.3;
-            animation: pulse 3s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.05); opacity: 0.1; }
-        }
-
-        .brand-title {
-            font-size: 3rem;
-            font-weight: 900;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #ffffff, #9ca3af);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            line-height: 1.1;
-        }
-
-        .brand-subtitle {
-            font-size: 1.3rem;
-            color: #6b7280;
-            line-height: 1.6;
-            margin-bottom: 3rem;
-        }
-
-        .highlight-text {
-            color: #22c55e;
-            font-weight: 700;
-        }
-
-        .benefits-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .benefit-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            color: #e5e7eb;
-            font-size: 1.1rem;
-        }
-
-        .benefit-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(34, 197, 94, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        /* Right Section */
-        .right-section {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .cadastro-card {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 3rem;
-            width: 100%;
-            max-width: 450px;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cadastro-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent);
-            border-radius: 50%;
-            transform: translate(50%, -50%);
-        }
-
-        .cadastro-header {
-            text-align: center;
-            margin-bottom: 2.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .cadastro-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 16px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.3);
-        }
-
-        .cadastro-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 0.5rem;
-        }
-
-        .cadastro-subtitle {
-            color: #9ca3af;
-            font-size: 1rem;
-        }
-
-        /* Form Styles */
-        .cadastro-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .form-group {
-            position: relative;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 1rem 1rem 1rem 3rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: white;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #22c55e;
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-        }
-
-        .form-input::placeholder {
-            color: #6b7280;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6b7280;
-            font-size: 1rem;
-            transition: color 0.3s ease;
-        }
-
-        .form-group:focus-within .input-icon {
-            color: #22c55e;
-        }
-
-        /* Checkbox */
-        .checkbox-group {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            margin: 1rem 0;
-        }
-
-        .custom-checkbox {
-            width: 18px;
-            height: 18px;
-            background: #22c55e;
-            border: 1px solid #22c55e;
-            border-radius: 4px;
-            cursor: pointer;
-            position: relative;
-            flex-shrink: 0;
-            margin-top: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .custom-checkbox input {
-            opacity: 0;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-            margin: 0;
-            z-index: 2;
-        }
-
-        .custom-checkbox::after {
-            content: '✓';
-            color: white;
-            font-size: 11px;
-            font-weight: bold;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        .custom-checkbox input:not(:checked) + .checkmark {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .custom-checkbox input:not(:checked) ~ .checkmark::after {
-            display: none;
-        }
-
-        .checkmark {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            pointer-events: none;
-        }
-
-        .checkbox-label {
-            color: #9ca3af;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        .checkbox-label a {
-            color: #22c55e;
-            text-decoration: none;
-        }
-
-        .checkbox-label a:hover {
-            text-decoration: underline;
-        }
-
-        /* Submit Button */
-        .submit-btn {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            padding: 1rem;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4);
-        }
-
-        .submit-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .submit-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .submit-btn:hover::before {
-            left: 100%;
-        }
-
-        /* Footer Links */
-        .form-footer {
-            text-align: center;
-            margin-top: 2rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .footer-text {
-            color: #6b7280;
-            margin-bottom: 1rem;
-        }
-
-        .footer-link {
-            color: #22c55e;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.3s ease;
-        }
-
-        .footer-link:hover {
-            color: #16a34a;
-            text-decoration: underline;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            margin: 1.5rem 0;
-            color: #6b7280;
-            font-size: 0.9rem;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .divider span {
-            padding: 0 1rem;
-        }
-
-        /* Floating Elements */
-        .floating-elements {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .floating-element {
-            position: absolute;
-            width: 8px;
-            height: 8px;
-            background: rgba(34, 197, 94, 0.3);
-            border-radius: 50%;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .floating-element:nth-child(1) {
-            top: 20%;
-            left: 10%;
-            animation-delay: 0s;
-        }
-
-        .floating-element:nth-child(2) {
-            top: 40%;
-            right: 15%;
-            animation-delay: 1s;
-        }
-
-        .floating-element:nth-child(3) {
-            bottom: 30%;
-            left: 20%;
-            animation-delay: 2s;
-        }
-
-        .floating-element:nth-child(4) {
-            bottom: 20%;
-            right: 25%;
-            animation-delay: 3s;
-        }
-
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0) rotate(0deg);
-                opacity: 0.3;
-            }
-            50% {
-                transform: translateY(-20px) rotate(180deg);
-                opacity: 0.8;
-            }
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .cadastro-container {
-                grid-template-columns: 1fr;
-                gap: 2rem;
-                max-width: 600px;
-            }
-
-            .brand-content {
-                display: none !important;
-            }
-            
-            .left-section {
-                order: 2;
-                text-align: center;
-            }
-            
-            .right-section {
-                order: 1;
-            }
-            
-            .brand-title {
-                font-size: 2.5rem;
-            }
-            
-            .benefits-list {
-                flex-direction: row;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 1rem;
-            }
-            
-            .benefit-item {
-                font-size: 1rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .cadastro-section {
-                padding: 2rem 0;
-            }
-
-            .brand-content {
-                display: none !important;
-            }
-            
-            .cadastro-container {
-                padding: 0 1rem;
-            }
-            
-            .cadastro-card {
-                padding: 2rem;
-                border-radius: 20px;
-            }
-            
-            .brand-logo {
-                width: 80px;
-                height: 80px;
-                font-size: 2rem;
-            }
-            
-            .brand-title {
-                font-size: 2rem;
-            }
-            
-            .brand-subtitle {
-                font-size: 1.1rem;
-            }
-            
-            .benefits-list {
-                display: none;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .cadastro-card {
-                padding: 1.5rem;
-            }
-            
-            .form-input {
-                padding: 0.8rem 0.8rem 0.8rem 2.5rem;
-            }
-
-            .brand-content {
-                display: none !important;
-            }
-            
-            .input-icon {
-                left: 0.8rem;
-            }
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .loading .submit-btn {
-            background: #6b7280;
-        }
-
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
-</head>
-<body>
-    <?php include('../inc/header.php'); ?>
-
-    <section class="cadastro-section">
-        <!-- Floating Elements -->
-        <div class="floating-elements">
-            <div class="floating-element"></div>
-            <div class="floating-element"></div>
-            <div class="floating-element"></div>
-            <div class="floating-element"></div>
-        </div>
-
-        <div class="cadastro-container fade-in">
-            <!-- Left Section -->
-            <div class="left-section">
-                <div class="brand-content">
-                    <h1 class="brand-title">Comece a ganhar hoje!</h1>
-                    <p class="brand-subtitle">
-                        Junte-se a milhares de usuários que já estão ganhando 
-                        <span class="highlight-text">prêmios incríveis</span> 
-                        com a RaspaGreen!
-                    </p>
-                    
-                    <div class="benefits-list">
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="bi bi-gift"></i>
-                            </div>
-                            <span>Prêmios de até R$ 15.000</span>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="bi bi-lightning-charge"></i>
-                            </div>
-                            <span>PIX instantâneo</span>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="bi bi-shield-check"></i>
-                            </div>
-                            <span>Plataforma 100% segura</span>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="bi bi-clock"></i>
-                            </div>
-                            <span>Disponível 24/7</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Section -->
-            <div class="right-section">
-                <div class="cadastro-card">
-                    <div class="cadastro-header">
-                        <div class="cadastro-icon">
-                            <i class="bi bi-person-plus"></i>
-                        </div>
-                        <h2 class="cadastro-title">Cadastre-se</h2>
-                        <p class="cadastro-subtitle">
-                            Crie sua conta grátis em menos de 1 minuto
-                        </p>
-                    </div>
-
-                    <form id="cadastroForm" method="POST" class="cadastro-form">
-                        <input id="ref" name="ref" type="hidden" value="">
-                        
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-person"></i>
-                            </div>
-                            <input type="text" name="nome" class="form-input" placeholder="Nome completo" required>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-telephone"></i>
-                            </div>
-                            <input type="text" id="telefone" name="telefone" class="form-input" placeholder="(11) 99999-9999" required>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-envelope"></i>
-                            </div>
-                            <input type="email" name="email" class="form-input" placeholder="seu@email.com" required>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="input-icon">
-                                <i class="bi bi-lock"></i>
-                            </div>
-                            <input type="password" name="senha" class="form-input" placeholder="Senha segura" required>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <div class="custom-checkbox">
-                                <input id="aceiteTermos" name="aceiteTermos" type="checkbox" checked required>
-                                <div class="checkmark"></div>
-                            </div>
-                            <label for="aceiteTermos" class="checkbox-label">
-                                Li e aceito os <a href="/politica" target="_blank">termos e políticas de privacidade</a>
-                            </label>
-                        </div>
-
-                        <button type="submit" class="submit-btn" id="submitBtn">
-                            <i class="bi bi-check-circle"></i>
-                            Criar Conta Grátis
-                        </button>
-                    </form>
-
-                    <div class="form-footer">
-                        <div class="divider">
-                            <span>ou</span>
-                        </div>
-                        
-                        <p class="footer-text">
-                            Já tem uma conta?
-                        </p>
-                        <a href="/login" class="footer-link">
-                            Faça login
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <?php include('../inc/footer.php'); ?>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Ref parameter handling
-            function getRefParam() {
-                const urlParams = new URLSearchParams(window.location.search);
-                return urlParams.get('ref');
-            }
-
-            const refParam = getRefParam();
-            if (refParam) {
-                localStorage.setItem('ref', refParam);
-            }
-
-            const params = new URLSearchParams(window.location.search);
-            let refValue = params.get('ref');
-
-            if (!refValue) {
-                refValue = localStorage.getItem('ref') || '';
-            } else {
-                localStorage.setItem('ref', refValue);
-            }
-
-            const refInput = document.getElementById('ref');
-            if (refInput) refInput.value = refValue;
-
-            // Phone mask
-            const telefoneInput = document.getElementById('telefone');
-            telefoneInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length > 11) value = value.slice(0, 11);
-
-                let formatted = '';
-                if (value.length > 0) {
-                    formatted += '(' + value.substring(0, 2);
-                }
-                if (value.length >= 3) {
-                    formatted += ') ' + value.substring(2, 7);
-                }
-                if (value.length >= 8) {
-                    formatted += '-' + value.substring(7);
-                }
-                e.target.value = formatted;
-            });
-
-            // Form submission
-            const cadastroForm = document.getElementById('cadastroForm');
-            const submitBtn = document.getElementById('submitBtn');
-
-            cadastroForm.addEventListener('submit', function(e) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite;"></i> Criando conta...';
-                cadastroForm.classList.add('loading');
-            });
-
-            // Add spin animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `;
-            document.head.appendChild(style);
-
-            // Focus enhancements
-            const inputs = document.querySelectorAll('.form-input');
-            inputs.forEach(input => {
-                input.addEventListener('focus', function() {
-                    this.parentElement.style.transform = 'translateY(-2px)';
-                });
-                
-                input.addEventListener('blur', function() {
-                    this.parentElement.style.transform = 'translateY(0)';
-                });
-            });
-        });
-
-        // Notiflix configuration
-        Notiflix.Notify.init({
-            width: '300px',
-            position: 'right-top',
-            distance: '20px',
-            opacity: 1,
-            borderRadius: '12px',
-            timeout: 4000,
-            success: {
-                background: '#22c55e',
-                textColor: '#fff',
-            },
-            failure: {
-                background: '#ef4444',
-                textColor: '#fff',
-            },
-            warning: {
-                background: '#f59e0b',
-                textColor: '#fff',
-            }
-        });
-
-        // Show messages if any
-        <?php if (isset($_SESSION['message'])): ?>
-            Notiflix.Notify.<?php echo $_SESSION['message']['type']; ?>('<?php echo $_SESSION['message']['text']; ?>');
-            <?php unset($_SESSION['message']); ?>
-        <?php endif; ?>
-
-        console.log('%c🎯 RaspaGreen - Cadastro Split Screen', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-    </script>
-</body>
+<?php<?php 
+session_start();<?php 
+<?php 
+if(isset($_SESSION['usuario_id'])){<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php já<?php está<?php logado!'];<?php 
+<?php header("Location:<?php /");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+require_once<?php '../conexao.php';<?php 
+<?php 
+if<?php ($_SERVER['REQUEST_METHOD']<?php ===<?php 'POST')<?php {<?php 
+<?php $nome<?php =<?php trim($_POST['nome']);<?php 
+<?php $telefone<?php =<?php trim($_POST['telefone']);<?php 
+<?php $email<?php =<?php trim($_POST['email']);<?php 
+<?php $senha<?php =<?php password_hash($_POST['senha'],<?php PASSWORD_DEFAULT);<?php 
+<?php $ref<?php =<?php $_POST['ref']<?php ??<?php null;<?php 
+<?php 
+<?php try<?php {<?php 
+<?php $stmt_config<?php =<?php $pdo->query("SELECT<?php cpa_padrao,<?php revshare_padrao<?php FROM<?php config<?php LIMIT<?php 1");<?php 
+<?php $config<?php =<?php $stmt_config->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+<?php $cpa_padrao<?php =<?php $config['cpa_padrao']<?php ??<?php 0.00;<?php 
+<?php $revshare_padrao<?php =<?php $config['revshare_padrao']<?php ??<?php 0.00;<?php 
+<?php }<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $cpa_padrao<?php =<?php 0.00;<?php 
+<?php $revshare_padrao<?php =<?php 0.00;<?php 
+<?php }<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("INSERT<?php INTO<?php usuarios<?php 
+<?php (nome,<?php telefone,<?php email,<?php senha,<?php saldo,<?php indicacao,<?php banido,<?php comissao_cpa,<?php comissao_revshare,<?php created_at,<?php updated_at)<?php 
+<?php VALUES<?php (?,<?php ?,<?php ?,<?php ?,<?php 0,<?php ?,<?php 0,<?php ?,<?php ?,<?php NOW(),<?php NOW())");<?php 
+<?php 
+<?php try<?php {<?php 
+<?php $stmt->execute([$nome,<?php $telefone,<?php $email,<?php $senha,<?php $ref,<?php $cpa_padrao,<?php $revshare_padrao]);<?php 
+<?php 
+<?php $usuarioId<?php =<?php $pdo->lastInsertId();<?php 
+<?php $_SESSION['usuario_id']<?php =<?php $usuarioId;<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'success',<?php 'text'<?php =><?php 'Cadastro<?php realizado<?php com<?php sucesso!'];<?php 
+<?php 
+<?php header("Location:<?php /");<?php 
+<?php exit;<?php 
+<?php }<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php error_log("Erro<?php ao<?php cadastrar:<?php "<?php .<?php $e->getMessage());<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php realizar<?php cadastro!'];<?php 
+<?php header("Location:<?php /cadastro");<?php 
+<?php exit;<?php 
+<?php }<?php 
+}<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+
+<?php <!--<?php xTracky<?php Integration<?php -->
+<?php <script<?php 
+<?php src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
+<?php data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
+<?php data-click-id-param="click_id">
+<?php </script>
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Cadastro</title><?php 
+<?php 
+<?php <!--<?php Fonts<?php --><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Icons<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php 
+<?php 
+<?php <!--<?php Styles<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php<?php echo<?php time();?>"/><?php 
+<?php 
+<?php <!--<?php Scripts<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php /*<?php Page<?php Styles<?php */<?php 
+<?php .cadastro-section<?php {<?php 
+<?php margin-top:<?php 100px;<?php 
+<?php padding:<?php 4rem<?php 0;<?php 
+<?php background:<?php #0a0a0a;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 100px);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-container<?php {<?php 
+<?php max-width:<?php 1200px;<?php 
+<?php width:<?php 100%;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php padding:<?php 0<?php 2rem;<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php 1fr<?php 1fr;<?php 
+<?php gap:<?php 4rem;<?php 
+<?php align-items:<?php center;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 200px);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Left<?php Section<?php */<?php 
+<?php .left-section<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php justify-content:<?php center;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-content<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-logo<?php {<?php 
+<?php width:<?php 120px;<?php 
+<?php height:<?php 120px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php color:<?php white;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 40px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-logo::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php inset:<?php -4px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 28px;<?php 
+<?php z-index:<?php -1;<?php 
+<?php opacity:<?php 0.3;<?php 
+<?php animation:<?php pulse<?php 3s<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php pulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php scale(1);<?php opacity:<?php 0.3;<?php }<?php 
+<?php 50%<?php {<?php transform:<?php scale(1.05);<?php opacity:<?php 0.1;<?php }<?php 
+<?php }<?php 
+<?php 
+<?php .brand-title<?php {<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #9ca3af);<?php 
+<?php background-clip:<?php text;<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php line-height:<?php 1.1;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-subtitle<?php {<?php 
+<?php font-size:<?php 1.3rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php line-height:<?php 1.6;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .highlight-text<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php }<?php 
+<?php 
+<?php .benefits-list<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .benefit-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .benefit-icon<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php flex-shrink:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Right<?php Section<?php */<?php 
+<?php .right-section<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-card<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 3rem;<?php 
+<?php width:<?php 100%;<?php 
+<?php max-width:<?php 450px;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php width:<?php 150px;<?php 
+<?php height:<?php 150px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php transform:<?php translate(50%,<?php -50%);<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-header<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 2.5rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-icon<?php {<?php 
+<?php width:<?php 60px;<?php 
+<?php height:<?php 60px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php margin:<?php 0<?php auto<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 24px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-title<?php {<?php 
+<?php font-size:<?php 1.8rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-subtitle<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Form<?php Styles<?php */<?php 
+<?php .cadastro-form<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php padding:<?php 1rem<?php 1rem<?php 1rem<?php 3rem;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php #22c55e;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.08);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .form-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .input-icon<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 1rem;<?php 
+<?php top:<?php 50%;<?php 
+<?php transform:<?php translateY(-50%);<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php color<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group:focus-within<?php .input-icon<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Checkbox<?php */<?php 
+<?php .checkbox-group<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php margin:<?php 1rem<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .custom-checkbox<?php {<?php 
+<?php width:<?php 18px;<?php 
+<?php height:<?php 18px;<?php 
+<?php background:<?php #22c55e;<?php 
+<?php border:<?php 1px<?php solid<?php #22c55e;<?php 
+<?php border-radius:<?php 4px;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php position:<?php relative;<?php 
+<?php flex-shrink:<?php 0;<?php 
+<?php margin-top:<?php 3px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .custom-checkbox<?php input<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php position:<?php absolute;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php margin:<?php 0;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .custom-checkbox::after<?php {<?php 
+<?php content:<?php '✓';<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 11px;<?php 
+<?php font-weight:<?php bold;<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 50%;<?php 
+<?php left:<?php 50%;<?php 
+<?php transform:<?php translate(-50%,<?php -50%);<?php 
+<?php }<?php 
+<?php 
+<?php .custom-checkbox<?php input:not(:checked)<?php +<?php .checkmark<?php {<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border-color:<?php rgba(255,<?php 255,<?php 255,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php .custom-checkbox<?php input:not(:checked)<?php ~<?php .checkmark::after<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .checkmark<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php border-radius:<?php 4px;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .checkbox-label<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php line-height:<?php 1.5;<?php 
+<?php }<?php 
+<?php 
+<?php .checkbox-label<?php a<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .checkbox-label<?php a:hover<?php {<?php 
+<?php text-decoration:<?php underline;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Submit<?php Button<?php */<?php 
+<?php .submit-btn<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border:<?php none;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn:hover<?php {<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 30px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn:disabled<?php {<?php 
+<?php opacity:<?php 0.6;<?php 
+<?php cursor:<?php not-allowed;<?php 
+<?php transform:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php -100%;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php linear-gradient(90deg,<?php transparent,<?php rgba(255,<?php 255,<?php 255,<?php 0.2),<?php transparent);<?php 
+<?php transition:<?php left<?php 0.5s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .submit-btn:hover::before<?php {<?php 
+<?php left:<?php 100%;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Footer<?php Links<?php */<?php 
+<?php .form-footer<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-top:<?php 2rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .footer-text<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .footer-link<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php transition:<?php color<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .footer-link:hover<?php {<?php 
+<?php color:<?php #16a34a;<?php 
+<?php text-decoration:<?php underline;<?php 
+<?php }<?php 
+<?php 
+<?php .divider<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php margin:<?php 1.5rem<?php 0;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .divider::before,<?php 
+<?php .divider::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php flex:<?php 1;<?php 
+<?php height:<?php 1px;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .divider<?php span<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Floating<?php Elements<?php */<?php 
+<?php .floating-elements<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php z-index:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .floating-element<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php width:<?php 8px;<?php 
+<?php height:<?php 8px;<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 6s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php .floating-element:nth-child(1)<?php {<?php 
+<?php top:<?php 20%;<?php 
+<?php left:<?php 10%;<?php 
+<?php animation-delay:<?php 0s;<?php 
+<?php }<?php 
+<?php 
+<?php .floating-element:nth-child(2)<?php {<?php 
+<?php top:<?php 40%;<?php 
+<?php right:<?php 15%;<?php 
+<?php animation-delay:<?php 1s;<?php 
+<?php }<?php 
+<?php 
+<?php .floating-element:nth-child(3)<?php {<?php 
+<?php bottom:<?php 30%;<?php 
+<?php left:<?php 20%;<?php 
+<?php animation-delay:<?php 2s;<?php 
+<?php }<?php 
+<?php 
+<?php .floating-element:nth-child(4)<?php {<?php 
+<?php bottom:<?php 20%;<?php 
+<?php right:<?php 25%;<?php 
+<?php animation-delay:<?php 3s;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php float<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php 
+<?php transform:<?php translateY(0)<?php rotate(0deg);<?php 
+<?php opacity:<?php 0.3;<?php 
+<?php }<?php 
+<?php 50%<?php {<?php 
+<?php transform:<?php translateY(-20px)<?php rotate(180deg);<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Responsive<?php */<?php 
+<?php @media<?php (max-width:<?php 1024px)<?php {<?php 
+<?php .cadastro-container<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 2rem;<?php 
+<?php max-width:<?php 600px;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-content<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .left-section<?php {<?php 
+<?php order:<?php 2;<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .right-section<?php {<?php 
+<?php order:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-title<?php {<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .benefits-list<?php {<?php 
+<?php flex-direction:<?php row;<?php 
+<?php flex-wrap:<?php wrap;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .benefit-item<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .cadastro-section<?php {<?php 
+<?php padding:<?php 2rem<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-content<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-container<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .cadastro-card<?php {<?php 
+<?php padding:<?php 2rem;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-logo<?php {<?php 
+<?php width:<?php 80px;<?php 
+<?php height:<?php 80px;<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-title<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-subtitle<?php {<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .benefits-list<?php {<?php 
+<?php display:<?php none;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .cadastro-card<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php padding:<?php 0.8rem<?php 0.8rem<?php 0.8rem<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .brand-content<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .input-icon<?php {<?php 
+<?php left:<?php 0.8rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Loading<?php States<?php */<?php 
+<?php .loading<?php {<?php 
+<?php opacity:<?php 0.7;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .loading<?php .submit-btn<?php {<?php 
+<?php background:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Animations<?php */<?php 
+<?php .fade-in<?php {<?php 
+<?php animation:<?php fadeIn<?php 0.6s<?php ease-out<?php forwards;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php fadeIn<?php {<?php 
+<?php from<?php {<?php 
+<?php opacity:<?php 0;<?php 
+<?php transform:<?php translateY(20px);<?php 
+<?php }<?php 
+<?php to<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php transform:<?php translateY(0);<?php 
+<?php }<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <?php<?php include('../inc/header.php');<?php ?><?php 
+<?php 
+<?php <section<?php class="cadastro-section"><?php 
+<?php <!--<?php Floating<?php Elements<?php --><?php 
+<?php <div<?php class="floating-elements"><?php 
+<?php <div<?php class="floating-element"></div><?php 
+<?php <div<?php class="floating-element"></div><?php 
+<?php <div<?php class="floating-element"></div><?php 
+<?php <div<?php class="floating-element"></div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="cadastro-container<?php fade-in"><?php 
+<?php <!--<?php Left<?php Section<?php --><?php 
+<?php <div<?php class="left-section"><?php 
+<?php <div<?php class="brand-content"><?php 
+<?php <h1<?php class="brand-title">Comece<?php a<?php ganhar<?php hoje!</h1><?php 
+<?php <p<?php class="brand-subtitle"><?php 
+<?php Junte-se<?php a<?php milhares<?php de<?php usuários<?php que<?php já<?php estão<?php ganhando<?php 
+<?php <span<?php class="highlight-text">prêmios<?php incríveis</span><?php 
+<?php com<?php a<?php RaspaGreen!<?php 
+<?php </p><?php 
+<?php 
+<?php <div<?php class="benefits-list"><?php 
+<?php <div<?php class="benefit-item"><?php 
+<?php <div<?php class="benefit-icon"><?php 
+<?php <i<?php class="bi<?php bi-gift"></i><?php 
+<?php </div><?php 
+<?php <span>Prêmios<?php de<?php até<?php R$<?php 15.000</span><?php 
+<?php </div><?php 
+<?php <div<?php class="benefit-item"><?php 
+<?php <div<?php class="benefit-icon"><?php 
+<?php <i<?php class="bi<?php bi-lightning-charge"></i><?php 
+<?php </div><?php 
+<?php <span>PIX<?php instantâneo</span><?php 
+<?php </div><?php 
+<?php <div<?php class="benefit-item"><?php 
+<?php <div<?php class="benefit-icon"><?php 
+<?php <i<?php class="bi<?php bi-shield-check"></i><?php 
+<?php </div><?php 
+<?php <span>Plataforma<?php 100%<?php segura</span><?php 
+<?php </div><?php 
+<?php <div<?php class="benefit-item"><?php 
+<?php <div<?php class="benefit-icon"><?php 
+<?php <i<?php class="bi<?php bi-clock"></i><?php 
+<?php </div><?php 
+<?php <span>Disponível<?php 24/7</span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Right<?php Section<?php --><?php 
+<?php <div<?php class="right-section"><?php 
+<?php <div<?php class="cadastro-card"><?php 
+<?php <div<?php class="cadastro-header"><?php 
+<?php <div<?php class="cadastro-icon"><?php 
+<?php <i<?php class="bi<?php bi-person-plus"></i><?php 
+<?php </div><?php 
+<?php <h2<?php class="cadastro-title">Cadastre-se</h2><?php 
+<?php <p<?php class="cadastro-subtitle"><?php 
+<?php Crie<?php sua<?php conta<?php grátis<?php em<?php menos<?php de<?php 1<?php minuto<?php 
+<?php </p><?php 
+<?php </div><?php 
+<?php 
+<?php <form<?php id="cadastroForm"<?php method="POST"<?php class="cadastro-form"><?php 
+<?php <input<?php id="ref"<?php name="ref"<?php type="hidden"<?php value=""><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-person"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="text"<?php name="nome"<?php class="form-input"<?php placeholder="Nome<?php completo"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-telephone"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="text"<?php id="telefone"<?php name="telefone"<?php class="form-input"<?php placeholder="(11)<?php 99999-9999"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-envelope"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="email"<?php name="email"<?php class="form-input"<?php placeholder="seu@email.com"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <div<?php class="input-icon"><?php 
+<?php <i<?php class="bi<?php bi-lock"></i><?php 
+<?php </div><?php 
+<?php <input<?php type="password"<?php name="senha"<?php class="form-input"<?php placeholder="Senha<?php segura"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="checkbox-group"><?php 
+<?php <div<?php class="custom-checkbox"><?php 
+<?php <input<?php id="aceiteTermos"<?php name="aceiteTermos"<?php type="checkbox"<?php checked<?php required><?php 
+<?php <div<?php class="checkmark"></div><?php 
+<?php </div><?php 
+<?php <label<?php for="aceiteTermos"<?php class="checkbox-label"><?php 
+<?php Li<?php e<?php aceito<?php os<?php <a<?php href="/politica"<?php target="_blank">termos<?php e<?php políticas<?php de<?php privacidade</a><?php 
+<?php </label><?php 
+<?php </div><?php 
+<?php 
+<?php <button<?php type="submit"<?php class="submit-btn"<?php id="submitBtn"><?php 
+<?php <i<?php class="bi<?php bi-check-circle"></i><?php 
+<?php Criar<?php Conta<?php Grátis<?php 
+<?php </button><?php 
+<?php </form><?php 
+<?php 
+<?php <div<?php class="form-footer"><?php 
+<?php <div<?php class="divider"><?php 
+<?php <span>ou</span><?php 
+<?php </div><?php 
+<?php 
+<?php <p<?php class="footer-text"><?php 
+<?php Já<?php tem<?php uma<?php conta?<?php 
+<?php </p><?php 
+<?php <a<?php href="/login"<?php class="footer-link"><?php 
+<?php Faça<?php login<?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php include('../inc/footer.php');<?php ?><?php 
+<?php 
+<?php <script><?php 
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php 
+<?php //<?php Ref<?php parameter<?php handling<?php 
+<?php function<?php getRefParam()<?php {<?php 
+<?php const<?php urlParams<?php =<?php new<?php URLSearchParams(window.location.search);<?php 
+<?php return<?php urlParams.get('ref');<?php 
+<?php }<?php 
+<?php 
+<?php const<?php refParam<?php =<?php getRefParam();<?php 
+<?php if<?php (refParam)<?php {<?php 
+<?php localStorage.setItem('ref',<?php refParam);<?php 
+<?php }<?php 
+<?php 
+<?php const<?php params<?php =<?php new<?php URLSearchParams(window.location.search);<?php 
+<?php let<?php refValue<?php =<?php params.get('ref');<?php 
+<?php 
+<?php if<?php (!refValue)<?php {<?php 
+<?php refValue<?php =<?php localStorage.getItem('ref')<?php ||<?php '';<?php 
+<?php }<?php else<?php {<?php 
+<?php localStorage.setItem('ref',<?php refValue);<?php 
+<?php }<?php 
+<?php 
+<?php const<?php refInput<?php =<?php document.getElementById('ref');<?php 
+<?php if<?php (refInput)<?php refInput.value<?php =<?php refValue;<?php 
+<?php 
+<?php //<?php Phone<?php mask<?php 
+<?php const<?php telefoneInput<?php =<?php document.getElementById('telefone');<?php 
+<?php telefoneInput.addEventListener('input',<?php function(e)<?php {<?php 
+<?php let<?php value<?php =<?php e.target.value.replace(/\D/g,<?php '');<?php 
+<?php if<?php (value.length<?php ><?php 11)<?php value<?php =<?php value.slice(0,<?php 11);<?php 
+<?php 
+<?php let<?php formatted<?php =<?php '';<?php 
+<?php if<?php (value.length<?php ><?php 0)<?php {<?php 
+<?php formatted<?php +=<?php '('<?php +<?php value.substring(0,<?php 2);<?php 
+<?php }<?php 
+<?php if<?php (value.length<?php >=<?php 3)<?php {<?php 
+<?php formatted<?php +=<?php ')<?php '<?php +<?php value.substring(2,<?php 7);<?php 
+<?php }<?php 
+<?php if<?php (value.length<?php >=<?php 8)<?php {<?php 
+<?php formatted<?php +=<?php '-'<?php +<?php value.substring(7);<?php 
+<?php }<?php 
+<?php e.target.value<?php =<?php formatted;<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Form<?php submission<?php 
+<?php const<?php cadastroForm<?php =<?php document.getElementById('cadastroForm');<?php 
+<?php const<?php submitBtn<?php =<?php document.getElementById('submitBtn');<?php 
+<?php 
+<?php cadastroForm.addEventListener('submit',<?php function(e)<?php {<?php 
+<?php submitBtn.disabled<?php =<?php true;<?php 
+<?php submitBtn.innerHTML<?php =<?php '<i<?php class="bi<?php bi-arrow-repeat"<?php style="animation:<?php spin<?php 1s<?php linear<?php infinite;"></i><?php Criando<?php conta...';<?php 
+<?php cadastroForm.classList.add('loading');<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Add<?php spin<?php animation<?php 
+<?php const<?php style<?php =<?php document.createElement('style');<?php 
+<?php style.textContent<?php =<?php `<?php 
+<?php @keyframes<?php spin<?php {<?php 
+<?php 0%<?php {<?php transform:<?php rotate(0deg);<?php }<?php 
+<?php 100%<?php {<?php transform:<?php rotate(360deg);<?php }<?php 
+<?php }<?php 
+<?php `;<?php 
+<?php document.head.appendChild(style);<?php 
+<?php 
+<?php //<?php Focus<?php enhancements<?php 
+<?php const<?php inputs<?php =<?php document.querySelectorAll('.form-input');<?php 
+<?php inputs.forEach(input<?php =><?php {<?php 
+<?php input.addEventListener('focus',<?php function()<?php {<?php 
+<?php this.parentElement.style.transform<?php =<?php 'translateY(-2px)';<?php 
+<?php });<?php 
+<?php 
+<?php input.addEventListener('blur',<?php function()<?php {<?php 
+<?php this.parentElement.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php });<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Notiflix<?php configuration<?php 
+<?php Notiflix.Notify.init({<?php 
+<?php width:<?php '300px',<?php 
+<?php position:<?php 'right-top',<?php 
+<?php distance:<?php '20px',<?php 
+<?php opacity:<?php 1,<?php 
+<?php borderRadius:<?php '12px',<?php 
+<?php timeout:<?php 4000,<?php 
+<?php success:<?php {<?php 
+<?php background:<?php '#22c55e',<?php 
+<?php textColor:<?php '#fff',<?php 
+<?php },<?php 
+<?php failure:<?php {<?php 
+<?php background:<?php '#ef4444',<?php 
+<?php textColor:<?php '#fff',<?php 
+<?php },<?php 
+<?php warning:<?php {<?php 
+<?php background:<?php '#f59e0b',<?php 
+<?php textColor:<?php '#fff',<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Show<?php messages<?php if<?php any<?php 
+<?php <?php<?php if<?php (isset($_SESSION['message'])):<?php ?><?php 
+<?php Notiflix.Notify.<?php<?php echo<?php $_SESSION['message']['type'];<?php ?>('<?php<?php echo<?php $_SESSION['message']['text'];<?php ?>');<?php 
+<?php <?php<?php unset($_SESSION['message']);<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php console.log('%c🎯<?php RaspaGreen<?php -<?php Cadastro<?php Split<?php Screen',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php </script><?php 
+</body><?php 
 </html>

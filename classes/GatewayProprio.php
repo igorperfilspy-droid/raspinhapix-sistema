@@ -1,112 +1,112 @@
 <?php
 
-class GatewayProprio {
-    private $pdo;
-    private $apiKey;
-    private $baseUrl;
+class<?php GatewayProprio<?php {
+<?php private<?php $pdo;
+<?php private<?php $apiKey;
+<?php private<?php $baseUrl;
 
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
-        $this->loadCredentials();
-    }
+<?php public<?php function<?php __construct($pdo)<?php {
+<?php $this->pdo<?php =<?php $pdo;
+<?php $this->loadCredentials();
+<?php }
 
-    private function loadCredentials() {
-        $stmt = $this->pdo->query("SELECT url, api_key FROM gatewayproprio LIMIT 1");
-        $credentials = $stmt->fetch();
+<?php private<?php function<?php loadCredentials()<?php {
+<?php $stmt<?php =<?php $this->pdo->query("SELECT<?php url,<?php api_key<?php FROM<?php gatewayproprio<?php LIMIT<?php 1");
+<?php $credentials<?php =<?php $stmt->fetch();
 
-        if (!$credentials) {
-            throw new Exception('Credenciais do Gateway Próprio não encontradas.');
-        }
+<?php if<?php (!$credentials)<?php {
+<?php throw<?php new<?php Exception('Credenciais<?php do<?php Gateway<?php Próprio<?php não<?php encontradas.');
+<?php }
 
-        $this->baseUrl = rtrim($credentials['url'], '/');
-        $this->apiKey = $credentials['api_key'];
-    }
+<?php $this->baseUrl<?php =<?php rtrim($credentials['url'],<?php '/');
+<?php $this->apiKey<?php =<?php $credentials['api_key'];
+<?php }
 
-    public function createDeposit($amount, $cpf, $nome, $email, $callbackUrl, $idempotencyKey) {
-        $url = $this->baseUrl . '/api/v1/cashin';
+<?php public<?php function<?php createDeposit($amount,<?php $cpf,<?php $nome,<?php $email,<?php $callbackUrl,<?php $idempotencyKey)<?php {
+<?php $url<?php =<?php $this->baseUrl<?php .<?php '/api/v1/cashin';
 
-        $payload = [
-            'nome' => $nome,
-            'cpf' => $cpf,
-            'valor' => number_format($amount, 2, '.', ''),
-            'descricao' => 'Pagamento Raspadinha',
-            'postback' => $callbackUrl,
-            'split' => [
-                [
-                    'target' => 'yarkan',
-                    'percentage' => 10
-                ]
-            ]
-        ];
+<?php $payload<?php =<?php [
+<?php 'nome'<?php =><?php $nome,
+<?php 'cpf'<?php =><?php $cpf,
+<?php 'valor'<?php =><?php number_format($amount,<?php 2,<?php '.',<?php ''),
+<?php 'descricao'<?php =><?php 'Pagamento<?php Raspadinha',
+<?php 'postback'<?php =><?php $callbackUrl,
+<?php 'split'<?php =><?php [
+<?php [
+<?php 'target'<?php =><?php 'yarkan',
+<?php 'percentage'<?php =><?php 10
+<?php ]
+<?php ]
+<?php ];
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Apikey: ' . $this->apiKey
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10
-        ]);
+<?php $ch<?php =<?php curl_init($url);
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_POST<?php =><?php true,
+<?php CURLOPT_POSTFIELDS<?php =><?php json_encode($payload),
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Content-Type:<?php application/json',
+<?php 'Apikey:<?php '<?php .<?php $this->apiKey
+<?php ],
+<?php CURLOPT_TIMEOUT<?php =><?php 30,
+<?php CURLOPT_CONNECTTIMEOUT<?php =><?php 10
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php $curlError<?php =<?php curl_error($ch);
+<?php curl_close($ch);
 
-        if ($curlError) {
-            throw new Exception('Erro na requisição cURL: ' . $curlError);
-        }
+<?php if<?php ($curlError)<?php {
+<?php throw<?php new<?php Exception('Erro<?php na<?php requisição<?php cURL:<?php '<?php .<?php $curlError);
+<?php }
 
-        if ($httpCode !== 200) {
-            throw new Exception('Erro HTTP ' . $httpCode . ' na requisição para o Gateway Próprio.');
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Erro<?php HTTP<?php '<?php .<?php $httpCode<?php .<?php '<?php na<?php requisição<?php para<?php o<?php Gateway<?php Próprio.');
+<?php }
 
-        $responseData = json_decode($response, true);
+<?php $responseData<?php =<?php json_decode($response,<?php true);
 
-        if (!$responseData) {
-            throw new Exception('Resposta inválida do Gateway Próprio.');
-        }
+<?php if<?php (!$responseData)<?php {
+<?php throw<?php new<?php Exception('Resposta<?php inválida<?php do<?php Gateway<?php Próprio.');
+<?php }
 
-        if (!isset($responseData['id'], $responseData['pix'])) {
-            throw new Exception('Resposta do Gateway Próprio não contém os dados necessários.');
-        }
+<?php if<?php (!isset($responseData['id'],<?php $responseData['pix']))<?php {
+<?php throw<?php new<?php Exception('Resposta<?php do<?php Gateway<?php Próprio<?php não<?php contém<?php os<?php dados<?php necessários.');
+<?php }
 
-        return [
-            'transactionId' => $responseData['id'],
-            'qrcode' => $responseData['pix'],
-            'idempotencyKey' => $idempotencyKey,
-            'status' => $responseData['status'] ?? 'PENDING',
-            'value' => $responseData['value'] ?? $amount
-        ];
-    }
+<?php return<?php [
+<?php 'transactionId'<?php =><?php $responseData['id'],
+<?php 'qrcode'<?php =><?php $responseData['pix'],
+<?php 'idempotencyKey'<?php =><?php $idempotencyKey,
+<?php 'status'<?php =><?php $responseData['status']<?php ??<?php 'PENDING',
+<?php 'value'<?php =><?php $responseData['value']<?php ??<?php $amount
+<?php ];
+<?php }
 
-    public function checkTransactionStatus($transactionId) {
-        $url = $this->baseUrl . '/api/v1/transaction/' . $transactionId;
+<?php public<?php function<?php checkTransactionStatus($transactionId)<?php {
+<?php $url<?php =<?php $this->baseUrl<?php .<?php '/api/v1/transaction/'<?php .<?php $transactionId;
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Apikey: ' . $this->apiKey
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10
-        ]);
+<?php $ch<?php =<?php curl_init($url);
+<?php curl_setopt_array($ch,<?php [
+<?php CURLOPT_RETURNTRANSFER<?php =><?php true,
+<?php CURLOPT_HTTPHEADER<?php =><?php [
+<?php 'Apikey:<?php '<?php .<?php $this->apiKey
+<?php ],
+<?php CURLOPT_TIMEOUT<?php =><?php 30,
+<?php CURLOPT_CONNECTTIMEOUT<?php =><?php 10
+<?php ]);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+<?php $response<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php curl_close($ch);
 
-        if ($httpCode !== 200) {
-            throw new Exception('Erro ao consultar status da transação.');
-        }
+<?php if<?php ($httpCode<?php !==<?php 200)<?php {
+<?php throw<?php new<?php Exception('Erro<?php ao<?php consultar<?php status<?php da<?php transação.');
+<?php }
 
-        return json_decode($response, true);
-    }
+<?php return<?php json_decode($response,<?php true);
+<?php }
 }
 
 ?>

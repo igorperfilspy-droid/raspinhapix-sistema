@@ -1,1144 +1,1144 @@
-<?php
-include '../includes/session.php';
-include '../conexao.php';
-include '../includes/notiflix.php';
-
-$usuarioId = $_SESSION['usuario_id'];
-$admin = ($stmt = $pdo->prepare("SELECT admin FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-
-if ($admin != 1) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você não é um administrador!'];
-    header("Location: /");
-    exit;
-}
-
-$config = $pdo->query("SELECT * FROM config LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-
-if (isset($_POST['salvar_config'])) {
-    $nome_site = $_POST['nome_site'];
-    $deposito_min = str_replace(',', '.', $_POST['deposito_min']);
-    $saque_min = str_replace(',', '.', $_POST['saque_min']);
-    $cpa_padrao = str_replace(',', '.', $_POST['cpa_padrao']);
-    $revshare_padrao = str_replace(',', '.', $_POST['revshare_padrao']); // Novo campo
-    
-    $logo = $config['logo'];
-    
-    if (isset($_FILES['logo']) && $_FILES['logo']['error'] == 0) {
-        $allowed = ['jpg', 'jpeg', 'png'];
-        $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $uploadDir = '../assets/upload/';
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $newName = uniqid() . '.' . $ext;
-            $uploadPath = $uploadDir . $newName;
-            
-            if (move_uploaded_file($_FILES['logo']['tmp_name'], $uploadPath)) {
-                if ($config['logo'] && file_exists('../' . $config['logo'])) {
-                    unlink('../' . $config['logo']);
-                }
-                $logo = '/assets/upload/' . $newName;
-            } else {
-                $_SESSION['failure'] = 'Erro ao fazer upload da logo!';
-                header('Location: '.$_SERVER['PHP_SELF']);
-                exit;
-            }
-        } else {
-            $_SESSION['failure'] = 'Formato de arquivo inválido! Use apenas JPG ou PNG.';
-            header('Location: '.$_SERVER['PHP_SELF']);
-            exit;
-        }
-    }
-    
-    // Query atualizada para incluir revshare_padrao
-    $stmt = $pdo->prepare("UPDATE config SET nome_site = ?, logo = ?, deposito_min = ?, saque_min = ?, cpa_padrao = ?, revshare_padrao = ?");
-    if ($stmt->execute([$nome_site, $logo, $deposito_min, $saque_min, $cpa_padrao, $revshare_padrao])) {
-        $_SESSION['success'] = 'Configurações atualizadas com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao atualizar as configurações!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-$nome = ($stmt = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-$nome = $nome ? explode(' ', $nome)[0] : null;
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite ?? 'Admin'; ?> - Configurações</title>
-    
-    <!-- TailwindCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Notiflix -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #000000;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        /* Sidebar Styles */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: linear-gradient(145deg, #0a0a0a 0%, #141414 25%, #1a1a1a 50%, #0f0f0f 100%);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(34, 197, 94, 0.2);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            box-shadow: 
-                0 0 50px rgba(34, 197, 94, 0.1),
-                inset 1px 0 0 rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
-            opacity: 0.8;
-            pointer-events: none;
-        }
-        
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-        
-        .sidebar-header {
-            position: relative;
-            padding: 2.5rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            text-decoration: none;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #ffffff;
-            box-shadow: 
-                0 8px 20px rgba(34, 197, 94, 0.3),
-                0 4px 8px rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-        
-        .logo-icon::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(135deg, #22c55e, #16a34a, #22c55e);
-            border-radius: 18px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .logo:hover .logo-icon::after {
-            opacity: 1;
-        }
-        
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .logo-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ffffff;
-            line-height: 1.2;
-        }
-        
-        .logo-subtitle {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .nav-menu {
-            padding: 2rem 0;
-            position: relative;
-        }
-        
-        .nav-section {
-            margin-bottom: 2rem;
-        }
-        
-        .nav-section-title {
-            padding: 0 2rem 0.75rem 2rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            position: relative;
-        }
-        
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem 2rem;
-            color: #a1a1aa;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            margin: 0.25rem 1rem;
-            border-radius: 12px;
-            font-weight: 500;
-        }
-        
-        .nav-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 0 4px 4px 0;
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .nav-item:hover::before,
-        .nav-item.active::before {
-            transform: scaleY(1);
-        }
-        
-        .nav-item:hover,
-        .nav-item.active {
-            color: #ffffff;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            transform: translateX(4px);
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.1);
-        }
-        
-        .nav-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            position: relative;
-        }
-        
-        .nav-text {
-            font-size: 0.95rem;
-            flex: 1;
-        }
-        
-        .nav-badge {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            min-width: 20px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-        
-        .sidebar-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 2rem;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .user-profile:hover {
-            background: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 1rem;
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-info {
-            flex: 1;
-        }
-        
-        .user-name {
-            font-weight: 600;
-            color: #ffffff;
-            font-size: 0.9rem;
-            line-height: 1.2;
-        }
-        
-        .user-role {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 320px;
-            min-height: 100vh;
-            transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: 
-                radial-gradient(circle at 10% 20%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.01) 0%, transparent 50%);
-        }
-        
-        .main-content.expanded {
-            margin-left: 0;
-        }
-        
-        .header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 2.5rem;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .menu-toggle {
-            display: none;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-            padding: 0.75rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .menu-toggle:hover {
-            background: rgba(34, 197, 94, 0.2);
-            transform: scale(1.05);
-        }
-        
-        .header-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #ffffff, #a1a1aa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .page-content {
-            padding: 2.5rem;
-        }
-        
-        .welcome-section {
-            margin-bottom: 3rem;
-        }
-        
-        .welcome-title {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(135deg, #ffffff 0%, #fff 50%, #fff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-        
-        .welcome-subtitle {
-            font-size: 1.25rem;
-            color: #6b7280;
-            font-weight: 400;
-        }
-        
-        /* Form Container */
-        .form-container {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 3rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .form-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, #22c55e, #16a34a, #22c55e);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .form-container:hover::before {
-            opacity: 1;
-        }
-        
-        .form-container:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.2);
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
-        }
-        
-        .form-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 2.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .form-title i {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1.25rem;
-        }
-        
-        /* Form Sections */
-        .form-section {
-            margin-bottom: 3rem;
-        }
-        
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #ffffff;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .section-title i {
-            color: #22c55e;
-            font-size: 1.125rem;
-        }
-        
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-        }
-        
-        .form-group {
-            position: relative;
-        }
-        
-        .form-label {
-            display: block;
-            color: #e5e7eb;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .form-label i {
-            color: #22c55e;
-            font-size: 0.875rem;
-        }
-        
-        .form-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1rem 1.25rem;
-            color: white;
-            font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .form-input.percentage {
-            padding-right: 2.5rem;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: rgba(34, 197, 94, 0.5);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-            background: rgba(0, 0, 0, 0.6);
-        }
-        
-        .form-input::placeholder {
-            color: #6b7280;
-        }
-        
-        .percentage-symbol {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            font-weight: 600;
-            pointer-events: none;
-        }
-        
-        .input-container {
-            position: relative;
-        }
-        
-        /* File Input */
-        .file-input-container {
-            position: relative;
-        }
-        
-        .file-input {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
-        .file-input-label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 1.5rem;
-            color: #9ca3af;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-        
-        .file-input-label:hover {
-            border-color: rgba(34, 197, 94, 0.4);
-            background: rgba(34, 197, 94, 0.05);
-            color: #22c55e;
-        }
-        
-        .file-input-label.has-file {
-            border-color: rgba(34, 197, 94, 0.4);
-            background: rgba(34, 197, 94, 0.1);
-            color: #22c55e;
-        }
-        
-        /* Current Logo */
-        .current-logo {
-            margin-top: 1rem;
-            padding: 1.5rem;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .current-logo p {
-            color: #9ca3af;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            font-weight: 500;
-        }
-        
-        .current-logo img {
-            max-height: 80px;
-            max-width: 100%;
-            object-fit: contain;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 0.75rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        /* Submit Button */
-        .submit-button {
-            width: 100%;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            padding: 1.25rem 2rem;
-            border-radius: 16px;
-            font-size: 1.125rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            margin-top: 3rem;
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
-        }
-        
-        .submit-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(34, 197, 94, 0.4);
-        }
-        
-        .submit-button:active {
-            transform: translateY(0);
-        }
-        
-        /* Mobile Styles */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                width: 300px;
-                z-index: 1001;
-            }
-            
-            .sidebar:not(.hidden) {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: block;
-            }
-            
-            .header-actions span {
-                display: none !important;
-            }
-            
-            .form-grid {
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-            }
-            
-            .page-content {
-                padding: 1.5rem;
-            }
-            
-            .welcome-title {
-                font-size: 2.25rem;
-            }
-            
-            .form-container {
-                padding: 2rem;
-            }
-            
-            .form-title {
-                font-size: 1.5rem;
-            }
-            
-            .sidebar {
-                width: 280px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .welcome-title {
-                font-size: 1.875rem;
-            }
-            
-            .form-container {
-                padding: 1.5rem;
-            }
-            
-            .form-grid {
-                gap: 1rem;
-            }
-            
-            .sidebar {
-                width: 260px;
-            }
-        }
-        
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(4px);
-        }
-        
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-    </style>
-</head>
-<body>
-    <!-- Notifications -->
-    <?php if (isset($_SESSION['success'])): ?>
-        <script>
-            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
-        </script>
-        <?php unset($_SESSION['success']); ?>
-    <?php elseif (isset($_SESSION['failure'])): ?>
-        <script>
-            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
-        </script>
-        <?php unset($_SESSION['failure']); ?>
-    <?php endif; ?>
-
-    <!-- Overlay for mobile -->
-    <div class="overlay" id="overlay"></div>
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-bolt"></i>
-                </div>
-                <div class="logo-text">
-                    <div class="logo-title">Dashboard</div>
-                </div>
-            </a>
-       </div>
-        
-       <nav class="nav-menu">
-            <div class="nav-section">
-                <div class="nav-section-title">Principal</div>
-                <a href="index.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
-                    <div class="nav-text">Dashboard</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Gestão</div>
-                <a href="usuarios.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user"></i></div>
-                    <div class="nav-text">Usuários</div>
-                </a>
-                <a href="afiliados.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user-plus"></i></div>
-                    <div class="nav-text">Afiliados</div>
-                </a>
-                <a href="depositos.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-credit-card"></i></div>
-                    <div class="nav-text">Depósitos</div>
-                </a>
-                <a href="saques.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-money-bill-wave"></i></div>
-                    <div class="nav-text">Saques</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Sistema</div>
-                <a href="config.php" class="nav-item active">
-                    <div class="nav-icon"><i class="fas fa-cogs"></i></div>
-                    <div class="nav-text">Configurações</div>
-                </a>
-                <a href="gateway.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-usd"></i></div>
-                    <div class="nav-text">Gateway</div>
-                </a>
-                <a href="banners.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-images"></i></div>
-                    <div class="nav-text">Banners</div>
-                </a>
-                <a href="cartelas.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-diamond"></i></div>
-                    <div class="nav-text">Raspadinhas</div>
-                </a>
-                <a href="../logout" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-sign-out-alt"></i></div>
-                    <div class="nav-text">Sair</div>
-                </a>
-            </div>
-        </nav>
-    </aside>
-    
-    <!-- Main Content -->
-    <main class="main-content" id="mainContent">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="menu-toggle" id="menuToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
-                
-                <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
-                    <div class="user-avatar">
-                        <?php= strtoupper(substr($nome, 0, 1)) ?>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Page Content -->
-        <div class="page-content">
-            <!-- Welcome Section -->
-            <section class="welcome-section">
-                <h2 class="welcome-title">Configurações do Sistema</h2>
-                <p class="welcome-subtitle">Gerencie as configurações básicas e personalize sua plataforma</p>
-            </section>
-            
-            <!-- Form Container -->
-            <div class="form-container">
-                <form method="POST" enctype="multipart/form-data">
-                    <h2 class="form-title">
-                        <i class="fas fa-cogs"></i>
-                        Configurações Gerais
-                    </h2>
-                    
-                    <!-- Site Configuration Section -->
-                    <div class="form-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-globe"></i>
-                            Informações do Site
-                        </h3>
-                        
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-tag"></i>
-                                    Nome do Site
-                                </label>
-                                <input type="text" name="nome_site" value="<?php= htmlspecialchars($config['nome_site'] ?? '') ?>" class="form-input" placeholder="Digite o nome do seu site" required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-image"></i>
-                                    Logo do Site
-                                </label>
-                                <div class="file-input-container">
-                                    <input type="file" name="logo" accept="image/jpeg, image/png" id="logo-upload" class="file-input">
-                                    <label for="logo-upload" class="file-input-label" id="file-label">
-                                        <i class="fas fa-cloud-upload-alt"></i>
-                                        <span>Clique para enviar logo (JPG, PNG)</span>
-                                    </label>
-                                </div>
-                                
-                                <?php if (!empty($config['logo'])): ?>
-                                    <div class="current-logo">
-                                        <p><i class="fas fa-image"></i> Logo atual:</p>
-                                        <img src="<?php= htmlspecialchars($config['logo']) ?>" alt="Logo atual">
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Financial Configuration Section -->
-                    <div class="form-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-dollar-sign"></i>
-                            Configurações Financeiras
-                        </h3>
-                        
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-plus-circle"></i>
-                                    Depósito Mínimo (R$)
-                                </label>
-                                <input type="text" name="deposito_min" value="<?php= htmlspecialchars($config['deposito_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 10,00" required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-minus-circle"></i>
-                                    Saque Mínimo (R$)
-                                </label>
-                                <input type="text" name="saque_min" value="<?php= htmlspecialchars($config['saque_min'] ?? '0') ?>" class="form-input" placeholder="Ex: 20,00" required>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Affiliate Configuration Section -->
-                    <div class="form-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-handshake"></i>
-                            Configurações de Afiliados
-                        </h3>
-                        
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-user-plus"></i>
-                                    CPA Padrão (R$)
-                                </label>
-                                <input type="text" name="cpa_padrao" value="<?php= htmlspecialchars($config['cpa_padrao'] ?? '0') ?>" class="form-input" placeholder="Ex: 5,00" required>
-                                <p style="color: #6b7280; font-size: 0.8rem; margin-top: 0.5rem;">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Comissão fixa paga por cada novo cadastro indicado
-                                </p>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-chart-line"></i>
-                                    RevShare Padrão (%)
-                                </label>
-                                <div class="input-container">
-                                    <input type="text" name="revshare_padrao" value="<?php= htmlspecialchars($config['revshare_padrao'] ?? '0') ?>" class="form-input percentage" placeholder="Ex: 10,00" required>
-                                    <span class="percentage-symbol">%</span>
-                                </div>
-                                <p style="color: #6b7280; font-size: 0.8rem; margin-top: 0.5rem;">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Percentual sobre as perdas dos usuários indicados
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" name="salvar_config" class="submit-button">
-                        <i class="fas fa-save"></i>
-                        Salvar Configurações
-                    </button>
-                </form>
-            </div>
-            
-        </div>
-    </main>
-    
-    <script>
-        // Mobile menu toggle
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const overlay = document.getElementById('overlay');
-        
-        menuToggle.addEventListener('click', () => {
-            const isHidden = sidebar.classList.contains('hidden');
-            
-            if (isHidden) {
-                sidebar.classList.remove('hidden');
-                overlay.classList.add('active');
-            } else {
-                sidebar.classList.add('hidden');
-                overlay.classList.add('active');
-            }
-        });
-        
-        overlay.addEventListener('click', () => {
-            sidebar.classList.add('hidden');
-            overlay.classList.remove('active');
-        });
-        
-        // Close sidebar on window resize if it's mobile
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-                overlay.classList.remove('active');
-            } else {
-                sidebar.classList.remove('hidden');
-                overlay.classList.remove('active');
-            }
-        });
-        
-        // Enhanced hover effects for nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateX(8px)';
-            });
-            
-            item.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateX(0)';
-                }
-            });
-        });
-        
-        // File input enhancement
-        document.getElementById('logo-upload').addEventListener('change', function(e) {
-            const label = document.getElementById('file-label');
-            const fileName = e.target.files[0]?.name;
-            
-            if (fileName) {
-                label.innerHTML = `
-                    <i class="fas fa-check-circle"></i>
-                    <span>${fileName}</span>
-                `;
-                label.classList.add('has-file');
-            } else {
-                label.innerHTML = `
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <span>Clique para enviar logo (JPG, PNG)</span>
-                `;
-                label.classList.remove('has-file');
-            }
-        });
-        
-        // Input formatting for currency fields
-        function formatCurrency(input) {
-            let value = input.value.replace(/\D/g, '');
-            if (value === '') return;
-            value = (value / 100).toFixed(2) + '';
-            value = value.replace(".", ",");
-            value = value.replace(/(\d)(\d{3}),/, "$1.$2,");
-            input.value = value;
-        }
-        
-        // Input formatting for percentage fields
-        function formatPercentage(input) {
-            let value = input.value.replace(/[^\d,]/g, '');
-            if (value.includes(',')) {
-                let parts = value.split(',');
-                if (parts[1] && parts[1].length > 2) {
-                    parts[1] = parts[1].substring(0, 2);
-                }
-                value = parts.join(',');
-            }
-            input.value = value;
-        }
-        
-        // Apply currency formatting to financial inputs
-        document.querySelectorAll('input[name="deposito_min"], input[name="saque_min"], input[name="cpa_padrao"]').forEach(input => {
-            input.addEventListener('input', function() {
-                formatCurrency(this);
-            });
-        });
-        
-        // Apply percentage formatting to revshare input
-        document.querySelector('input[name="revshare_padrao"]').addEventListener('input', function() {
-            formatPercentage(this);
-        });
-        
-        // Smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('%c⚙️ Configurações do Sistema carregadas!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Check if mobile on load
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-            }
-            
-            // Animate form container on load
-            const formContainer = document.querySelector('.form-container');
-            formContainer.style.opacity = '0';
-            formContainer.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                formContainer.style.transition = 'all 0.6s ease';
-                formContainer.style.opacity = '1';
-                formContainer.style.transform = 'translateY(0)';
-            }, 300);
-        });
-    </script>
-</body>
+<?php<?php 
+include<?php '../includes/session.php';<?php 
+include<?php '../conexao.php';<?php 
+include<?php '../includes/notiflix.php';<?php 
+<?php 
+$usuarioId<?php =<?php $_SESSION['usuario_id'];<?php 
+$admin<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php admin<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+<?php 
+if<?php ($admin<?php !=<?php 1)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php não<?php é<?php um<?php administrador!'];<?php 
+<?php header("Location:<?php /");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$config<?php =<?php $pdo->query("SELECT<?php *<?php FROM<?php config<?php LIMIT<?php 1")->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+if<?php (isset($_POST['salvar_config']))<?php {<?php 
+<?php $nome_site<?php =<?php $_POST['nome_site'];<?php 
+<?php $deposito_min<?php =<?php str_replace(',',<?php '.',<?php $_POST['deposito_min']);<?php 
+<?php $saque_min<?php =<?php str_replace(',',<?php '.',<?php $_POST['saque_min']);<?php 
+<?php $cpa_padrao<?php =<?php str_replace(',',<?php '.',<?php $_POST['cpa_padrao']);<?php 
+<?php $revshare_padrao<?php =<?php str_replace(',',<?php '.',<?php $_POST['revshare_padrao']);<?php //<?php Novo<?php campo<?php 
+<?php 
+<?php $logo<?php =<?php $config['logo'];<?php 
+<?php 
+<?php if<?php (isset($_FILES['logo'])<?php &&<?php $_FILES['logo']['error']<?php ==<?php 0)<?php {<?php 
+<?php $allowed<?php =<?php ['jpg',<?php 'jpeg',<?php 'png'];<?php 
+<?php $ext<?php =<?php pathinfo($_FILES['logo']['name'],<?php PATHINFO_EXTENSION);<?php 
+<?php 
+<?php if<?php (in_array(strtolower($ext),<?php $allowed))<?php {<?php 
+<?php $uploadDir<?php =<?php '../assets/upload/';<?php 
+<?php if<?php (!file_exists($uploadDir))<?php {<?php 
+<?php mkdir($uploadDir,<?php 0777,<?php true);<?php 
+<?php }<?php 
+<?php 
+<?php $newName<?php =<?php uniqid()<?php .<?php '.'<?php .<?php $ext;<?php 
+<?php $uploadPath<?php =<?php $uploadDir<?php .<?php $newName;<?php 
+<?php 
+<?php if<?php (move_uploaded_file($_FILES['logo']['tmp_name'],<?php $uploadPath))<?php {<?php 
+<?php if<?php ($config['logo']<?php &&<?php file_exists('../'<?php .<?php $config['logo']))<?php {<?php 
+<?php unlink('../'<?php .<?php $config['logo']);<?php 
+<?php }<?php 
+<?php $logo<?php =<?php '/assets/upload/'<?php .<?php $newName;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php fazer<?php upload<?php da<?php logo!';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Formato<?php de<?php arquivo<?php inválido!<?php Use<?php apenas<?php JPG<?php ou<?php PNG.';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Query<?php atualizada<?php para<?php incluir<?php revshare_padrao<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php config<?php SET<?php nome_site<?php =<?php ?,<?php logo<?php =<?php ?,<?php deposito_min<?php =<?php ?,<?php saque_min<?php =<?php ?,<?php cpa_padrao<?php =<?php ?,<?php revshare_padrao<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$nome_site,<?php $logo,<?php $deposito_min,<?php $saque_min,<?php $cpa_padrao,<?php $revshare_padrao]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Configurações<?php atualizadas<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php atualizar<?php as<?php configurações!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$nome<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php nome<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+$nome<?php =<?php $nome<?php ?<?php explode('<?php ',<?php $nome)[0]<?php :<?php null;<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite<?php ??<?php 'Admin';<?php ?><?php -<?php Configurações</title><?php 
+<?php 
+<?php <!--<?php TailwindCSS<?php --><?php 
+<?php <script<?php src="https://cdn.tailwindcss.com"></script><?php 
+<?php 
+<?php <!--<?php Font<?php Awesome<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><?php 
+<?php 
+<?php <!--<?php Notiflix<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Google<?php Fonts<?php --><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php *<?php {<?php 
+<?php margin:<?php 0;<?php 
+<?php padding:<?php 0;<?php 
+<?php box-sizing:<?php border-box;<?php 
+<?php }<?php 
+<?php 
+<?php body<?php {<?php 
+<?php font-family:<?php 'Inter',<?php -apple-system,<?php BlinkMacSystemFont,<?php sans-serif;<?php 
+<?php background:<?php #000000;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php overflow-x:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Sidebar<?php Styles<?php */<?php 
+<?php .sidebar<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 320px;<?php 
+<?php height:<?php 100vh;<?php 
+<?php background:<?php linear-gradient(145deg,<?php #0a0a0a<?php 0%,<?php #141414<?php 25%,<?php #1a1a1a<?php 50%,<?php #0f0f0f<?php 100%);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-right:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transition:<?php all<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 0<?php 50px<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php 
+<?php inset<?php 1px<?php 0<?php 0<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 20%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.1)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 60%,<?php rgba(59,<?php 130,<?php 246,<?php 0.05)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar.hidden<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar-header<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php padding:<?php 2.5rem<?php 2rem;<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php }<?php 
+<?php 
+<?php .logo<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e<?php 0%,<?php #16a34a<?php 100%);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3),<?php 
+<?php 0<?php 4px<?php 8px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -2px;<?php 
+<?php left:<?php -2px;<?php 
+<?php right:<?php -2px;<?php 
+<?php bottom:<?php -2px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a,<?php #22c55e);<?php 
+<?php border-radius:<?php 18px;<?php 
+<?php z-index:<?php -1;<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .logo:hover<?php .logo-icon::after<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-text<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-title<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-subtitle<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-menu<?php {<?php 
+<?php padding:<?php 2rem<?php 0;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section<?php {<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section-title<?php {<?php 
+<?php padding:<?php 0<?php 2rem<?php 0.75rem<?php 2rem;<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php padding:<?php 1rem<?php 2rem;<?php 
+<?php color:<?php #a1a1aa;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php position:<?php relative;<?php 
+<?php margin:<?php 0.25rem<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 0;<?php 
+<?php top:<?php 0;<?php 
+<?php bottom:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 0<?php 4px<?php 4px<?php 0;<?php 
+<?php transform:<?php scaleY(0);<?php 
+<?php transition:<?php transform<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover::before,<?php 
+<?php .nav-item.active::before<?php {<?php 
+<?php transform:<?php scaleY(1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover,<?php 
+<?php .nav-item.active<?php {<?php 
+<?php color:<?php #ffffff;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.05)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php translateX(4px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-icon<?php {<?php 
+<?php width:<?php 24px;<?php 
+<?php height:<?php 24px;<?php 
+<?php margin-right:<?php 1rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-text<?php {<?php 
+<?php font-size:<?php 0.95rem;<?php 
+<?php flex:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-badge<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 0.7rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php padding:<?php 0.25rem<?php 0.5rem;<?php 
+<?php border-radius:<?php 6px;<?php 
+<?php min-width:<?php 20px;<?php 
+<?php text-align:<?php center;<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(239,<?php 68,<?php 68,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar-footer<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .user-profile<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .user-profile:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-avatar<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-info<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .user-name<?php {<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .user-role<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Content<?php */<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 320px;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php transition:<?php margin-left<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 10%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.03)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.02)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 40%,<?php rgba(59,<?php 130,<?php 246,<?php 0.01)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content.expanded<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .header<?php {<?php 
+<?php position:<?php sticky;<?php 
+<?php top:<?php 0;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.95);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php padding:<?php 1.5rem<?php 2.5rem;<?php 
+<?php z-index:<?php 100;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .header-content<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php none;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(34,<?php 197,<?php 94,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php scale(1.05);<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #a1a1aa);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-section<?php {<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff<?php 0%,<?php #fff<?php 50%,<?php #fff<?php 100%);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-subtitle<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-weight:<?php 400;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Form<?php Container<?php */<?php 
+<?php .form-container<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 3rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .form-container::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 4px;<?php 
+<?php background:<?php linear-gradient(90deg,<?php #22c55e,<?php #16a34a,<?php #22c55e);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-container:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .form-container:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php box-shadow:<?php 0<?php 25px<?php 80px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php .form-title<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 2.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php padding-bottom:<?php 1.5rem;<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .form-title<?php i<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Form<?php Sections<?php */<?php 
+<?php .form-section<?php {<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .section-title<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .section-title<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.125rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(280px,<?php 1fr));<?php 
+<?php gap:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .form-label<?php {<?php 
+<?php display:<?php block;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-label<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 0.875rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1rem<?php 1.25rem;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input.percentage<?php {<?php 
+<?php padding-right:<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.6);<?php 
+<?php }<?php 
+<?php 
+<?php .form-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .percentage-symbol<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php right:<?php 1rem;<?php 
+<?php top:<?php 50%;<?php 
+<?php transform:<?php translateY(-50%);<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .input-container<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php File<?php Input<?php */<?php 
+<?php .file-input-container<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .file-input<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php opacity:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php }<?php 
+<?php 
+<?php .file-input-label<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php border:<?php 2px<?php dashed<?php rgba(255,<?php 255,<?php 255,<?php 0.2);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .file-input-label:hover<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.05);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .file-input-label.has-file<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Current<?php Logo<?php */<?php 
+<?php .current-logo<?php {<?php 
+<?php margin-top:<?php 1rem;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php }<?php 
+<?php 
+<?php .current-logo<?php p<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php .current-logo<?php img<?php {<?php 
+<?php max-height:<?php 80px;<?php 
+<?php max-width:<?php 100%;<?php 
+<?php object-fit:<?php contain;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php background:<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Submit<?php Button<?php */<?php 
+<?php .submit-button<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border:<?php none;<?php 
+<?php padding:<?php 1.25rem<?php 2rem;<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php font-size:<?php 1.125rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php margin-top:<?php 3rem;<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .submit-button:hover<?php {<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 12px<?php 35px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .submit-button:active<?php {<?php 
+<?php transform:<?php translateY(0);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Mobile<?php Styles<?php */<?php 
+<?php @media<?php (max-width:<?php 1024px)<?php {<?php 
+<?php .sidebar<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php width:<?php 300px;<?php 
+<?php z-index:<?php 1001;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar:not(.hidden)<?php {<?php 
+<?php transform:<?php translateX(0);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php block;<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php span<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .form-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .header<?php {<?php 
+<?php padding:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 2.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-container<?php {<?php 
+<?php padding:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-title<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 280px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 1.875rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-container<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-grid<?php {<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 260px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php .overlay<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.7);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php opacity:<?php 0;<?php 
+<?php visibility:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(4px);<?php 
+<?php }<?php 
+<?php 
+<?php .overlay.active<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php visibility:<?php visible;<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <!--<?php Notifications<?php --><?php 
+<?php <?php<?php if<?php (isset($_SESSION['success'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.success('<?php=<?php $_SESSION['success']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['success']);<?php ?><?php 
+<?php <?php<?php elseif<?php (isset($_SESSION['failure'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.failure('<?php=<?php $_SESSION['failure']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['failure']);<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <!--<?php Overlay<?php for<?php mobile<?php --><?php 
+<?php <div<?php class="overlay"<?php id="overlay"></div><?php 
+<?php 
+<?php <!--<?php Sidebar<?php --><?php 
+<?php <aside<?php class="sidebar"<?php id="sidebar"><?php 
+<?php <div<?php class="sidebar-header"><?php 
+<?php <a<?php href="#"<?php class="logo"><?php 
+<?php <div<?php class="logo-icon"><?php 
+<?php <i<?php class="fas<?php fa-bolt"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="logo-text"><?php 
+<?php <div<?php class="logo-title">Dashboard</div><?php 
+<?php </div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <nav<?php class="nav-menu"><?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Principal</div><?php 
+<?php <a<?php href="index.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-chart-pie"></i></div><?php 
+<?php <div<?php class="nav-text">Dashboard</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Gestão</div><?php 
+<?php <a<?php href="usuarios.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user"></i></div><?php 
+<?php <div<?php class="nav-text">Usuários</div><?php 
+<?php </a><?php 
+<?php <a<?php href="afiliados.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user-plus"></i></div><?php 
+<?php <div<?php class="nav-text">Afiliados</div><?php 
+<?php </a><?php 
+<?php <a<?php href="depositos.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-credit-card"></i></div><?php 
+<?php <div<?php class="nav-text">Depósitos</div><?php 
+<?php </a><?php 
+<?php <a<?php href="saques.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-money-bill-wave"></i></div><?php 
+<?php <div<?php class="nav-text">Saques</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Sistema</div><?php 
+<?php <a<?php href="config.php"<?php class="nav-item<?php active"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-cogs"></i></div><?php 
+<?php <div<?php class="nav-text">Configurações</div><?php 
+<?php </a><?php 
+<?php <a<?php href="gateway.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-usd"></i></div><?php 
+<?php <div<?php class="nav-text">Gateway</div><?php 
+<?php </a><?php 
+<?php <a<?php href="banners.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-images"></i></div><?php 
+<?php <div<?php class="nav-text">Banners</div><?php 
+<?php </a><?php 
+<?php <a<?php href="cartelas.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-diamond"></i></div><?php 
+<?php <div<?php class="nav-text">Raspadinhas</div><?php 
+<?php </a><?php 
+<?php <a<?php href="../logout"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-sign-out-alt"></i></div><?php 
+<?php <div<?php class="nav-text">Sair</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </nav><?php 
+<?php </aside><?php 
+<?php 
+<?php <!--<?php Main<?php Content<?php --><?php 
+<?php <main<?php class="main-content"<?php id="mainContent"><?php 
+<?php <!--<?php Header<?php --><?php 
+<?php <header<?php class="header"><?php 
+<?php <div<?php class="header-content"><?php 
+<?php <div<?php style="display:<?php flex;<?php align-items:<?php center;<?php gap:<?php 1rem;"><?php 
+<?php <button<?php class="menu-toggle"<?php id="menuToggle"><?php 
+<?php <i<?php class="fas<?php fa-bars"></i><?php 
+<?php </button><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="header-actions"><?php 
+<?php <span<?php style="color:<?php #a1a1aa;<?php font-size:<?php 0.9rem;<?php display:<?php none;">Bem-vindo,<?php <?php=<?php htmlspecialchars($nome)<?php ?></span><?php 
+<?php <div<?php class="user-avatar"><?php 
+<?php <?php=<?php strtoupper(substr($nome,<?php 0,<?php 1))<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </header><?php 
+<?php 
+<?php <!--<?php Page<?php Content<?php --><?php 
+<?php <div<?php class="page-content"><?php 
+<?php <!--<?php Welcome<?php Section<?php --><?php 
+<?php <section<?php class="welcome-section"><?php 
+<?php <h2<?php class="welcome-title">Configurações<?php do<?php Sistema</h2><?php 
+<?php <p<?php class="welcome-subtitle">Gerencie<?php as<?php configurações<?php básicas<?php e<?php personalize<?php sua<?php plataforma</p><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Form<?php Container<?php --><?php 
+<?php <div<?php class="form-container"><?php 
+<?php <form<?php method="POST"<?php enctype="multipart/form-data"><?php 
+<?php <h2<?php class="form-title"><?php 
+<?php <i<?php class="fas<?php fa-cogs"></i><?php 
+<?php Configurações<?php Gerais<?php 
+<?php </h2><?php 
+<?php 
+<?php <!--<?php Site<?php Configuration<?php Section<?php --><?php 
+<?php <div<?php class="form-section"><?php 
+<?php <h3<?php class="section-title"><?php 
+<?php <i<?php class="fas<?php fa-globe"></i><?php 
+<?php Informações<?php do<?php Site<?php 
+<?php </h3><?php 
+<?php 
+<?php <div<?php class="form-grid"><?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-tag"></i><?php 
+<?php Nome<?php do<?php Site<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="nome_site"<?php value="<?php=<?php htmlspecialchars($config['nome_site']<?php ??<?php '')<?php ?>"<?php class="form-input"<?php placeholder="Digite<?php o<?php nome<?php do<?php seu<?php site"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-image"></i><?php 
+<?php Logo<?php do<?php Site<?php 
+<?php </label><?php 
+<?php <div<?php class="file-input-container"><?php 
+<?php <input<?php type="file"<?php name="logo"<?php accept="image/jpeg,<?php image/png"<?php id="logo-upload"<?php class="file-input"><?php 
+<?php <label<?php for="logo-upload"<?php class="file-input-label"<?php id="file-label"><?php 
+<?php <i<?php class="fas<?php fa-cloud-upload-alt"></i><?php 
+<?php <span>Clique<?php para<?php enviar<?php logo<?php (JPG,<?php PNG)</span><?php 
+<?php </label><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php if<?php (!empty($config['logo'])):<?php ?><?php 
+<?php <div<?php class="current-logo"><?php 
+<?php <p><i<?php class="fas<?php fa-image"></i><?php Logo<?php atual:</p><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($config['logo'])<?php ?>"<?php alt="Logo<?php atual"><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Financial<?php Configuration<?php Section<?php --><?php 
+<?php <div<?php class="form-section"><?php 
+<?php <h3<?php class="section-title"><?php 
+<?php <i<?php class="fas<?php fa-dollar-sign"></i><?php 
+<?php Configurações<?php Financeiras<?php 
+<?php </h3><?php 
+<?php 
+<?php <div<?php class="form-grid"><?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-plus-circle"></i><?php 
+<?php Depósito<?php Mínimo<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="deposito_min"<?php value="<?php=<?php htmlspecialchars($config['deposito_min']<?php ??<?php '0')<?php ?>"<?php class="form-input"<?php placeholder="Ex:<?php 10,00"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-minus-circle"></i><?php 
+<?php Saque<?php Mínimo<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="saque_min"<?php value="<?php=<?php htmlspecialchars($config['saque_min']<?php ??<?php '0')<?php ?>"<?php class="form-input"<?php placeholder="Ex:<?php 20,00"<?php required><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Affiliate<?php Configuration<?php Section<?php --><?php 
+<?php <div<?php class="form-section"><?php 
+<?php <h3<?php class="section-title"><?php 
+<?php <i<?php class="fas<?php fa-handshake"></i><?php 
+<?php Configurações<?php de<?php Afiliados<?php 
+<?php </h3><?php 
+<?php 
+<?php <div<?php class="form-grid"><?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-user-plus"></i><?php 
+<?php CPA<?php Padrão<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="cpa_padrao"<?php value="<?php=<?php htmlspecialchars($config['cpa_padrao']<?php ??<?php '0')<?php ?>"<?php class="form-input"<?php placeholder="Ex:<?php 5,00"<?php required><?php 
+<?php <p<?php style="color:<?php #6b7280;<?php font-size:<?php 0.8rem;<?php margin-top:<?php 0.5rem;"><?php 
+<?php <i<?php class="fas<?php fa-info-circle"></i><?php 
+<?php Comissão<?php fixa<?php paga<?php por<?php cada<?php novo<?php cadastro<?php indicado<?php 
+<?php </p><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-chart-line"></i><?php 
+<?php RevShare<?php Padrão<?php (%)<?php 
+<?php </label><?php 
+<?php <div<?php class="input-container"><?php 
+<?php <input<?php type="text"<?php name="revshare_padrao"<?php value="<?php=<?php htmlspecialchars($config['revshare_padrao']<?php ??<?php '0')<?php ?>"<?php class="form-input<?php percentage"<?php placeholder="Ex:<?php 10,00"<?php required><?php 
+<?php <span<?php class="percentage-symbol">%</span><?php 
+<?php </div><?php 
+<?php <p<?php style="color:<?php #6b7280;<?php font-size:<?php 0.8rem;<?php margin-top:<?php 0.5rem;"><?php 
+<?php <i<?php class="fas<?php fa-info-circle"></i><?php 
+<?php Percentual<?php sobre<?php as<?php perdas<?php dos<?php usuários<?php indicados<?php 
+<?php </p><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <button<?php type="submit"<?php name="salvar_config"<?php class="submit-button"><?php 
+<?php <i<?php class="fas<?php fa-save"></i><?php 
+<?php Salvar<?php Configurações<?php 
+<?php </button><?php 
+<?php </form><?php 
+<?php </div><?php 
+<?php 
+<?php </div><?php 
+<?php </main><?php 
+<?php 
+<?php <script><?php 
+<?php //<?php Mobile<?php menu<?php toggle<?php 
+<?php const<?php menuToggle<?php =<?php document.getElementById('menuToggle');<?php 
+<?php const<?php sidebar<?php =<?php document.getElementById('sidebar');<?php 
+<?php const<?php mainContent<?php =<?php document.getElementById('mainContent');<?php 
+<?php const<?php overlay<?php =<?php document.getElementById('overlay');<?php 
+<?php 
+<?php menuToggle.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php const<?php isHidden<?php =<?php sidebar.classList.contains('hidden');<?php 
+<?php 
+<?php if<?php (isHidden)<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php overlay.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Close<?php sidebar<?php on<?php window<?php resize<?php if<?php it's<?php mobile<?php 
+<?php window.addEventListener('resize',<?php ()<?php =><?php {<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Enhanced<?php hover<?php effects<?php for<?php nav<?php items<?php 
+<?php document.querySelectorAll('.nav-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('mouseenter',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(8px)';<?php 
+<?php });<?php 
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {<?php 
+<?php if<?php (!this.classList.contains('active'))<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(0)';<?php 
+<?php }<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php File<?php input<?php enhancement<?php 
+<?php document.getElementById('logo-upload').addEventListener('change',<?php function(e)<?php {<?php 
+<?php const<?php label<?php =<?php document.getElementById('file-label');<?php 
+<?php const<?php fileName<?php =<?php e.target.files[0]?.name;<?php 
+<?php 
+<?php if<?php (fileName)<?php {<?php 
+<?php label.innerHTML<?php =<?php `<?php 
+<?php <i<?php class="fas<?php fa-check-circle"></i><?php 
+<?php <span>${fileName}</span><?php 
+<?php `;<?php 
+<?php label.classList.add('has-file');<?php 
+<?php }<?php else<?php {<?php 
+<?php label.innerHTML<?php =<?php `<?php 
+<?php <i<?php class="fas<?php fa-cloud-upload-alt"></i><?php 
+<?php <span>Clique<?php para<?php enviar<?php logo<?php (JPG,<?php PNG)</span><?php 
+<?php `;<?php 
+<?php label.classList.remove('has-file');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Input<?php formatting<?php for<?php currency<?php fields<?php 
+<?php function<?php formatCurrency(input)<?php {<?php 
+<?php let<?php value<?php =<?php input.value.replace(/\D/g,<?php '');<?php 
+<?php if<?php (value<?php ===<?php '')<?php return;<?php 
+<?php value<?php =<?php (value<?php /<?php 100).toFixed(2)<?php +<?php '';<?php 
+<?php value<?php =<?php value.replace(".",<?php ",");<?php 
+<?php value<?php =<?php value.replace(/(\d)(\d{3}),/,<?php "$1.$2,");<?php 
+<?php input.value<?php =<?php value;<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Input<?php formatting<?php for<?php percentage<?php fields<?php 
+<?php function<?php formatPercentage(input)<?php {<?php 
+<?php let<?php value<?php =<?php input.value.replace(/[^\d,]/g,<?php '');<?php 
+<?php if<?php (value.includes(','))<?php {<?php 
+<?php let<?php parts<?php =<?php value.split(',');<?php 
+<?php if<?php (parts[1]<?php &&<?php parts[1].length<?php ><?php 2)<?php {<?php 
+<?php parts[1]<?php =<?php parts[1].substring(0,<?php 2);<?php 
+<?php }<?php 
+<?php value<?php =<?php parts.join(',');<?php 
+<?php }<?php 
+<?php input.value<?php =<?php value;<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Apply<?php currency<?php formatting<?php to<?php financial<?php inputs<?php 
+<?php document.querySelectorAll('input[name="deposito_min"],<?php input[name="saque_min"],<?php input[name="cpa_padrao"]').forEach(input<?php =><?php {<?php 
+<?php input.addEventListener('input',<?php function()<?php {<?php 
+<?php formatCurrency(this);<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Apply<?php percentage<?php formatting<?php to<?php revshare<?php input<?php 
+<?php document.querySelector('input[name="revshare_padrao"]').addEventListener('input',<?php function()<?php {<?php 
+<?php formatPercentage(this);<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Smooth<?php scroll<?php behavior<?php 
+<?php document.documentElement.style.scrollBehavior<?php =<?php 'smooth';<?php 
+<?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php ()<?php =><?php {<?php 
+<?php console.log('%c⚙️<?php Configurações<?php do<?php Sistema<?php carregadas!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php 
+<?php //<?php Check<?php if<?php mobile<?php on<?php load<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Animate<?php form<?php container<?php on<?php load<?php 
+<?php const<?php formContainer<?php =<?php document.querySelector('.form-container');<?php 
+<?php formContainer.style.opacity<?php =<?php '0';<?php 
+<?php formContainer.style.transform<?php =<?php 'translateY(20px)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php formContainer.style.transition<?php =<?php 'all<?php 0.6s<?php ease';<?php 
+<?php formContainer.style.opacity<?php =<?php '1';<?php 
+<?php formContainer.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php },<?php 300);<?php 
+<?php });<?php 
+<?php </script><?php 
+</body><?php 
 </html>

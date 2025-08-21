@@ -1,6 +1,6 @@
-<?php
-
-session_start();
-$_SESSION['message'] = ['type' => 'success', 'text' => 'Você saiu!'];
-
-header("Location: /");
+<?php<?php 
+<?php 
+session_start();<?php 
+$_SESSION['message']<?php =<?php ['type'<?php =><?php 'success',<?php 'text'<?php =><?php 'Você<?php saiu!'];<?php 
+<?php 
+header("Location:<?php /");

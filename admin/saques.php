@@ -1,1403 +1,1403 @@
 <?php
-include '../includes/session.php';
-include '../conexao.php';
-include '../includes/notiflix.php';
+include<?php '../includes/session.php';
+include<?php '../conexao.php';
+include<?php '../includes/notiflix.php';
 
-$usuarioId = $_SESSION['usuario_id'];
-$admin = ($stmt = $pdo->prepare("SELECT admin FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
+$usuarioId<?php =<?php $_SESSION['usuario_id'];
+$admin<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php admin<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;
 
-if ($admin != 1) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você não é um administrador!'];
-    header("Location: /");
-    exit;
+if<?php ($admin<?php !=<?php 1)<?php {
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php não<?php é<?php um<?php administrador!'];
+<?php header("Location:<?php /");
+<?php exit;
 }
 
-if (isset($_POST['aprovar_saque'])) {
-    $saque_id = $_POST['saque_id'];
-    
-    try {
-        $pdo->beginTransaction();
-        
-        // Verificar qual gateway está ativo
-        $stmt = $pdo->prepare("SELECT active FROM gateway LIMIT 1");
-        $stmt->execute();
-        $activeGateway = $stmt->fetchColumn();
-        
-        if (!in_array($activeGateway, ['pixup', 'digitopay'])) {
-            throw new Exception('Gateway não configurado ou não suportado.');
-        }
-        
-        // Buscar dados do saque
-        $stmt = $pdo->prepare("SELECT s.*, u.nome, u.email FROM saques s JOIN usuarios u ON s.user_id = u.id WHERE s.id = ? LIMIT 1 FOR UPDATE");
-        $stmt->execute([$saque_id]);
-        $saque = $stmt->fetch();
-        
-        if (!$saque) {
-            throw new Exception("Saque não encontrado");
-        }
-        
-        if ($activeGateway === 'pixup') {
-            // ===== PROCESSAR COM PIXUP =====
-            $stmt = $pdo->prepare("SELECT ci, cs, url FROM pixup LIMIT 1");
-            $stmt->execute();
-            $pixup = $stmt->fetch();
-            
-            if (!$pixup) {
-                throw new Exception("Credenciais PIXUP não configuradas");
-            }
-            
-            $auth = base64_encode($pixup['ci'] . ':' . $pixup['cs']);
-            
-            // STEP 1: Obter Token (FORÇANDO IPv4)
-            $ch = curl_init($pixup['url'] . '/v2/oauth/token');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4); // Forçar IPv4
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Basic ' . $auth,
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'User-Agent: PHP-CURL/7.0'
-            ]);
-            
-            $tokenResponse = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-            
-            if ($curlError) {
-                throw new Exception("Erro cURL no token: " . $curlError);
-            }
-            
-            $tokenData = json_decode($tokenResponse, true);
-            
-            if ($httpCode !== 200 || !isset($tokenData['access_token'])) {
-                throw new Exception("Falha ao obter token de acesso da PIXUP. HTTP: $httpCode | Response: $tokenResponse");
-            }
-            
-            $accessToken = $tokenData['access_token'];
-            
-            // STEP 2: Preparar Payload
-            $external_id = uniqid() . '-' . time();
-            $cpf_limpo = preg_replace('/\D/', '', $saque['cpf']);
-            
-            $payload = [
-                'amount' => (float)$saque['valor'],
-                'description' => 'Saque Raspadinha - ID: ' . $saque['id'],
-                'external_id' => $external_id,
-                'creditParty' => [
-                    'name' => trim($saque['nome']),
-                    'keyType' => 'CPF',
-                    'key' => $cpf_limpo,
-                    'taxId' => $cpf_limpo
-                ]
-            ];
-            
-            // STEP 3: Fazer Pagamento (FORÇANDO IPv4)
-            $ch = curl_init($pixup['url'] . '/v2/pix/payment');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4); // Forçar IPv4
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $accessToken,
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'User-Agent: PHP-CURL/7.0'
-            ]);
-            
-            $paymentResponse = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-            
-            if ($curlError) {
-                throw new Exception("Erro cURL no pagamento: " . $curlError);
-            }
-            
-            $paymentData = json_decode($paymentResponse, true);
-            
-            if ($httpCode !== 200 && $httpCode !== 201) {
-                $errorMsg = "Falha ao processar pagamento na PIXUP. HTTP: $httpCode | Response: $paymentResponse";
-                
-                if ($paymentData && isset($paymentData['message'])) {
-                    $errorMsg .= " | Erro da API: " . $paymentData['message'];
-                }
-                if ($paymentData && isset($paymentData['errors'])) {
-                    $errorMsg .= " | Erros: " . json_encode($paymentData['errors']);
-                }
-                
-                throw new Exception($errorMsg);
-            }
-            
-            // STEP 4: Atualizar status para PAID usando colunas existentes
-            $stmt = $pdo->prepare("UPDATE saques SET 
-                status = 'PAID', 
-                gateway = 'pixup',
-                transaction_id = ?,
-                webhook_data = ?
-                WHERE id = ?");
-            
-            $updateResult = $stmt->execute([
-                $external_id,
-                json_encode($paymentData),
-                $saque_id
-            ]);
-            
-            if (!$updateResult) {
-                throw new Exception("Erro ao atualizar status do saque no banco de dados");
-            }
-            
-            if ($stmt->rowCount() === 0) {
-                throw new Exception("Nenhuma linha foi atualizada - saque ID $saque_id pode não existir");
-            }
-            
-        } elseif ($activeGateway === 'digitopay') {
-            // ===== PROCESSAR COM DIGITOPAY =====
-            require_once __DIR__ . '/../classes/DigitoPay.php';
-            
-            $digitoPay = new DigitoPay($pdo);
-            
-            // Configurar URLs base para callback
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-            $host = $_SERVER['HTTP_HOST'];
-            $callbackUrl = $protocol . $host . '/callback/digitopay_withdraw.php';
-            
-            $idempotencyKey = uniqid() . '-' . time();
-            
-            // Criar saque via DigitoPay
-            $withdrawData = $digitoPay->createWithdraw(
-                $saque['valor'],
-                $saque['cpf'],
-                $saque['nome'],
-                $saque['cpf'], // pixKey (usando CPF)
-                'CPF',         // pixKeyType
-                $callbackUrl,
-                $idempotencyKey
-            );
-            
-            // Atualizar o saque com os dados da transação
-            $stmt = $pdo->prepare("UPDATE saques SET 
-                status = 'PROCESSING', 
-                gateway = 'digitopay',
-                transaction_id_digitopay = :transaction_id,
-                digitopay_idempotency_key = :idempotency_key,
-                webhook_data = :response,
-                updated_at = NOW() 
-                WHERE id = :id");
-            
-            $stmt->execute([
-                ':id' => $saque_id,
-                ':transaction_id' => $withdrawData['transactionId'] ?? null,
-                ':idempotency_key' => $idempotencyKey,
-                ':response' => json_encode($withdrawData)
-            ]);
-            
-            $pdo->commit();
-            $_SESSION['success'] = 'Saque enviado para processamento via DigitoPay! Status: ' . ($withdrawData['status'] ?? 'PROCESSING');
-            
-            header('Location: '.$_SERVER['PHP_SELF']);
-            exit;
-        }
-        
-        $pdo->commit();
-        $_SESSION['success'] = 'Saque aprovado e pagamento realizado com sucesso!';
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $_SESSION['failure'] = 'Erro ao aprovar o saque: ' . $e->getMessage();
-    }
-    
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
+if<?php (isset($_POST['aprovar_saque']))<?php {
+<?php $saque_id<?php =<?php $_POST['saque_id'];
+<?php 
+<?php try<?php {
+<?php $pdo->beginTransaction();
+<?php 
+<?php //<?php Verificar<?php qual<?php gateway<?php está<?php ativo
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php active<?php FROM<?php gateway<?php LIMIT<?php 1");
+<?php $stmt->execute();
+<?php $activeGateway<?php =<?php $stmt->fetchColumn();
+<?php 
+<?php if<?php (!in_array($activeGateway,<?php ['pixup',<?php 'digitopay']))<?php {
+<?php throw<?php new<?php Exception('Gateway<?php não<?php configurado<?php ou<?php não<?php suportado.');
+<?php }
+<?php 
+<?php //<?php Buscar<?php dados<?php do<?php saque
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php s.*,<?php u.nome,<?php u.email<?php FROM<?php saques<?php s<?php JOIN<?php usuarios<?php u<?php ON<?php s.user_id<?php =<?php u.id<?php WHERE<?php s.id<?php =<?php ?<?php LIMIT<?php 1<?php FOR<?php UPDATE");
+<?php $stmt->execute([$saque_id]);
+<?php $saque<?php =<?php $stmt->fetch();
+<?php 
+<?php if<?php (!$saque)<?php {
+<?php throw<?php new<?php Exception("Saque<?php não<?php encontrado");
+<?php }
+<?php 
+<?php if<?php ($activeGateway<?php ===<?php 'pixup')<?php {
+<?php //<?php =====<?php PROCESSAR<?php COM<?php PIXUP<?php =====
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php ci,<?php cs,<?php url<?php FROM<?php pixup<?php LIMIT<?php 1");
+<?php $stmt->execute();
+<?php $pixup<?php =<?php $stmt->fetch();
+<?php 
+<?php if<?php (!$pixup)<?php {
+<?php throw<?php new<?php Exception("Credenciais<?php PIXUP<?php não<?php configuradas");
+<?php }
+<?php 
+<?php $auth<?php =<?php base64_encode($pixup['ci']<?php .<?php ':'<?php .<?php $pixup['cs']);
+<?php 
+<?php //<?php STEP<?php 1:<?php Obter<?php Token<?php (FORÇANDO<?php IPv4)
+<?php $ch<?php =<?php curl_init($pixup['url']<?php .<?php '/v2/oauth/token');
+<?php curl_setopt($ch,<?php CURLOPT_RETURNTRANSFER,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_POST,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_TIMEOUT,<?php 30);
+<?php curl_setopt($ch,<?php CURLOPT_CONNECTTIMEOUT,<?php 10);
+<?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYPEER,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYHOST,<?php 2);
+<?php curl_setopt($ch,<?php CURLOPT_IPRESOLVE,<?php CURL_IPRESOLVE_V4);<?php //<?php Forçar<?php IPv4
+<?php curl_setopt($ch,<?php CURLOPT_HTTPHEADER,<?php [
+<?php 'Authorization:<?php Basic<?php '<?php .<?php $auth,
+<?php 'Content-Type:<?php application/json',
+<?php 'Accept:<?php application/json',
+<?php 'User-Agent:<?php PHP-CURL/7.0'
+<?php ]);
+<?php 
+<?php $tokenResponse<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php $curlError<?php =<?php curl_error($ch);
+<?php curl_close($ch);
+<?php 
+<?php if<?php ($curlError)<?php {
+<?php throw<?php new<?php Exception("Erro<?php cURL<?php no<?php token:<?php "<?php .<?php $curlError);
+<?php }
+<?php 
+<?php $tokenData<?php =<?php json_decode($tokenResponse,<?php true);
+<?php 
+<?php if<?php ($httpCode<?php !==<?php 200<?php ||<?php !isset($tokenData['access_token']))<?php {
+<?php throw<?php new<?php Exception("Falha<?php ao<?php obter<?php token<?php de<?php acesso<?php da<?php PIXUP.<?php HTTP:<?php $httpCode<?php |<?php Response:<?php $tokenResponse");
+<?php }
+<?php 
+<?php $accessToken<?php =<?php $tokenData['access_token'];
+<?php 
+<?php //<?php STEP<?php 2:<?php Preparar<?php Payload
+<?php $external_id<?php =<?php uniqid()<?php .<?php '-'<?php .<?php time();
+<?php $cpf_limpo<?php =<?php preg_replace('/\D/',<?php '',<?php $saque['cpf']);
+<?php 
+<?php $payload<?php =<?php [
+<?php 'amount'<?php =><?php (float)$saque['valor'],
+<?php 'description'<?php =><?php 'Saque<?php Raspadinha<?php -<?php ID:<?php '<?php .<?php $saque['id'],
+<?php 'external_id'<?php =><?php $external_id,
+<?php 'creditParty'<?php =><?php [
+<?php 'name'<?php =><?php trim($saque['nome']),
+<?php 'keyType'<?php =><?php 'CPF',
+<?php 'key'<?php =><?php $cpf_limpo,
+<?php 'taxId'<?php =><?php $cpf_limpo
+<?php ]
+<?php ];
+<?php 
+<?php //<?php STEP<?php 3:<?php Fazer<?php Pagamento<?php (FORÇANDO<?php IPv4)
+<?php $ch<?php =<?php curl_init($pixup['url']<?php .<?php '/v2/pix/payment');
+<?php curl_setopt($ch,<?php CURLOPT_RETURNTRANSFER,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_POST,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_TIMEOUT,<?php 60);
+<?php curl_setopt($ch,<?php CURLOPT_CONNECTTIMEOUT,<?php 10);
+<?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYPEER,<?php true);
+<?php curl_setopt($ch,<?php CURLOPT_SSL_VERIFYHOST,<?php 2);
+<?php curl_setopt($ch,<?php CURLOPT_POSTFIELDS,<?php json_encode($payload));
+<?php curl_setopt($ch,<?php CURLOPT_IPRESOLVE,<?php CURL_IPRESOLVE_V4);<?php //<?php Forçar<?php IPv4
+<?php curl_setopt($ch,<?php CURLOPT_HTTPHEADER,<?php [
+<?php 'Authorization:<?php Bearer<?php '<?php .<?php $accessToken,
+<?php 'Content-Type:<?php application/json',
+<?php 'Accept:<?php application/json',
+<?php 'User-Agent:<?php PHP-CURL/7.0'
+<?php ]);
+<?php 
+<?php $paymentResponse<?php =<?php curl_exec($ch);
+<?php $httpCode<?php =<?php curl_getinfo($ch,<?php CURLINFO_HTTP_CODE);
+<?php $curlError<?php =<?php curl_error($ch);
+<?php curl_close($ch);
+<?php 
+<?php if<?php ($curlError)<?php {
+<?php throw<?php new<?php Exception("Erro<?php cURL<?php no<?php pagamento:<?php "<?php .<?php $curlError);
+<?php }
+<?php 
+<?php $paymentData<?php =<?php json_decode($paymentResponse,<?php true);
+<?php 
+<?php if<?php ($httpCode<?php !==<?php 200<?php &&<?php $httpCode<?php !==<?php 201)<?php {
+<?php $errorMsg<?php =<?php "Falha<?php ao<?php processar<?php pagamento<?php na<?php PIXUP.<?php HTTP:<?php $httpCode<?php |<?php Response:<?php $paymentResponse";
+<?php 
+<?php if<?php ($paymentData<?php &&<?php isset($paymentData['message']))<?php {
+<?php $errorMsg<?php .=<?php "<?php |<?php Erro<?php da<?php API:<?php "<?php .<?php $paymentData['message'];
+<?php }
+<?php if<?php ($paymentData<?php &&<?php isset($paymentData['errors']))<?php {
+<?php $errorMsg<?php .=<?php "<?php |<?php Erros:<?php "<?php .<?php json_encode($paymentData['errors']);
+<?php }
+<?php 
+<?php throw<?php new<?php Exception($errorMsg);
+<?php }
+<?php 
+<?php //<?php STEP<?php 4:<?php Atualizar<?php status<?php para<?php PAID<?php usando<?php colunas<?php existentes
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php saques<?php SET<?php 
+<?php status<?php =<?php 'PAID',<?php 
+<?php gateway<?php =<?php 'pixup',
+<?php transaction_id<?php =<?php ?,
+<?php webhook_data<?php =<?php ?
+<?php WHERE<?php id<?php =<?php ?");
+<?php 
+<?php $updateResult<?php =<?php $stmt->execute([
+<?php $external_id,
+<?php json_encode($paymentData),
+<?php $saque_id
+<?php ]);
+<?php 
+<?php if<?php (!$updateResult)<?php {
+<?php throw<?php new<?php Exception("Erro<?php ao<?php atualizar<?php status<?php do<?php saque<?php no<?php banco<?php de<?php dados");
+<?php }
+<?php 
+<?php if<?php ($stmt->rowCount()<?php ===<?php 0)<?php {
+<?php throw<?php new<?php Exception("Nenhuma<?php linha<?php foi<?php atualizada<?php -<?php saque<?php ID<?php $saque_id<?php pode<?php não<?php existir");
+<?php }
+<?php 
+<?php }<?php elseif<?php ($activeGateway<?php ===<?php 'digitopay')<?php {
+<?php //<?php =====<?php PROCESSAR<?php COM<?php DIGITOPAY<?php =====
+<?php require_once<?php __DIR__<?php .<?php '/../classes/DigitoPay.php';
+<?php 
+<?php $digitoPay<?php =<?php new<?php DigitoPay($pdo);
+<?php 
+<?php //<?php Configurar<?php URLs<?php base<?php para<?php callback
+<?php $protocol<?php =<?php (!empty($_SERVER['HTTPS'])<?php &&<?php $_SERVER['HTTPS']<?php !==<?php 'off')<?php ?<?php 'https://'<?php :<?php 'http://';
+<?php $host<?php =<?php $_SERVER['HTTP_HOST'];
+<?php $callbackUrl<?php =<?php $protocol<?php .<?php $host<?php .<?php '/callback/digitopay_withdraw.php';
+<?php 
+<?php $idempotencyKey<?php =<?php uniqid()<?php .<?php '-'<?php .<?php time();
+<?php 
+<?php //<?php Criar<?php saque<?php via<?php DigitoPay
+<?php $withdrawData<?php =<?php $digitoPay->createWithdraw(
+<?php $saque['valor'],
+<?php $saque['cpf'],
+<?php $saque['nome'],
+<?php $saque['cpf'],<?php //<?php pixKey<?php (usando<?php CPF)
+<?php 'CPF',<?php //<?php pixKeyType
+<?php $callbackUrl,
+<?php $idempotencyKey
+<?php );
+<?php 
+<?php //<?php Atualizar<?php o<?php saque<?php com<?php os<?php dados<?php da<?php transação
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php saques<?php SET<?php 
+<?php status<?php =<?php 'PROCESSING',<?php 
+<?php gateway<?php =<?php 'digitopay',
+<?php transaction_id_digitopay<?php =<?php :transaction_id,
+<?php digitopay_idempotency_key<?php =<?php :idempotency_key,
+<?php webhook_data<?php =<?php :response,
+<?php updated_at<?php =<?php NOW()<?php 
+<?php WHERE<?php id<?php =<?php :id");
+<?php 
+<?php $stmt->execute([
+<?php ':id'<?php =><?php $saque_id,
+<?php ':transaction_id'<?php =><?php $withdrawData['transactionId']<?php ??<?php null,
+<?php ':idempotency_key'<?php =><?php $idempotencyKey,
+<?php ':response'<?php =><?php json_encode($withdrawData)
+<?php ]);
+<?php 
+<?php $pdo->commit();
+<?php $_SESSION['success']<?php =<?php 'Saque<?php enviado<?php para<?php processamento<?php via<?php DigitoPay!<?php Status:<?php '<?php .<?php ($withdrawData['status']<?php ??<?php 'PROCESSING');
+<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);
+<?php exit;
+<?php }
+<?php 
+<?php $pdo->commit();
+<?php $_SESSION['success']<?php =<?php 'Saque<?php aprovado<?php e<?php pagamento<?php realizado<?php com<?php sucesso!';
+<?php 
+<?php }<?php catch<?php (Exception<?php $e)<?php {
+<?php $pdo->rollBack();
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php aprovar<?php o<?php saque:<?php '<?php .<?php $e->getMessage();
+<?php }
+<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);
+<?php exit;
 }
 
-if (isset($_POST['reprovar_saque'])) {
-    $saque_id = $_POST['saque_id'];
-    
-    try {
-        $pdo->beginTransaction();
-        
-        // Buscar dados do saque antes de deletar
-        $stmt = $pdo->prepare("SELECT user_id, valor FROM saques WHERE id = ?");
-        $stmt->execute([$saque_id]);
-        $saque = $stmt->fetch();
-        
-        if ($saque) {
-            // Buscar saldo atual do usuário
-            $stmt = $pdo->prepare("SELECT saldo FROM usuarios WHERE id = ?");
-            $stmt->execute([$saque['user_id']]);
-            $saldoAtual = $stmt->fetchColumn();
-            
-            // Devolver o valor para o saldo do usuário
-            $novoSaldo = $saldoAtual + $saque['valor'];
-            $stmt = $pdo->prepare("UPDATE usuarios SET saldo = ? WHERE id = ?");
-            $stmt->execute([$novoSaldo, $saque['user_id']]);
-            
-            // Registrar transação de estorno com saldos corretos
-            $stmt = $pdo->prepare("
-                INSERT INTO transacoes (user_id, tipo, valor, saldo_anterior, saldo_posterior, status, descricao, created_at) 
-                VALUES (?, 'REFUND', ?, ?, ?, 'COMPLETED', 'Estorno de saque reprovado', NOW())
-            ");
-            $stmt->execute([$saque['user_id'], $saque['valor'], $saldoAtual, $novoSaldo]);
-        }
-        
-        // Deletar o saque
-        $stmt = $pdo->prepare("DELETE FROM saques WHERE id = ?");
-        $stmt->execute([$saque_id]);
-        
-        $pdo->commit();
-        $_SESSION['success'] = 'Saque reprovado e valor devolvido ao usuário!';
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $_SESSION['failure'] = 'Erro ao reprovar o saque: ' . $e->getMessage();
-    }
-    
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
+if<?php (isset($_POST['reprovar_saque']))<?php {
+<?php $saque_id<?php =<?php $_POST['saque_id'];
+<?php 
+<?php try<?php {
+<?php $pdo->beginTransaction();
+<?php 
+<?php //<?php Buscar<?php dados<?php do<?php saque<?php antes<?php de<?php deletar
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php user_id,<?php valor<?php FROM<?php saques<?php WHERE<?php id<?php =<?php ?");
+<?php $stmt->execute([$saque_id]);
+<?php $saque<?php =<?php $stmt->fetch();
+<?php 
+<?php if<?php ($saque)<?php {
+<?php //<?php Buscar<?php saldo<?php atual<?php do<?php usuário
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php saldo<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?");
+<?php $stmt->execute([$saque['user_id']]);
+<?php $saldoAtual<?php =<?php $stmt->fetchColumn();
+<?php 
+<?php //<?php Devolver<?php o<?php valor<?php para<?php o<?php saldo<?php do<?php usuário
+<?php $novoSaldo<?php =<?php $saldoAtual<?php +<?php $saque['valor'];
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php usuarios<?php SET<?php saldo<?php =<?php ?<?php WHERE<?php id<?php =<?php ?");
+<?php $stmt->execute([$novoSaldo,<?php $saque['user_id']]);
+<?php 
+<?php //<?php Registrar<?php transação<?php de<?php estorno<?php com<?php saldos<?php corretos
+<?php $stmt<?php =<?php $pdo->prepare("
+<?php INSERT<?php INTO<?php transacoes<?php (user_id,<?php tipo,<?php valor,<?php saldo_anterior,<?php saldo_posterior,<?php status,<?php descricao,<?php created_at)<?php 
+<?php VALUES<?php (?,<?php 'REFUND',<?php ?,<?php ?,<?php ?,<?php 'COMPLETED',<?php 'Estorno<?php de<?php saque<?php reprovado',<?php NOW())
+<?php ");
+<?php $stmt->execute([$saque['user_id'],<?php $saque['valor'],<?php $saldoAtual,<?php $novoSaldo]);
+<?php }
+<?php 
+<?php //<?php Deletar<?php o<?php saque
+<?php $stmt<?php =<?php $pdo->prepare("DELETE<?php FROM<?php saques<?php WHERE<?php id<?php =<?php ?");
+<?php $stmt->execute([$saque_id]);
+<?php 
+<?php $pdo->commit();
+<?php $_SESSION['success']<?php =<?php 'Saque<?php reprovado<?php e<?php valor<?php devolvido<?php ao<?php usuário!';
+<?php 
+<?php }<?php catch<?php (Exception<?php $e)<?php {
+<?php $pdo->rollBack();
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php reprovar<?php o<?php saque:<?php '<?php .<?php $e->getMessage();
+<?php }
+<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);
+<?php exit;
 }
 
-$nome = ($stmt = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-$nome = $nome ? explode(' ', $nome)[0] : null;
+$nome<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php nome<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;
+$nome<?php =<?php $nome<?php ?<?php explode('<?php ',<?php $nome)[0]<?php :<?php null;
 
-$stmt = $pdo->query("SELECT saques.id, saques.user_id, saques.valor, saques.cpf, saques.status, saques.updated_at, saques.gateway, usuarios.nome 
-                     FROM saques 
-                     JOIN usuarios ON saques.user_id = usuarios.id
-                     ORDER BY saques.updated_at DESC");
-$saques = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stmt<?php =<?php $pdo->query("SELECT<?php saques.id,<?php saques.user_id,<?php saques.valor,<?php saques.cpf,<?php saques.status,<?php saques.updated_at,<?php saques.gateway,<?php usuarios.nome<?php 
+<?php FROM<?php saques<?php 
+<?php JOIN<?php usuarios<?php ON<?php saques.user_id<?php =<?php usuarios.id
+<?php ORDER<?php BY<?php saques.updated_at<?php DESC");
+$saques<?php =<?php $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Calculate statistics
-$total_saques = count($saques);
-$saques_aprovados = array_filter($saques, function($s) { 
-    return in_array($s['status'], ['PAID', 'REALIZADO']); 
+//<?php Calculate<?php statistics
+$total_saques<?php =<?php count($saques);
+$saques_aprovados<?php =<?php array_filter($saques,<?php function($s)<?php {<?php 
+<?php return<?php in_array($s['status'],<?php ['PAID',<?php 'REALIZADO']);<?php 
 });
-$saques_pendentes = array_filter($saques, function($s) { 
-    return in_array($s['status'], ['PENDING', 'PROCESSING', 'EM PROCESSAMENTO', 'ANALISE']); 
+$saques_pendentes<?php =<?php array_filter($saques,<?php function($s)<?php {<?php 
+<?php return<?php in_array($s['status'],<?php ['PENDING',<?php 'PROCESSING',<?php 'EM<?php PROCESSAMENTO',<?php 'ANALISE']);<?php 
 });
-$valor_total_aprovado = array_sum(array_column($saques_aprovados, 'valor'));
-$valor_total_pendente = array_sum(array_column($saques_pendentes, 'valor'));
+$valor_total_aprovado<?php =<?php array_sum(array_column($saques_aprovados,<?php 'valor'));
+$valor_total_pendente<?php =<?php array_sum(array_column($saques_pendentes,<?php 'valor'));
 
-// Verificar gateway ativo para exibir na interface
-$stmt = $pdo->prepare("SELECT active FROM gateway LIMIT 1");
+//<?php Verificar<?php gateway<?php ativo<?php para<?php exibir<?php na<?php interface
+$stmt<?php =<?php $pdo->prepare("SELECT<?php active<?php FROM<?php gateway<?php LIMIT<?php 1");
 $stmt->execute();
-$activeGateway = $stmt->fetchColumn();
+$activeGateway<?php =<?php $stmt->fetchColumn();
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE<?php html>
+<html<?php lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite ?? 'Admin'; ?> - Gerenciar Saques</title>
-            <?php 
-    // Se as variáveis não estiverem definidas, buscar do banco
-    if (!isset($faviconSite)) {
-        try {
-            $stmt = $pdo->prepare("SELECT favicon FROM config WHERE id = 1 LIMIT 1");
-            $stmt->execute();
-            $config_favicon = $stmt->fetch(PDO::FETCH_ASSOC);
-            $faviconSite = $config_favicon['favicon'] ?? null;
-            
-            // Se $nomeSite não estiver definido, buscar também
-            if (!isset($nomeSite)) {
-                $stmt = $pdo->prepare("SELECT nome_site FROM config WHERE id = 1 LIMIT 1");
-                $stmt->execute();
-                $config_nome = $stmt->fetch(PDO::FETCH_ASSOC);
-                $nomeSite = $config_nome['nome_site'] ?? 'Raspadinha';
-            }
-        } catch (PDOException $e) {
-            $faviconSite = null;
-            $nomeSite = $nomeSite ?? 'Raspadinha';
-        }
-    }
-    ?>
-    <?php if ($faviconSite && file_exists($_SERVER['DOCUMENT_ROOT'] . $faviconSite)): ?>
-        <link rel="icon" type="image/x-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="shortcut icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
-        <link rel="apple-touch-icon" href="<?php= htmlspecialchars($faviconSite) ?>"/>
-    <?php else: ?>
-        <link rel="icon" href="data:image/svg+xml,<?php= urlencode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#22c55e"/><text x="50" y="50" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial" font-size="40" font-weight="bold">' . strtoupper(substr($nomeSite, 0, 1)) . '</text></svg>') ?>"/>
-    <?php endif; ?>
-    <!-- TailwindCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Notiflix -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #000000;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        /* Sidebar Styles */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: linear-gradient(145deg, #0a0a0a 0%, #141414 25%, #1a1a1a 50%, #0f0f0f 100%);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(34, 197, 94, 0.2);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            box-shadow: 
-                0 0 50px rgba(34, 197, 94, 0.1),
-                inset 1px 0 0 rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
-            opacity: 0.8;
-            pointer-events: none;
-        }
-        
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-        
-        .sidebar-header {
-            position: relative;
-            padding: 2.5rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            text-decoration: none;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #ffffff;
-            box-shadow: 
-                0 8px 20px rgba(34, 197, 94, 0.3),
-                0 4px 8px rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-        
-        .logo-icon::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(135deg, #22c55e, #16a34a, #22c55e);
-            border-radius: 18px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .logo:hover .logo-icon::after {
-            opacity: 1;
-        }
-        
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .logo-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ffffff;
-            line-height: 1.2;
-        }
-        
-        .logo-subtitle {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .nav-menu {
-            padding: 2rem 0;
-            position: relative;
-        }
-        
-        .nav-section {
-            margin-bottom: 2rem;
-        }
-        
-        .nav-section-title {
-            padding: 0 2rem 0.75rem 2rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            position: relative;
-        }
-        
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem 2rem;
-            color: #a1a1aa;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            margin: 0.25rem 1rem;
-            border-radius: 12px;
-            font-weight: 500;
-        }
-        
-        .nav-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 0 4px 4px 0;
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .nav-item:hover::before,
-        .nav-item.active::before {
-            transform: scaleY(1);
-        }
-        
-        .nav-item:hover,
-        .nav-item.active {
-            color: #ffffff;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            transform: translateX(4px);
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.1);
-        }
-        
-        .nav-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            position: relative;
-        }
-        
-        .nav-text {
-            font-size: 0.95rem;
-            flex: 1;
-        }
-        
-        .nav-badge {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            min-width: 20px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-        
-        .sidebar-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 2rem;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .user-profile:hover {
-            background: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 1rem;
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-info {
-            flex: 1;
-        }
-        
-        .user-name {
-            font-weight: 600;
-            color: #ffffff;
-            font-size: 0.9rem;
-            line-height: 1.2;
-        }
-        
-        .user-role {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 320px;
-            min-height: 100vh;
-            transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: 
-                radial-gradient(circle at 10% 20%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.01) 0%, transparent 50%);
-        }
-        
-        .main-content.expanded {
-            margin-left: 0;
-        }
-        
-        .header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 2.5rem;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .menu-toggle {
-            display: none;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-            padding: 0.75rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .menu-toggle:hover {
-            background: rgba(34, 197, 94, 0.2);
-            transform: scale(1.05);
-        }
-        
-        .header-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #ffffff, #a1a1aa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .page-content {
-            padding: 2.5rem;
-        }
-        
-        .welcome-section {
-            margin-bottom: 3rem;
-        }
-        
-        .welcome-title {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(135deg, #ffffff 0%, #fff 50%, #fff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-        
-        .welcome-subtitle {
-            font-size: 1.25rem;
-            color: #6b7280;
-            font-weight: 400;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-        
-        .mini-stat-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-        }
-        
-        .mini-stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .mini-stat-card:hover::before {
-            opacity: 1;
-        }
-        
-        .mini-stat-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.3);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-        }
-        
-        .mini-stat-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        
-        .mini-stat-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1rem;
-        }
-        
-        .mini-stat-icon.warning {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
-            border-color: rgba(251, 191, 36, 0.3);
-            color: #f59e0b;
-        }
-        
-        .mini-stat-value {
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: #ffffff;
-            margin-bottom: 0.25rem;
-        }
-        
-        .mini-stat-label {
-            color: #a1a1aa;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
-        .withdrawals-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-            gap: 1.5rem;
-        }
-        
-        .withdrawal-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .withdrawal-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .withdrawal-card:hover::before {
-            opacity: 1;
-        }
-        
-        .withdrawal-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        .withdrawal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-        }
-        
-        .withdrawal-user {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 0.5rem;
-        }
-        
-        .withdrawal-cpf {
-            font-size: 0.9rem;
-            color: #6b7280;
-            font-family: 'Monaco', 'Consolas', monospace;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .withdrawal-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 12px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .withdrawal-status.approved {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            color: #22c55e;
-        }
-        
-        .withdrawal-status.pending {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1));
-            border: 1px solid rgba(251, 191, 36, 0.3);
-            color: #f59e0b;
-        }
-        
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
-        }
-        
-        .withdrawal-value {
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 1rem;
-        }
-        
-        .withdrawal-actions {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .action-btn {
-            flex: 1;
-            padding: 0.875rem 1.5rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .btn-approve {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-        }
-        
-        .btn-approve:hover {
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
-        }
-        
-        .btn-reject {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        
-        .btn-reject:hover {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
-        }
-        
-        .btn-disabled {
-            background: rgba(107, 114, 128, 0.3);
-            color: #9ca3af;
-            cursor: not-allowed;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .btn-disabled:hover {
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .withdrawal-date {
-            color: #9ca3af;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .withdrawal-date i {
-            color: #6b7280;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #6b7280;
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(10, 10, 10, 0.4) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.3;
-            color: #374151;
-        }
-        
-        .empty-state h3 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #9ca3af;
-            margin-bottom: 0.5rem;
-        }
-        
-        .empty-state p {
-            font-size: 1rem;
-            font-weight: 400;
-        }
-        
-        /* Mobile Styles */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                width: 300px;
-                z-index: 1001;
-            }
-            
-            .sidebar:not(.hidden) {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: block;
-            }
-            
-            .header-actions span {
-                display: none !important;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            }
-            
-            .withdrawals-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-            }
-            
-            .page-content {
-                padding: 1.5rem;
-            }
-            
-            .welcome-title {
-                font-size: 2.25rem;
-            }
-            
-            .withdrawal-card {
-                padding: 1.5rem;
-            }
-            
-            .withdrawal-actions {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 280px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .welcome-title {
-                font-size: 1.875rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .withdrawal-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-            
-            .withdrawal-value {
-                font-size: 1.5rem;
-            }
-            
-            .sidebar {
-                width: 260px;
-            }
-        }
-        
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(4px);
-        }
-        
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-    </style>
+<?php <meta<?php charset="UTF-8">
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0">
+<?php <title><?php<?php echo<?php $nomeSite<?php ??<?php 'Admin';<?php ?><?php -<?php Gerenciar<?php Saques</title>
+<?php <?php<?php 
+<?php //<?php Se<?php as<?php variáveis<?php não<?php estiverem<?php definidas,<?php buscar<?php do<?php banco
+<?php if<?php (!isset($faviconSite))<?php {
+<?php try<?php {
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php favicon<?php FROM<?php config<?php WHERE<?php id<?php =<?php 1<?php LIMIT<?php 1");
+<?php $stmt->execute();
+<?php $config_favicon<?php =<?php $stmt->fetch(PDO::FETCH_ASSOC);
+<?php $faviconSite<?php =<?php $config_favicon['favicon']<?php ??<?php null;
+<?php 
+<?php //<?php Se<?php $nomeSite<?php não<?php estiver<?php definido,<?php buscar<?php também
+<?php if<?php (!isset($nomeSite))<?php {
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php nome_site<?php FROM<?php config<?php WHERE<?php id<?php =<?php 1<?php LIMIT<?php 1");
+<?php $stmt->execute();
+<?php $config_nome<?php =<?php $stmt->fetch(PDO::FETCH_ASSOC);
+<?php $nomeSite<?php =<?php $config_nome['nome_site']<?php ??<?php 'Raspadinha';
+<?php }
+<?php }<?php catch<?php (PDOException<?php $e)<?php {
+<?php $faviconSite<?php =<?php null;
+<?php $nomeSite<?php =<?php $nomeSite<?php ??<?php 'Raspadinha';
+<?php }
+<?php }
+<?php ?>
+<?php <?php<?php if<?php ($faviconSite<?php &&<?php file_exists($_SERVER['DOCUMENT_ROOT']<?php .<?php $faviconSite)):<?php ?>
+<?php <link<?php rel="icon"<?php type="image/x-icon"<?php href="<?php=<?php htmlspecialchars($faviconSite)<?php ?>"/>
+<?php <link<?php rel="shortcut<?php icon"<?php href="<?php=<?php htmlspecialchars($faviconSite)<?php ?>"/>
+<?php <link<?php rel="apple-touch-icon"<?php href="<?php=<?php htmlspecialchars($faviconSite)<?php ?>"/>
+<?php <?php<?php else:<?php ?>
+<?php <link<?php rel="icon"<?php href="data:image/svg+xml,<?php=<?php urlencode('<svg<?php xmlns="http://www.w3.org/2000/svg"<?php viewBox="0<?php 0<?php 100<?php 100"><rect<?php width="100"<?php height="100"<?php fill="#22c55e"/><text<?php x="50"<?php y="50"<?php text-anchor="middle"<?php dominant-baseline="middle"<?php fill="white"<?php font-family="Arial"<?php font-size="40"<?php font-weight="bold">'<?php .<?php strtoupper(substr($nomeSite,<?php 0,<?php 1))<?php .<?php '</text></svg>')<?php ?>"/>
+<?php <?php<?php endif;<?php ?>
+<?php <!--<?php TailwindCSS<?php -->
+<?php <script<?php src="https://cdn.tailwindcss.com"></script>
+<?php 
+<?php <!--<?php Font<?php Awesome<?php -->
+<?php <link<?php rel="stylesheet"<?php href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<?php 
+<?php <!--<?php Notiflix<?php -->
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet">
+<?php 
+<?php <!--<?php Google<?php Fonts<?php -->
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"<?php rel="stylesheet">
+<?php 
+<?php <style>
+<?php *<?php {
+<?php margin:<?php 0;
+<?php padding:<?php 0;
+<?php box-sizing:<?php border-box;
+<?php }
+<?php 
+<?php body<?php {
+<?php font-family:<?php 'Inter',<?php -apple-system,<?php BlinkMacSystemFont,<?php sans-serif;
+<?php background:<?php #000000;
+<?php color:<?php #ffffff;
+<?php min-height:<?php 100vh;
+<?php overflow-x:<?php hidden;
+<?php }
+<?php 
+<?php /*<?php Sidebar<?php Styles<?php */
+<?php .sidebar<?php {
+<?php position:<?php fixed;
+<?php top:<?php 0;
+<?php left:<?php 0;
+<?php width:<?php 320px;
+<?php height:<?php 100vh;
+<?php background:<?php linear-gradient(145deg,<?php #0a0a0a<?php 0%,<?php #141414<?php 25%,<?php #1a1a1a<?php 50%,<?php #0f0f0f<?php 100%);
+<?php backdrop-filter:<?php blur(20px);
+<?php border-right:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php transition:<?php all<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);
+<?php z-index:<?php 1000;
+<?php box-shadow:<?php 
+<?php 0<?php 0<?php 50px<?php rgba(34,<?php 197,<?php 94,<?php 0.1),
+<?php inset<?php 1px<?php 0<?php 0<?php rgba(255,<?php 255,<?php 255,<?php 0.05);
+<?php }
+<?php 
+<?php .sidebar::before<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php top:<?php 0;
+<?php left:<?php 0;
+<?php width:<?php 100%;
+<?php height:<?php 100%;
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 20%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php transparent<?php 50%),
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.1)<?php 0%,<?php transparent<?php 50%),
+<?php radial-gradient(circle<?php at<?php 40%<?php 60%,<?php rgba(59,<?php 130,<?php 246,<?php 0.05)<?php 0%,<?php transparent<?php 50%);
+<?php opacity:<?php 0.8;
+<?php pointer-events:<?php none;
+<?php }
+<?php 
+<?php .sidebar.hidden<?php {
+<?php transform:<?php translateX(-100%);
+<?php }
+<?php 
+<?php .sidebar-header<?php {
+<?php position:<?php relative;
+<?php padding:<?php 2.5rem<?php 2rem;
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);
+<?php }
+<?php 
+<?php .logo<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 1rem;
+<?php text-decoration:<?php none;
+<?php position:<?php relative;
+<?php z-index:<?php 2;
+<?php }
+<?php 
+<?php .logo-icon<?php {
+<?php width:<?php 48px;
+<?php height:<?php 48px;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e<?php 0%,<?php #16a34a<?php 100%);
+<?php border-radius:<?php 16px;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php font-size:<?php 1.5rem;
+<?php color:<?php #ffffff;
+<?php box-shadow:<?php 
+<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3),
+<?php 0<?php 4px<?php 8px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);
+<?php position:<?php relative;
+<?php }
+<?php 
+<?php .logo-icon::after<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php top:<?php -2px;
+<?php left:<?php -2px;
+<?php right:<?php -2px;
+<?php bottom:<?php -2px;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a,<?php #22c55e);
+<?php border-radius:<?php 18px;
+<?php z-index:<?php -1;
+<?php opacity:<?php 0;
+<?php transition:<?php opacity<?php 0.3s<?php ease;
+<?php }
+<?php 
+<?php .logo:hover<?php .logo-icon::after<?php {
+<?php opacity:<?php 1;
+<?php }
+<?php 
+<?php .logo-text<?php {
+<?php display:<?php flex;
+<?php flex-direction:<?php column;
+<?php }
+<?php 
+<?php .logo-title<?php {
+<?php font-size:<?php 1.5rem;
+<?php font-weight:<?php 800;
+<?php color:<?php #ffffff;
+<?php line-height:<?php 1.2;
+<?php }
+<?php 
+<?php .logo-subtitle<?php {
+<?php font-size:<?php 0.75rem;
+<?php color:<?php #22c55e;
+<?php font-weight:<?php 500;
+<?php text-transform:<?php uppercase;
+<?php letter-spacing:<?php 1px;
+<?php }
+<?php 
+<?php .nav-menu<?php {
+<?php padding:<?php 2rem<?php 0;
+<?php position:<?php relative;
+<?php }
+<?php 
+<?php .nav-section<?php {
+<?php margin-bottom:<?php 2rem;
+<?php }
+<?php 
+<?php .nav-section-title<?php {
+<?php padding:<?php 0<?php 2rem<?php 0.75rem<?php 2rem;
+<?php font-size:<?php 0.75rem;
+<?php font-weight:<?php 600;
+<?php color:<?php #6b7280;
+<?php text-transform:<?php uppercase;
+<?php letter-spacing:<?php 1px;
+<?php position:<?php relative;
+<?php }
+<?php 
+<?php .nav-item<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php padding:<?php 1rem<?php 2rem;
+<?php color:<?php #a1a1aa;
+<?php text-decoration:<?php none;
+<?php transition:<?php all<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);
+<?php position:<?php relative;
+<?php margin:<?php 0.25rem<?php 1rem;
+<?php border-radius:<?php 12px;
+<?php font-weight:<?php 500;
+<?php }
+<?php 
+<?php .nav-item::before<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php left:<?php 0;
+<?php top:<?php 0;
+<?php bottom:<?php 0;
+<?php width:<?php 4px;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php border-radius:<?php 0<?php 4px<?php 4px<?php 0;
+<?php transform:<?php scaleY(0);
+<?php transition:<?php transform<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);
+<?php }
+<?php 
+<?php .nav-item:hover::before,
+<?php .nav-item.active::before<?php {
+<?php transform:<?php scaleY(1);
+<?php }
+<?php 
+<?php .nav-item:hover,
+<?php .nav-item.active<?php {
+<?php color:<?php #ffffff;
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.05)<?php 100%);
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php transform:<?php translateX(4px);
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);
+<?php }
+<?php 
+<?php .nav-icon<?php {
+<?php width:<?php 24px;
+<?php height:<?php 24px;
+<?php margin-right:<?php 1rem;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php font-size:<?php 1rem;
+<?php position:<?php relative;
+<?php }
+<?php 
+<?php .nav-text<?php {
+<?php font-size:<?php 0.95rem;
+<?php flex:<?php 1;
+<?php }
+<?php 
+<?php .nav-badge<?php {
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);
+<?php color:<?php white;
+<?php font-size:<?php 0.7rem;
+<?php font-weight:<?php 600;
+<?php padding:<?php 0.25rem<?php 0.5rem;
+<?php border-radius:<?php 6px;
+<?php min-width:<?php 20px;
+<?php text-align:<?php center;
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(239,<?php 68,<?php 68,<?php 0.3);
+<?php }
+<?php 
+<?php .sidebar-footer<?php {
+<?php position:<?php absolute;
+<?php bottom:<?php 0;
+<?php left:<?php 0;
+<?php right:<?php 0;
+<?php padding:<?php 2rem;
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php }
+<?php 
+<?php .user-profile<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 0.75rem;
+<?php padding:<?php 1rem;
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php border-radius:<?php 12px;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php }
+<?php 
+<?php .user-profile:hover<?php {
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php }
+<?php 
+<?php .user-avatar<?php {
+<?php width:<?php 40px;
+<?php height:<?php 40px;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php border-radius:<?php 10px;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php font-weight:<?php 700;
+<?php color:<?php #ffffff;
+<?php font-size:<?php 1rem;
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php }
+<?php 
+<?php .user-info<?php {
+<?php flex:<?php 1;
+<?php }
+<?php 
+<?php .user-name<?php {
+<?php font-weight:<?php 600;
+<?php color:<?php #ffffff;
+<?php font-size:<?php 0.9rem;
+<?php line-height:<?php 1.2;
+<?php }
+<?php 
+<?php .user-role<?php {
+<?php font-size:<?php 0.75rem;
+<?php color:<?php #22c55e;
+<?php font-weight:<?php 500;
+<?php }
+<?php 
+<?php /*<?php Main<?php Content<?php */
+<?php .main-content<?php {
+<?php margin-left:<?php 320px;
+<?php min-height:<?php 100vh;
+<?php transition:<?php margin-left<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 10%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.03)<?php 0%,<?php transparent<?php 50%),
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.02)<?php 0%,<?php transparent<?php 50%),
+<?php radial-gradient(circle<?php at<?php 40%<?php 40%,<?php rgba(59,<?php 130,<?php 246,<?php 0.01)<?php 0%,<?php transparent<?php 50%);
+<?php }
+<?php 
+<?php .main-content.expanded<?php {
+<?php margin-left:<?php 0;
+<?php }
+<?php 
+<?php .header<?php {
+<?php position:<?php sticky;
+<?php top:<?php 0;
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.95);
+<?php backdrop-filter:<?php blur(20px);
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php padding:<?php 1.5rem<?php 2.5rem;
+<?php z-index:<?php 100;
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);
+<?php }
+<?php 
+<?php .header-content<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php space-between;
+<?php }
+<?php 
+<?php .menu-toggle<?php {
+<?php display:<?php none;
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(34,<?php 197,<?php 94,<?php 0.05));
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php color:<?php #22c55e;
+<?php padding:<?php 0.75rem;
+<?php border-radius:<?php 12px;
+<?php font-size:<?php 1.1rem;
+<?php cursor:<?php pointer;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php }
+<?php 
+<?php .menu-toggle:hover<?php {
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php transform:<?php scale(1.05);
+<?php }
+<?php 
+<?php .header-title<?php {
+<?php font-size:<?php 1.75rem;
+<?php font-weight:<?php 700;
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #a1a1aa);
+<?php -webkit-background-clip:<?php text;
+<?php -webkit-text-fill-color:<?php transparent;
+<?php background-clip:<?php text;
+<?php }
+<?php 
+<?php .header-actions<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 1rem;
+<?php }
+<?php 
+<?php .page-content<?php {
+<?php padding:<?php 2.5rem;
+<?php }
+<?php 
+<?php .welcome-section<?php {
+<?php margin-bottom:<?php 3rem;
+<?php }
+<?php 
+<?php .welcome-title<?php {
+<?php font-size:<?php 3rem;
+<?php font-weight:<?php 800;
+<?php margin-bottom:<?php 0.75rem;
+<?php background:<?php linear-gradient(135deg,<?php #ffffff<?php 0%,<?php #fff<?php 50%,<?php #fff<?php 100%);
+<?php -webkit-background-clip:<?php text;
+<?php -webkit-text-fill-color:<?php transparent;
+<?php background-clip:<?php text;
+<?php line-height:<?php 1.2;
+<?php }
+<?php 
+<?php .welcome-subtitle<?php {
+<?php font-size:<?php 1.25rem;
+<?php color:<?php #6b7280;
+<?php font-weight:<?php 400;
+<?php }
+<?php 
+<?php .stats-grid<?php {
+<?php display:<?php grid;
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(280px,<?php 1fr));
+<?php gap:<?php 1.5rem;
+<?php margin-bottom:<?php 3rem;
+<?php }
+<?php 
+<?php .mini-stat-card<?php {
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php border-radius:<?php 16px;
+<?php padding:<?php 1.5rem;
+<?php position:<?php relative;
+<?php overflow:<?php hidden;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php backdrop-filter:<?php blur(20px);
+<?php }
+<?php 
+<?php .mini-stat-card::before<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php top:<?php 0;
+<?php left:<?php 0;
+<?php width:<?php 100%;
+<?php height:<?php 3px;
+<?php background:<?php linear-gradient(90deg,<?php #22c55e,<?php #16a34a);
+<?php opacity:<?php 0;
+<?php transition:<?php opacity<?php 0.3s<?php ease;
+<?php }
+<?php 
+<?php .mini-stat-card:hover::before<?php {
+<?php opacity:<?php 1;
+<?php }
+<?php 
+<?php .mini-stat-card:hover<?php {
+<?php transform:<?php translateY(-4px);
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php box-shadow:<?php 0<?php 15px<?php 35px<?php rgba(0,<?php 0,<?php 0,<?php 0.4);
+<?php }
+<?php 
+<?php .mini-stat-header<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php space-between;
+<?php margin-bottom:<?php 1rem;
+<?php }
+<?php 
+<?php .mini-stat-icon<?php {
+<?php width:<?php 40px;
+<?php height:<?php 40px;
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php border-radius:<?php 10px;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php color:<?php #22c55e;
+<?php font-size:<?php 1rem;
+<?php }
+<?php 
+<?php .mini-stat-icon.warning<?php {
+<?php background:<?php linear-gradient(135deg,<?php rgba(251,<?php 191,<?php 36,<?php 0.2)<?php 0%,<?php rgba(251,<?php 191,<?php 36,<?php 0.1)<?php 100%);
+<?php border-color:<?php rgba(251,<?php 191,<?php 36,<?php 0.3);
+<?php color:<?php #f59e0b;
+<?php }
+<?php 
+<?php .mini-stat-value<?php {
+<?php font-size:<?php 1.75rem;
+<?php font-weight:<?php 800;
+<?php color:<?php #ffffff;
+<?php margin-bottom:<?php 0.25rem;
+<?php }
+<?php 
+<?php .mini-stat-label<?php {
+<?php color:<?php #a1a1aa;
+<?php font-size:<?php 0.875rem;
+<?php font-weight:<?php 500;
+<?php }
+<?php 
+<?php .withdrawals-grid<?php {
+<?php display:<?php grid;
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(450px,<?php 1fr));
+<?php gap:<?php 1.5rem;
+<?php }
+<?php 
+<?php .withdrawal-card<?php {
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php border-radius:<?php 20px;
+<?php padding:<?php 2rem;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php backdrop-filter:<?php blur(20px);
+<?php position:<?php relative;
+<?php overflow:<?php hidden;
+<?php }
+<?php 
+<?php .withdrawal-card::before<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php top:<?php 0;
+<?php right:<?php 0;
+<?php width:<?php 100px;
+<?php height:<?php 100px;
+<?php background:<?php radial-gradient(circle,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 70%);
+<?php opacity:<?php 0;
+<?php transition:<?php opacity<?php 0.3s<?php ease;
+<?php }
+<?php 
+<?php .withdrawal-card:hover::before<?php {
+<?php opacity:<?php 1;
+<?php }
+<?php 
+<?php .withdrawal-card:hover<?php {
+<?php transform:<?php translateY(-4px);
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php box-shadow:<?php 0<?php 20px<?php 40px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);
+<?php }
+<?php 
+<?php .withdrawal-header<?php {
+<?php display:<?php flex;
+<?php justify-content:<?php space-between;
+<?php align-items:<?php flex-start;
+<?php margin-bottom:<?php 1.5rem;
+<?php }
+<?php 
+<?php .withdrawal-user<?php {
+<?php font-size:<?php 1.25rem;
+<?php font-weight:<?php 700;
+<?php color:<?php #ffffff;
+<?php margin-bottom:<?php 0.5rem;
+<?php }
+<?php 
+<?php .withdrawal-cpf<?php {
+<?php font-size:<?php 0.9rem;
+<?php color:<?php #6b7280;
+<?php font-family:<?php 'Monaco',<?php 'Consolas',<?php monospace;
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);
+<?php padding:<?php 0.25rem<?php 0.5rem;
+<?php border-radius:<?php 6px;
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php display:<?php inline-flex;
+<?php align-items:<?php center;
+<?php gap:<?php 0.5rem;
+<?php }
+<?php 
+<?php .withdrawal-status<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 0.5rem;
+<?php padding:<?php 0.5rem<?php 1rem;
+<?php border-radius:<?php 12px;
+<?php font-size:<?php 0.875rem;
+<?php font-weight:<?php 600;
+<?php text-transform:<?php uppercase;
+<?php letter-spacing:<?php 0.5px;
+<?php }
+<?php 
+<?php .withdrawal-status.approved<?php {
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2),<?php rgba(34,<?php 197,<?php 94,<?php 0.1));
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php color:<?php #22c55e;
+<?php }
+<?php 
+<?php .withdrawal-status.pending<?php {
+<?php background:<?php linear-gradient(135deg,<?php rgba(251,<?php 191,<?php 36,<?php 0.2),<?php rgba(251,<?php 191,<?php 36,<?php 0.1));
+<?php border:<?php 1px<?php solid<?php rgba(251,<?php 191,<?php 36,<?php 0.3);
+<?php color:<?php #f59e0b;
+<?php }
+<?php 
+<?php .status-dot<?php {
+<?php width:<?php 8px;
+<?php height:<?php 8px;
+<?php border-radius:<?php 50%;
+<?php background:<?php currentColor;
+<?php }
+<?php 
+<?php .withdrawal-value<?php {
+<?php font-size:<?php 2rem;
+<?php font-weight:<?php 800;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php -webkit-background-clip:<?php text;
+<?php -webkit-text-fill-color:<?php transparent;
+<?php background-clip:<?php text;
+<?php margin-bottom:<?php 1rem;
+<?php }
+<?php 
+<?php .withdrawal-actions<?php {
+<?php display:<?php flex;
+<?php gap:<?php 1rem;
+<?php margin-bottom:<?php 1rem;
+<?php }
+<?php 
+<?php .action-btn<?php {
+<?php flex:<?php 1;
+<?php padding:<?php 0.875rem<?php 1.5rem;
+<?php border-radius:<?php 12px;
+<?php font-weight:<?php 600;
+<?php font-size:<?php 0.9rem;
+<?php cursor:<?php pointer;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php border:<?php none;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php gap:<?php 0.5rem;
+<?php }
+<?php 
+<?php .action-btn:hover<?php {
+<?php transform:<?php translateY(-2px);
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);
+<?php }
+<?php 
+<?php .btn-approve<?php {
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php color:<?php white;
+<?php }
+<?php 
+<?php .btn-approve:hover<?php {
+<?php background:<?php linear-gradient(135deg,<?php #16a34a,<?php #15803d);
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);
+<?php }
+<?php 
+<?php .btn-reject<?php {
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);
+<?php color:<?php white;
+<?php }
+<?php 
+<?php .btn-reject:hover<?php {
+<?php background:<?php linear-gradient(135deg,<?php #dc2626,<?php #b91c1c);
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(239,<?php 68,<?php 68,<?php 0.4);
+<?php }
+<?php 
+<?php .btn-disabled<?php {
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.3);
+<?php color:<?php #9ca3af;
+<?php cursor:<?php not-allowed;
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php }
+<?php 
+<?php .btn-disabled:hover<?php {
+<?php transform:<?php none;
+<?php box-shadow:<?php none;
+<?php }
+<?php 
+<?php .withdrawal-date<?php {
+<?php color:<?php #9ca3af;
+<?php font-size:<?php 0.875rem;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 0.5rem;
+<?php padding-top:<?php 1rem;
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php }
+<?php 
+<?php .withdrawal-date<?php i<?php {
+<?php color:<?php #6b7280;
+<?php }
+<?php 
+<?php .empty-state<?php {
+<?php text-align:<?php center;
+<?php padding:<?php 4rem<?php 2rem;
+<?php color:<?php #6b7280;
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.3)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.4)<?php 100%);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.05);
+<?php border-radius:<?php 20px;
+<?php backdrop-filter:<?php blur(10px);
+<?php }
+<?php 
+<?php .empty-state<?php i<?php {
+<?php font-size:<?php 4rem;
+<?php margin-bottom:<?php 1.5rem;
+<?php opacity:<?php 0.3;
+<?php color:<?php #374151;
+<?php }
+<?php 
+<?php .empty-state<?php h3<?php {
+<?php font-size:<?php 1.5rem;
+<?php font-weight:<?php 600;
+<?php color:<?php #9ca3af;
+<?php margin-bottom:<?php 0.5rem;
+<?php }
+<?php 
+<?php .empty-state<?php p<?php {
+<?php font-size:<?php 1rem;
+<?php font-weight:<?php 400;
+<?php }
+<?php 
+<?php /*<?php Mobile<?php Styles<?php */
+<?php @media<?php (max-width:<?php 1024px)<?php {
+<?php .sidebar<?php {
+<?php transform:<?php translateX(-100%);
+<?php width:<?php 300px;
+<?php z-index:<?php 1001;
+<?php }
+<?php 
+<?php .sidebar:not(.hidden)<?php {
+<?php transform:<?php translateX(0);
+<?php }
+<?php 
+<?php .main-content<?php {
+<?php margin-left:<?php 0;
+<?php }
+<?php 
+<?php .menu-toggle<?php {
+<?php display:<?php block;
+<?php }
+<?php 
+<?php .header-actions<?php span<?php {
+<?php display:<?php none<?php !important;
+<?php }
+<?php 
+<?php .stats-grid<?php {
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(250px,<?php 1fr));
+<?php }
+<?php 
+<?php .withdrawals-grid<?php {
+<?php grid-template-columns:<?php 1fr;
+<?php }
+<?php }
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {
+<?php .header<?php {
+<?php padding:<?php 1rem;
+<?php }
+<?php 
+<?php .page-content<?php {
+<?php padding:<?php 1.5rem;
+<?php }
+<?php 
+<?php .welcome-title<?php {
+<?php font-size:<?php 2.25rem;
+<?php }
+<?php 
+<?php .withdrawal-card<?php {
+<?php padding:<?php 1.5rem;
+<?php }
+<?php 
+<?php .withdrawal-actions<?php {
+<?php flex-direction:<?php column;
+<?php }
+<?php 
+<?php .sidebar<?php {
+<?php width:<?php 280px;
+<?php }
+<?php }
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {
+<?php .welcome-title<?php {
+<?php font-size:<?php 1.875rem;
+<?php }
+<?php 
+<?php .stats-grid<?php {
+<?php grid-template-columns:<?php 1fr;
+<?php }
+<?php 
+<?php .withdrawal-header<?php {
+<?php flex-direction:<?php column;
+<?php align-items:<?php flex-start;
+<?php gap:<?php 1rem;
+<?php }
+<?php 
+<?php .withdrawal-value<?php {
+<?php font-size:<?php 1.5rem;
+<?php }
+<?php 
+<?php .sidebar<?php {
+<?php width:<?php 260px;
+<?php }
+<?php }
+<?php 
+<?php .overlay<?php {
+<?php position:<?php fixed;
+<?php top:<?php 0;
+<?php left:<?php 0;
+<?php width:<?php 100%;
+<?php height:<?php 100%;
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.7);
+<?php z-index:<?php 1000;
+<?php opacity:<?php 0;
+<?php visibility:<?php hidden;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php backdrop-filter:<?php blur(4px);
+<?php }
+<?php 
+<?php .overlay.active<?php {
+<?php opacity:<?php 1;
+<?php visibility:<?php visible;
+<?php }
+<?php </style>
 </head>
 <body>
-    <!-- Notifications -->
-    <?php if (isset($_SESSION['success'])): ?>
-        <script>
-            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
-        </script>
-        <?php unset($_SESSION['success']); ?>
-    <?php elseif (isset($_SESSION['failure'])): ?>
-        <script>
-            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
-        </script>
-        <?php unset($_SESSION['failure']); ?>
-    <?php endif; ?>
+<?php <!--<?php Notifications<?php -->
+<?php <?php<?php if<?php (isset($_SESSION['success'])):<?php ?>
+<?php <script>
+<?php Notiflix.Notify.success('<?php=<?php $_SESSION['success']<?php ?>');
+<?php </script>
+<?php <?php<?php unset($_SESSION['success']);<?php ?>
+<?php <?php<?php elseif<?php (isset($_SESSION['failure'])):<?php ?>
+<?php <script>
+<?php Notiflix.Notify.failure('<?php=<?php $_SESSION['failure']<?php ?>');
+<?php </script>
+<?php <?php<?php unset($_SESSION['failure']);<?php ?>
+<?php <?php<?php endif;<?php ?>
 
-    <!-- Overlay for mobile -->
-    <div class="overlay" id="overlay"></div>
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-bolt"></i>
-                </div>
-                <div class="logo-text">
-                    <div class="logo-title">Dashboard</div>
-                </div>
-            </a>
-        </div>
-        
-       <nav class="nav-menu">
-            <div class="nav-section">
-                <div class="nav-section-title">Principal</div>
-                <a href="index.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
-                    <div class="nav-text">Dashboard</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Gestão</div>
-                <a href="usuarios.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user"></i></div>
-                    <div class="nav-text">Usuários</div>
-                </a>
-                <a href="afiliados.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user-plus"></i></div>
-                    <div class="nav-text">Afiliados</div>
-                </a>
-                <a href="depositos.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-credit-card"></i></div>
-                    <div class="nav-text">Depósitos</div>
-                </a>
-                <a href="saques.php" class="nav-item active">
-                    <div class="nav-icon"><i class="fas fa-money-bill-wave"></i></div>
-                    <div class="nav-text">Saques</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Sistema</div>
-                <a href="config.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-cogs"></i></div>
-                    <div class="nav-text">Configurações</div>
-                </a>
-                <a href="gateway.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-usd"></i></div>
-                    <div class="nav-text">Gateway</div>
-                </a>
-                <a href="banners.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-images"></i></div>
-                    <div class="nav-text">Banners</div>
-                </a>
-                <a href="cartelas.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-diamond"></i></div>
-                    <div class="nav-text">Raspadinhas</div>
-                </a>
-                <a href="../logout" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-sign-out-alt"></i></div>
-                    <div class="nav-text">Sair</div>
-                </a>
-            </div>
-        </nav>
-    </aside>
-    
-    <!-- Main Content -->
-    <main class="main-content" id="mainContent">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="menu-toggle" id="menuToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
-                
-                <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
-                    <div class="user-avatar">
-                        <?php= strtoupper(substr($nome, 0, 1)) ?>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Page Content -->
-        <div class="page-content">
-            <!-- Welcome Section -->
-            <section class="welcome-section">
-                <h2 class="welcome-title">Gestão de Saques</h2>
-                <p class="welcome-subtitle">Aprove ou reprove solicitações de saque via PIX de forma segura</p>
-            </section>
-            
-            <!-- Stats Grid -->
-            <section class="stats-grid">
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-money-bill-wave"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format($total_saques, 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Total de Saques</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format(count($saques_aprovados), 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Saques Aprovados</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon warning">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format(count($saques_pendentes), 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Saques Pendentes</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_aprovado, 2, ',', '.') ?></div>
-                    <div class="mini-stat-label">Valor Total Pago</div>
-                </div>
-            </section>
-            
-            <!-- Withdrawals Section -->
-            <section>
-                <?php if (empty($saques)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-money-bill-wave"></i>
-                        <h3>Nenhum saque encontrado</h3>
-                        <p>Não há solicitações de saque registradas no sistema ainda</p>
-                    </div>
-                <?php else: ?>
-                    <div class="withdrawals-grid">
-                        <?php foreach ($saques as $saque): ?>
-                            <div class="withdrawal-card">
-                                <div class="withdrawal-header">
-                                    <div>
-                                        <h3 class="withdrawal-user"><?php= htmlspecialchars($saque['nome']) ?></h3>
-                                        <div class="withdrawal-cpf">
-                                            <i class="fas fa-key"></i>
-                                            PIX: <?php= htmlspecialchars($saque['cpf']) ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="withdrawal-status <?php= $saque['status'] == 'PAID' ? 'approved' : 'pending' ?>">
-                                        <div class="status-dot"></div>
-                                        <span><?php= $saque['status'] == 'PAID' ? 'Aprovado' : 'Pendente' ?></span>
-                                    </div>
-                                </div>
-                                
-                                <div class="withdrawal-value">
-                                    R$ <?php= number_format($saque['valor'], 2, ',', '.') ?>
-                                </div>
-                                
-                                <?php if ($saque['status'] == 'PENDING'): ?>
-                                    <div class="withdrawal-actions">
-                                        <form method="POST" style="flex: 1;">
-                                            <input type="hidden" name="saque_id" value="<?php= $saque['id'] ?>">
-                                            <button type="submit" name="aprovar_saque" class="action-btn btn-approve" onclick="openLoading()">
-                                                <i class="fas fa-check"></i>
-                                                Aprovar Saque
-                                            </button>
-                                        </form>
-                                        <form method="POST" style="flex: 1;">
-                                            <input type="hidden" name="saque_id" value="<?php= $saque['id'] ?>">
-                                            <button type="submit" name="reprovar_saque" class="action-btn btn-reject" onclick="openLoading()">
-                                                <i class="fas fa-times"></i>
-                                                Reprovar
-                                            </button>
-                                        </form>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="withdrawal-actions">
-                                        <button class="action-btn btn-disabled" disabled>
-                                            <i class="fas fa-check-double"></i>
-                                            Saque Processado
-                                        </button>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="withdrawal-date">
-                                    <i class="fas fa-calendar"></i>
-                                    <span><?php= date('d/m/Y H:i', strtotime($saque['updated_at'])) ?></span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </section>
-        </div>
-    </main>
-    
-    <script>
-        // Loading function
-        function openLoading() {
-            Notiflix.Loading.standard('Processando solicitação...');
-        }
-        
-        // Mobile menu toggle
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const overlay = document.getElementById('overlay');
-        
-        menuToggle.addEventListener('click', () => {
-            const isHidden = sidebar.classList.contains('hidden');
-            
-            if (isHidden) {
-                sidebar.classList.remove('hidden');
-                overlay.classList.add('active');
-            } else {
-                sidebar.classList.add('hidden');
-                overlay.classList.add('active');
-            }
-        });
-        
-        overlay.addEventListener('click', () => {
-            sidebar.classList.add('hidden');
-            overlay.classList.remove('active');
-        });
-        
-        // Close sidebar on window resize if it's mobile
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-                overlay.classList.remove('active');
-            } else {
-                sidebar.classList.remove('hidden');
-                overlay.classList.remove('active');
-            }
-        });
-        
-        // Enhanced hover effects for nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateX(8px)';
-            });
-            
-            item.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateX(0)';
-                }
-            });
-        });
-        
-        // Smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('%c💸 Gerenciamento de Saques carregado!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Check if mobile on load
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-            }
-            
-            // Animate cards on load
-            const withdrawalCards = document.querySelectorAll('.withdrawal-card');
-            withdrawalCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-            
-            // Animate stats cards
-            const statCards = document.querySelectorAll('.mini-stat-card');
-            statCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 150);
-            });
-        });
-    </script>
+<?php <!--<?php Overlay<?php for<?php mobile<?php -->
+<?php <div<?php class="overlay"<?php id="overlay"></div>
+<?php 
+<?php <!--<?php Sidebar<?php -->
+<?php <aside<?php class="sidebar"<?php id="sidebar">
+<?php <div<?php class="sidebar-header">
+<?php <a<?php href="#"<?php class="logo">
+<?php <div<?php class="logo-icon">
+<?php <i<?php class="fas<?php fa-bolt"></i>
+<?php </div>
+<?php <div<?php class="logo-text">
+<?php <div<?php class="logo-title">Dashboard</div>
+<?php </div>
+<?php </a>
+<?php </div>
+<?php 
+<?php <nav<?php class="nav-menu">
+<?php <div<?php class="nav-section">
+<?php <div<?php class="nav-section-title">Principal</div>
+<?php <a<?php href="index.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-chart-pie"></i></div>
+<?php <div<?php class="nav-text">Dashboard</div>
+<?php </a>
+<?php </div>
+<?php 
+<?php <div<?php class="nav-section">
+<?php <div<?php class="nav-section-title">Gestão</div>
+<?php <a<?php href="usuarios.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user"></i></div>
+<?php <div<?php class="nav-text">Usuários</div>
+<?php </a>
+<?php <a<?php href="afiliados.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user-plus"></i></div>
+<?php <div<?php class="nav-text">Afiliados</div>
+<?php </a>
+<?php <a<?php href="depositos.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-credit-card"></i></div>
+<?php <div<?php class="nav-text">Depósitos</div>
+<?php </a>
+<?php <a<?php href="saques.php"<?php class="nav-item<?php active">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-money-bill-wave"></i></div>
+<?php <div<?php class="nav-text">Saques</div>
+<?php </a>
+<?php </div>
+<?php 
+<?php <div<?php class="nav-section">
+<?php <div<?php class="nav-section-title">Sistema</div>
+<?php <a<?php href="config.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-cogs"></i></div>
+<?php <div<?php class="nav-text">Configurações</div>
+<?php </a>
+<?php <a<?php href="gateway.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-usd"></i></div>
+<?php <div<?php class="nav-text">Gateway</div>
+<?php </a>
+<?php <a<?php href="banners.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-images"></i></div>
+<?php <div<?php class="nav-text">Banners</div>
+<?php </a>
+<?php <a<?php href="cartelas.php"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-diamond"></i></div>
+<?php <div<?php class="nav-text">Raspadinhas</div>
+<?php </a>
+<?php <a<?php href="../logout"<?php class="nav-item">
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-sign-out-alt"></i></div>
+<?php <div<?php class="nav-text">Sair</div>
+<?php </a>
+<?php </div>
+<?php </nav>
+<?php </aside>
+<?php 
+<?php <!--<?php Main<?php Content<?php -->
+<?php <main<?php class="main-content"<?php id="mainContent">
+<?php <!--<?php Header<?php -->
+<?php <header<?php class="header">
+<?php <div<?php class="header-content">
+<?php <div<?php style="display:<?php flex;<?php align-items:<?php center;<?php gap:<?php 1rem;">
+<?php <button<?php class="menu-toggle"<?php id="menuToggle">
+<?php <i<?php class="fas<?php fa-bars"></i>
+<?php </button>
+<?php </div>
+<?php 
+<?php <div<?php class="header-actions">
+<?php <span<?php style="color:<?php #a1a1aa;<?php font-size:<?php 0.9rem;<?php display:<?php none;">Bem-vindo,<?php <?php=<?php htmlspecialchars($nome)<?php ?></span>
+<?php <div<?php class="user-avatar">
+<?php <?php=<?php strtoupper(substr($nome,<?php 0,<?php 1))<?php ?>
+<?php </div>
+<?php </div>
+<?php </div>
+<?php </header>
+<?php 
+<?php <!--<?php Page<?php Content<?php -->
+<?php <div<?php class="page-content">
+<?php <!--<?php Welcome<?php Section<?php -->
+<?php <section<?php class="welcome-section">
+<?php <h2<?php class="welcome-title">Gestão<?php de<?php Saques</h2>
+<?php <p<?php class="welcome-subtitle">Aprove<?php ou<?php reprove<?php solicitações<?php de<?php saque<?php via<?php PIX<?php de<?php forma<?php segura</p>
+<?php </section>
+<?php 
+<?php <!--<?php Stats<?php Grid<?php -->
+<?php <section<?php class="stats-grid">
+<?php <div<?php class="mini-stat-card">
+<?php <div<?php class="mini-stat-header">
+<?php <div<?php class="mini-stat-icon">
+<?php <i<?php class="fas<?php fa-money-bill-wave"></i>
+<?php </div>
+<?php </div>
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format($total_saques,<?php 0,<?php ',',<?php '.')<?php ?></div>
+<?php <div<?php class="mini-stat-label">Total<?php de<?php Saques</div>
+<?php </div>
+<?php 
+<?php <div<?php class="mini-stat-card">
+<?php <div<?php class="mini-stat-header">
+<?php <div<?php class="mini-stat-icon">
+<?php <i<?php class="fas<?php fa-check-circle"></i>
+<?php </div>
+<?php </div>
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format(count($saques_aprovados),<?php 0,<?php ',',<?php '.')<?php ?></div>
+<?php <div<?php class="mini-stat-label">Saques<?php Aprovados</div>
+<?php </div>
+<?php 
+<?php <div<?php class="mini-stat-card">
+<?php <div<?php class="mini-stat-header">
+<?php <div<?php class="mini-stat-icon<?php warning">
+<?php <i<?php class="fas<?php fa-clock"></i>
+<?php </div>
+<?php </div>
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format(count($saques_pendentes),<?php 0,<?php ',',<?php '.')<?php ?></div>
+<?php <div<?php class="mini-stat-label">Saques<?php Pendentes</div>
+<?php </div>
+<?php 
+<?php <div<?php class="mini-stat-card">
+<?php <div<?php class="mini-stat-header">
+<?php <div<?php class="mini-stat-icon">
+<?php <i<?php class="fas<?php fa-dollar-sign"></i>
+<?php </div>
+<?php </div>
+<?php <div<?php class="mini-stat-value">R$<?php <?php=<?php number_format($valor_total_aprovado,<?php 2,<?php ',',<?php '.')<?php ?></div>
+<?php <div<?php class="mini-stat-label">Valor<?php Total<?php Pago</div>
+<?php </div>
+<?php </section>
+<?php 
+<?php <!--<?php Withdrawals<?php Section<?php -->
+<?php <section>
+<?php <?php<?php if<?php (empty($saques)):<?php ?>
+<?php <div<?php class="empty-state">
+<?php <i<?php class="fas<?php fa-money-bill-wave"></i>
+<?php <h3>Nenhum<?php saque<?php encontrado</h3>
+<?php <p>Não<?php há<?php solicitações<?php de<?php saque<?php registradas<?php no<?php sistema<?php ainda</p>
+<?php </div>
+<?php <?php<?php else:<?php ?>
+<?php <div<?php class="withdrawals-grid">
+<?php <?php<?php foreach<?php ($saques<?php as<?php $saque):<?php ?>
+<?php <div<?php class="withdrawal-card">
+<?php <div<?php class="withdrawal-header">
+<?php <div>
+<?php <h3<?php class="withdrawal-user"><?php=<?php htmlspecialchars($saque['nome'])<?php ?></h3>
+<?php <div<?php class="withdrawal-cpf">
+<?php <i<?php class="fas<?php fa-key"></i>
+<?php PIX:<?php <?php=<?php htmlspecialchars($saque['cpf'])<?php ?>
+<?php </div>
+<?php </div>
+<?php 
+<?php <div<?php class="withdrawal-status<?php <?php=<?php $saque['status']<?php ==<?php 'PAID'<?php ?<?php 'approved'<?php :<?php 'pending'<?php ?>">
+<?php <div<?php class="status-dot"></div>
+<?php <span><?php=<?php $saque['status']<?php ==<?php 'PAID'<?php ?<?php 'Aprovado'<?php :<?php 'Pendente'<?php ?></span>
+<?php </div>
+<?php </div>
+<?php 
+<?php <div<?php class="withdrawal-value">
+<?php R$<?php <?php=<?php number_format($saque['valor'],<?php 2,<?php ',',<?php '.')<?php ?>
+<?php </div>
+<?php 
+<?php <?php<?php if<?php ($saque['status']<?php ==<?php 'PENDING'):<?php ?>
+<?php <div<?php class="withdrawal-actions">
+<?php <form<?php method="POST"<?php style="flex:<?php 1;">
+<?php <input<?php type="hidden"<?php name="saque_id"<?php value="<?php=<?php $saque['id']<?php ?>">
+<?php <button<?php type="submit"<?php name="aprovar_saque"<?php class="action-btn<?php btn-approve"<?php onclick="openLoading()">
+<?php <i<?php class="fas<?php fa-check"></i>
+<?php Aprovar<?php Saque
+<?php </button>
+<?php </form>
+<?php <form<?php method="POST"<?php style="flex:<?php 1;">
+<?php <input<?php type="hidden"<?php name="saque_id"<?php value="<?php=<?php $saque['id']<?php ?>">
+<?php <button<?php type="submit"<?php name="reprovar_saque"<?php class="action-btn<?php btn-reject"<?php onclick="openLoading()">
+<?php <i<?php class="fas<?php fa-times"></i>
+<?php Reprovar
+<?php </button>
+<?php </form>
+<?php </div>
+<?php <?php<?php else:<?php ?>
+<?php <div<?php class="withdrawal-actions">
+<?php <button<?php class="action-btn<?php btn-disabled"<?php disabled>
+<?php <i<?php class="fas<?php fa-check-double"></i>
+<?php Saque<?php Processado
+<?php </button>
+<?php </div>
+<?php <?php<?php endif;<?php ?>
+<?php 
+<?php <div<?php class="withdrawal-date">
+<?php <i<?php class="fas<?php fa-calendar"></i>
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($saque['updated_at']))<?php ?></span>
+<?php </div>
+<?php </div>
+<?php <?php<?php endforeach;<?php ?>
+<?php </div>
+<?php <?php<?php endif;<?php ?>
+<?php </section>
+<?php </div>
+<?php </main>
+<?php 
+<?php <script>
+<?php //<?php Loading<?php function
+<?php function<?php openLoading()<?php {
+<?php Notiflix.Loading.standard('Processando<?php solicitação...');
+<?php }
+<?php 
+<?php //<?php Mobile<?php menu<?php toggle
+<?php const<?php menuToggle<?php =<?php document.getElementById('menuToggle');
+<?php const<?php sidebar<?php =<?php document.getElementById('sidebar');
+<?php const<?php mainContent<?php =<?php document.getElementById('mainContent');
+<?php const<?php overlay<?php =<?php document.getElementById('overlay');
+<?php 
+<?php menuToggle.addEventListener('click',<?php ()<?php =><?php {
+<?php const<?php isHidden<?php =<?php sidebar.classList.contains('hidden');
+<?php 
+<?php if<?php (isHidden)<?php {
+<?php sidebar.classList.remove('hidden');
+<?php overlay.classList.add('active');
+<?php }<?php else<?php {
+<?php sidebar.classList.add('hidden');
+<?php overlay.classList.add('active');
+<?php }
+<?php });
+<?php 
+<?php overlay.addEventListener('click',<?php ()<?php =><?php {
+<?php sidebar.classList.add('hidden');
+<?php overlay.classList.remove('active');
+<?php });
+<?php 
+<?php //<?php Close<?php sidebar<?php on<?php window<?php resize<?php if<?php it's<?php mobile
+<?php window.addEventListener('resize',<?php ()<?php =><?php {
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {
+<?php sidebar.classList.add('hidden');
+<?php overlay.classList.remove('active');
+<?php }<?php else<?php {
+<?php sidebar.classList.remove('hidden');
+<?php overlay.classList.remove('active');
+<?php }
+<?php });
+<?php 
+<?php //<?php Enhanced<?php hover<?php effects<?php for<?php nav<?php items
+<?php document.querySelectorAll('.nav-item').forEach(item<?php =><?php {
+<?php item.addEventListener('mouseenter',<?php function()<?php {
+<?php this.style.transform<?php =<?php 'translateX(8px)';
+<?php });
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {
+<?php if<?php (!this.classList.contains('active'))<?php {
+<?php this.style.transform<?php =<?php 'translateX(0)';
+<?php }
+<?php });
+<?php });
+<?php 
+<?php //<?php Smooth<?php scroll<?php behavior
+<?php document.documentElement.style.scrollBehavior<?php =<?php 'smooth';
+<?php 
+<?php //<?php Initialize
+<?php document.addEventListener('DOMContentLoaded',<?php ()<?php =><?php {
+<?php console.log('%c💸<?php Gerenciamento<?php de<?php Saques<?php carregado!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');
+<?php 
+<?php //<?php Check<?php if<?php mobile<?php on<?php load
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {
+<?php sidebar.classList.add('hidden');
+<?php }
+<?php 
+<?php //<?php Animate<?php cards<?php on<?php load
+<?php const<?php withdrawalCards<?php =<?php document.querySelectorAll('.withdrawal-card');
+<?php withdrawalCards.forEach((card,<?php index)<?php =><?php {
+<?php card.style.opacity<?php =<?php '0';
+<?php card.style.transform<?php =<?php 'translateY(20px)';
+<?php setTimeout(()<?php =><?php {
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';
+<?php card.style.opacity<?php =<?php '1';
+<?php card.style.transform<?php =<?php 'translateY(0)';
+<?php },<?php index<?php *<?php 100);
+<?php });
+<?php 
+<?php //<?php Animate<?php stats<?php cards
+<?php const<?php statCards<?php =<?php document.querySelectorAll('.mini-stat-card');
+<?php statCards.forEach((card,<?php index)<?php =><?php {
+<?php card.style.opacity<?php =<?php '0';
+<?php card.style.transform<?php =<?php 'translateY(20px)';
+<?php setTimeout(()<?php =><?php {
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';
+<?php card.style.opacity<?php =<?php '1';
+<?php card.style.transform<?php =<?php 'translateY(0)';
+<?php },<?php index<?php *<?php 150);
+<?php });
+<?php });
+<?php </script>
 </body>
 </html>

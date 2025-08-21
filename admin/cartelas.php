@@ -1,1808 +1,1808 @@
-<?php
-include '../includes/session.php';
-include '../conexao.php';
-include '../includes/notiflix.php';
-
-$usuarioId = $_SESSION['usuario_id'];
-$admin = ($stmt = $pdo->prepare("SELECT admin FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-
-if ($admin != 1) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você não é um administrador!'];
-    header("Location: /");
-    exit;
-}
-
-$nome = ($stmt = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-$nome = $nome ? explode(' ', $nome)[0] : null;
-
-if (isset($_POST['adicionar_raspadinha'])) {
-    $nome = $_POST['nome'];
-    $descricao = $_POST['descricao'];
-    $valor = str_replace(',', '.', $_POST['valor']);
-    
-    $banner = '';
-    if (isset($_FILES['banner']) && $_FILES['banner']['error'] == 0) {
-        $allowed = ['jpg', 'jpeg', 'png'];
-        $ext = pathinfo($_FILES['banner']['name'], PATHINFO_EXTENSION);
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $uploadDir = '../assets/img/banners/';
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $newName = uniqid() . '.' . $ext;
-            $uploadPath = $uploadDir . $newName;
-            
-            if (move_uploaded_file($_FILES['banner']['tmp_name'], $uploadPath)) {
-                $banner = '/assets/img/banners/' . $newName;
-            } else {
-                $_SESSION['failure'] = 'Erro ao fazer upload do banner!';
-                header('Location: '.$_SERVER['PHP_SELF']);
-                exit;
-            }
-        } else {
-            $_SESSION['failure'] = 'Formato de arquivo inválido! Use apenas JPG ou PNG.';
-            header('Location: '.$_SERVER['PHP_SELF']);
-            exit;
-        }
-    }
-    
-    $stmt = $pdo->prepare("INSERT INTO raspadinhas (nome, descricao, banner, valor) VALUES (?, ?, ?, ?)");
-    if ($stmt->execute([$nome, $descricao, $banner, $valor])) {
-        $_SESSION['success'] = 'Raspadinha adicionada com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao adicionar raspadinha!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-if (isset($_POST['editar_raspadinha'])) {
-    $id = $_POST['id'];
-    $nome = $_POST['nome'];
-    $descricao = $_POST['descricao'];
-    $valor = str_replace(',', '.', $_POST['valor']);
-    
-    $raspadinha = $pdo->prepare("SELECT banner FROM raspadinhas WHERE id = ?");
-    $raspadinha->execute([$id]);
-    $raspadinha = $raspadinha->fetch(PDO::FETCH_ASSOC);
-    $banner = $raspadinha['banner'];
-    
-    if (isset($_FILES['banner']) && $_FILES['banner']['error'] == 0) {
-        $allowed = ['jpg', 'jpeg', 'png'];
-        $ext = pathinfo($_FILES['banner']['name'], PATHINFO_EXTENSION);
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $uploadDir = '../assets/img/banners/';
-            $newName = uniqid() . '.' . $ext;
-            $uploadPath = $uploadDir . $newName;
-            
-            if (move_uploaded_file($_FILES['banner']['tmp_name'], $uploadPath)) {
-                if ($banner && file_exists('../' . $banner)) {
-                    unlink('../' . $banner);
-                }
-                $banner = '/assets/img/banners/' . $newName;
-            } else {
-                $_SESSION['failure'] = 'Erro ao fazer upload do novo banner!';
-                header('Location: '.$_SERVER['PHP_SELF']);
-                exit;
-            }
-        } else {
-            $_SESSION['failure'] = 'Formato de arquivo inválido! Use apenas JPG ou PNG.';
-            header('Location: '.$_SERVER['PHP_SELF']);
-            exit;
-        }
-    }
-    
-    $stmt = $pdo->prepare("UPDATE raspadinhas SET nome = ?, descricao = ?, banner = ?, valor = ? WHERE id = ?");
-    if ($stmt->execute([$nome, $descricao, $banner, $valor, $id])) {
-        $_SESSION['success'] = 'Raspadinha atualizada com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao atualizar raspadinha!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-if (isset($_GET['excluir_raspadinha'])) {
-    $id = $_GET['id'];
-    
-    $raspadinha = $pdo->prepare("SELECT banner FROM raspadinhas WHERE id = ?");
-    $raspadinha->execute([$id]);
-    $raspadinha = $raspadinha->fetch(PDO::FETCH_ASSOC);
-    
-    $pdo->prepare("DELETE FROM raspadinha_premios WHERE raspadinha_id = ?")->execute([$id]);
-    
-    if ($pdo->prepare("DELETE FROM raspadinhas WHERE id = ?")->execute([$id])) {
-        if ($raspadinha['banner'] && file_exists('../' . $raspadinha['banner'])) {
-            unlink('../' . $raspadinha['banner']);
-        }
-        $_SESSION['success'] = 'Raspadinha excluída com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao excluir raspadinha!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-if (isset($_POST['adicionar_premio'])) {
-    $raspadinha_id = $_POST['raspadinha_id'];
-    $nome = $_POST['nome'];
-    $valor = str_replace(',', '.', $_POST['valor']);
-    $probabilidade = str_replace(',', '.', $_POST['probabilidade']);
-    
-    $icone = '';
-    if (isset($_FILES['icone']) && $_FILES['icone']['error'] == 0) {
-        $allowed = ['jpg', 'jpeg', 'png'];
-        $ext = pathinfo($_FILES['icone']['name'], PATHINFO_EXTENSION);
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $uploadDir = '../assets/img/icons/';
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $newName = uniqid() . '.' . $ext;
-            $uploadPath = $uploadDir . $newName;
-            
-            if (move_uploaded_file($_FILES['icone']['tmp_name'], $uploadPath)) {
-                $icone = '/assets/img/icons/' . $newName;
-            } else {
-                $_SESSION['failure'] = 'Erro ao fazer upload do ícone!';
-                header('Location: '.$_SERVER['PHP_SELF']);
-                exit;
-            }
-        } else {
-            $_SESSION['failure'] = 'Formato de arquivo inválido! Use apenas JPG ou PNG.';
-            header('Location: '.$_SERVER['PHP_SELF']);
-            exit;
-        }
-    }
-    
-    $stmt = $pdo->prepare("INSERT INTO raspadinha_premios (raspadinha_id, nome, icone, valor, probabilidade) VALUES (?, ?, ?, ?, ?)");
-    if ($stmt->execute([$raspadinha_id, $nome, $icone, $valor, $probabilidade])) {
-        $_SESSION['success'] = 'Prêmio adicionado com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao adicionar prêmio!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);
-    exit;
-}
-
-if (isset($_POST['editar_premio'])) {
-    $id = $_POST['id'];
-    $raspadinha_id = $_POST['raspadinha_id'];
-    $nome = $_POST['nome'];
-    $valor = str_replace(',', '.', $_POST['valor']);
-    $probabilidade = str_replace(',', '.', $_POST['probabilidade']);
-    
-    $premio = $pdo->prepare("SELECT icone FROM raspadinha_premios WHERE id = ?");
-    $premio->execute([$id]);
-    $premio = $premio->fetch(PDO::FETCH_ASSOC);
-    $icone = $premio['icone'];
-    
-    if (isset($_FILES['icone']) && $_FILES['icone']['error'] == 0) {
-        $allowed = ['jpg', 'jpeg', 'png'];
-        $ext = pathinfo($_FILES['icone']['name'], PATHINFO_EXTENSION);
-        
-        if (in_array(strtolower($ext), $allowed)) {
-            $uploadDir = '../assets/img/icons/';
-            $newName = uniqid() . '.' . $ext;
-            $uploadPath = $uploadDir . $newName;
-            
-            if (move_uploaded_file($_FILES['icone']['tmp_name'], $uploadPath)) {
-                if ($icone && file_exists('../' . $icone)) {
-                    unlink('../' . $icone);
-                }
-                $icone = '/assets/img/icons/' . $newName;
-            } else {
-                $_SESSION['failure'] = 'Erro ao fazer upload do novo ícone!';
-                header('Location: '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);
-                exit;
-            }
-        } else {
-            $_SESSION['failure'] = 'Formato de arquivo inválido! Use apenas JPG ou PNG.';
-            header('Location: '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);
-            exit;
-        }
-    }
-    
-    $stmt = $pdo->prepare("UPDATE raspadinha_premios SET nome = ?, icone = ?, valor = ?, probabilidade = ? WHERE id = ?");
-    if ($stmt->execute([$nome, $icone, $valor, $probabilidade, $id])) {
-        $_SESSION['success'] = 'Prêmio atualizado com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao atualizar prêmio!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);
-    exit;
-}
-
-if (isset($_GET['excluir_premio'])) {
-    $id = $_GET['id'];
-    $raspadinha_id = $_GET['raspadinha_id'];
-    
-    $premio = $pdo->prepare("SELECT icone FROM raspadinha_premios WHERE id = ?");
-    $premio->execute([$id]);
-    $premio = $premio->fetch(PDO::FETCH_ASSOC);
-    
-    if ($pdo->prepare("DELETE FROM raspadinha_premios WHERE id = ?")->execute([$id])) {
-        if ($premio['icone'] && file_exists('../' . $premio['icone'])) {
-            unlink('../' . $premio['icone']);
-        }
-        $_SESSION['success'] = 'Prêmio excluído com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao excluir prêmio!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);
-    exit;
-}
-
-$raspadinhas = $pdo->query("SELECT * FROM raspadinhas ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
-
-// Calculate statistics
-$total_raspadinhas = count($raspadinhas);
-$valor_total_raspadinhas = array_sum(array_column($raspadinhas, 'valor'));
-
-$premios = [];
-$raspadinha_selecionada = null;
-if (isset($_GET['raspadinha_id'])) {
-    $raspadinha_id = $_GET['raspadinha_id'];
-    $premios = $pdo->prepare("SELECT * FROM raspadinha_premios WHERE raspadinha_id = ? ORDER BY probabilidade DESC");
-    $premios->execute([$raspadinha_id]);
-    $premios = $premios->fetchAll(PDO::FETCH_ASSOC);
-    
-    $raspadinha_selecionada = $pdo->prepare("SELECT * FROM raspadinhas WHERE id = ?");
-    $raspadinha_selecionada->execute([$raspadinha_id]);
-    $raspadinha_selecionada = $raspadinha_selecionada->fetch(PDO::FETCH_ASSOC);
-}
-
-$total_premios = 0;
-$valor_total_premios = 0;
-if (!empty($premios)) {
-    $total_premios = count($premios);
-    $valor_total_premios = array_sum(array_column($premios, 'valor'));
-}
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite ?? 'Admin'; ?> - Gerenciar Raspadinhas</title>
-    
-    <!-- TailwindCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Notiflix -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #000000;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        /* Advanced Sidebar Styles - Same as depositos.php */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: linear-gradient(145deg, #0a0a0a 0%, #141414 25%, #1a1a1a 50%, #0f0f0f 100%);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(34, 197, 94, 0.2);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            box-shadow: 
-                0 0 50px rgba(34, 197, 94, 0.1),
-                inset 1px 0 0 rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
-            opacity: 0.8;
-            pointer-events: none;
-        }
-        
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-        
-        /* Enhanced Sidebar Header */
-        .sidebar-header {
-            position: relative;
-            padding: 2.5rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            text-decoration: none;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #ffffff;
-            box-shadow: 
-                0 8px 20px rgba(34, 197, 94, 0.3),
-                0 4px 8px rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-        
-        .logo-icon::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(135deg, #22c55e, #16a34a, #22c55e);
-            border-radius: 18px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .logo:hover .logo-icon::after {
-            opacity: 1;
-        }
-        
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .logo-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ffffff;
-            line-height: 1.2;
-        }
-        
-        .logo-subtitle {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        /* Advanced Navigation */
-        .nav-menu {
-            padding: 2rem 0;
-            position: relative;
-        }
-        
-        .nav-section {
-            margin-bottom: 2rem;
-        }
-        
-        .nav-section-title {
-            padding: 0 2rem 0.75rem 2rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            position: relative;
-        }
-        
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem 2rem;
-            color: #a1a1aa;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            margin: 0.25rem 1rem;
-            border-radius: 12px;
-            font-weight: 500;
-        }
-        
-        .nav-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 0 4px 4px 0;
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .nav-item:hover::before,
-        .nav-item.active::before {
-            transform: scaleY(1);
-        }
-        
-        .nav-item:hover,
-        .nav-item.active {
-            color: #ffffff;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            transform: translateX(4px);
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.1);
-        }
-        
-        .nav-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            position: relative;
-        }
-        
-        .nav-text {
-            font-size: 0.95rem;
-            flex: 1;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 320px;
-            min-height: 100vh;
-            transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: 
-                radial-gradient(circle at 10% 20%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.01) 0%, transparent 50%);
-        }
-        
-        .main-content.expanded {
-            margin-left: 0;
-        }
-        
-        /* Enhanced Header */
-        .header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 2.5rem;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .menu-toggle {
-            display: none;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-            padding: 0.75rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .menu-toggle:hover {
-            background: rgba(34, 197, 94, 0.2);
-            transform: scale(1.05);
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 1rem;
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-        }
-        
-        /* Main Page Content */
-        .page-content {
-            padding: 2.5rem;
-        }
-        
-        .welcome-section {
-            margin-bottom: 3rem;
-        }
-        
-        .welcome-title {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(135deg, #ffffff 0%, #fff 50%, #fff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-        
-        .welcome-subtitle {
-            font-size: 1.25rem;
-            color: #6b7280;
-            font-weight: 400;
-        }
-        
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-        
-        .mini-stat-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-        }
-        
-        .mini-stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .mini-stat-card:hover::before {
-            opacity: 1;
-        }
-        
-        .mini-stat-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.3);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-        }
-        
-        .mini-stat-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        
-        .mini-stat-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1rem;
-        }
-        
-        .mini-stat-icon.purple {
-            background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(147, 51, 234, 0.1) 100%);
-            border-color: rgba(147, 51, 234, 0.3);
-            color: #9333ea;
-        }
-        
-        .mini-stat-value {
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: #ffffff;
-            margin-bottom: 0.25rem;
-        }
-        
-        .mini-stat-label {
-            color: #a1a1aa;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
-        /* Form Section */
-        .form-section {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(20px);
-        }
-        
-        .form-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-icon-container {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1.125rem;
-        }
-        
-        .form-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #ffffff;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-label {
-            display: block;
-            color: #e5e7eb;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        
-        .form-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
-            color: white;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: rgba(34, 197, 94, 0.5);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-        }
-        
-        .form-input::placeholder {
-            color: #6b7280;
-        }
-        
-        .form-button {
-            width: 100%;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 0.875rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .form-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-        }
-        
-        .cancel-button {
-            width: 100%;
-            background: rgba(107, 114, 128, 0.3);
-            color: #e5e7eb;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 0.75rem 1.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-decoration: none;
-            text-align: center;
-            display: block;
-            margin-top: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .cancel-button:hover {
-            background: rgba(107, 114, 128, 0.4);
-        }
-        
-        /* Raspadinha Cards */
-        .raspadinha-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .raspadinha-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .raspadinha-card:hover::before {
-            opacity: 1;
-        }
-        
-        .raspadinha-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        .raspadinha-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-        }
-        
-        .raspadinha-name {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 0.5rem;
-        }
-        
-        .raspadinha-description {
-            font-size: 0.9rem;
-            color: #9ca3af;
-            margin-bottom: 1rem;
-        }
-        
-        .raspadinha-banner {
-            width: 80px;
-            height: 50px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .raspadinha-value {
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 1rem;
-        }
-        
-        .raspadinha-date {
-            color: #9ca3af;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .raspadinha-date i {
-            color: #6b7280;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-        }
-        
-        .action-btn {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .action-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        
-        .btn-manage {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-        }
-        
-        .btn-edit {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-        }
-        
-        .btn-delete {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        
-        /* Prize Cards */
-        .prize-card {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .prize-card:hover {
-            background: rgba(34, 197, 94, 0.15);
-            border-color: rgba(34, 197, 94, 0.3);
-            transform: translateY(-2px);
-        }
-        
-        .prize-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        
-        .prize-name {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .prize-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .prize-info {
-            display: flex;
-            gap: 1.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .prize-stat {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #e5e7eb;
-            font-size: 0.9rem;
-        }
-        
-        .prize-stat i {
-            color: #22c55e;
-            width: 16px;
-            text-align: center;
-        }
-        
-        .prize-actions {
-            display: flex;
-            gap: 1rem;
-        }
-        
-        .prize-action-btn {
-            flex: 1;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .prize-edit-btn {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-        }
-        
-        .prize-delete-btn {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        
-        .prize-action-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Selected Raspadinha Header */
-        .selected-raspadinha {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        
-        .selected-raspadinha h3 {
-            color: #22c55e;
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin: 0;
-        }
-        
-        .selected-raspadinha p {
-            color: #9ca3af;
-            margin: 0.5rem 0 0 0;
-            font-size: 0.9rem;
-        }
-        
-        .back-btn {
-            background: rgba(107, 114, 128, 0.3);
-            color: #e5e7eb;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .back-btn:hover {
-            background: rgba(107, 114, 128, 0.4);
-            transform: translateY(-1px);
-        }
-        
-        /* Content Grid */
-        .content-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 2rem; /* Aumentar de 1.5rem para 2rem ou mais */
-        }
-        
-        .raspadinha-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem; /* Adicionar esta linha */
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        /* Current Image Preview */
-        .current-image {
-            margin-top: 0.5rem;
-            padding: 0.75rem;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .current-image p {
-            color: #9ca3af;
-            font-size: 0.8rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .current-image img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 6px;
-            max-height: 100px;
-        }
-        
-        /* Empty States */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #6b7280;
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(10, 10, 10, 0.4) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.3;
-            color: #374151;
-        }
-        
-        .empty-state h3 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #9ca3af;
-            margin-bottom: 0.5rem;
-        }
-        
-        .empty-state p {
-            font-size: 1rem;
-            font-weight: 400;
-        }
-        
-        /* Scroll Container */
-        .scroll-container {
-            max-height: 500px;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-        
-        .scroll-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .scroll-container::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
-        
-        .scroll-container::-webkit-scrollbar-thumb {
-            background: rgba(34, 197, 94, 0.3);
-            border-radius: 4px;
-        }
-        
-        .scroll-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(34, 197, 94, 0.5);
-        }
-        
-        /* Mobile Styles */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                width: 300px;
-                z-index: 1001;
-            }
-            
-            .sidebar:not(.hidden) {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: block;
-            }
-            
-            .header-actions span {
-                display: none !important;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            }
-            
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .raspadinhas-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-            }
-            
-            .page-content {
-                padding: 1.5rem;
-            }
-            
-            .welcome-title {
-                font-size: 2.25rem;
-            }
-            
-            .raspadinha-card {
-                padding: 1.5rem;
-            }
-            
-            .raspadinha-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 280px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .welcome-title {
-                font-size: 1.875rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .raspadinha-value {
-                font-size: 1.5rem;
-            }
-            
-            .sidebar {
-                width: 260px;
-            }
-        }
-        
-        /* Overlay for mobile */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(4px);
-        }
-        
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-    </style>
-</head>
-<body>
-    <!-- Notifications -->
-    <?php if (isset($_SESSION['success'])): ?>
-        <script>
-            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
-        </script>
-        <?php unset($_SESSION['success']); ?>
-    <?php elseif (isset($_SESSION['failure'])): ?>
-        <script>
-            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
-        </script>
-        <?php unset($_SESSION['failure']); ?>
-    <?php endif; ?>
-
-    <!-- Overlay for mobile -->
-    <div class="overlay" id="overlay"></div>
-    
-    <!-- Advanced Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-bolt"></i>
-                </div>
-                <div class="logo-text">
-                    <div class="logo-title">Dashboard</div>
-                </div>
-            </a>
-        </div>
-        
-        <nav class="nav-menu">
-            <div class="nav-section">
-                <div class="nav-section-title">Principal</div>
-                <a href="index.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
-                    <div class="nav-text">Dashboard</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Gestão</div>
-                <a href="usuarios.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user"></i></div>
-                    <div class="nav-text">Usuários</div>
-                </a>
-                <a href="afiliados.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user-plus"></i></div>
-                    <div class="nav-text">Afiliados</div>
-                </a>
-                <a href="depositos.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-credit-card"></i></div>
-                    <div class="nav-text">Depósitos</div>
-                </a>
-                <a href="saques.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-money-bill-wave"></i></div>
-                    <div class="nav-text">Saques</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Sistema</div>
-                <a href="config.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-cogs"></i></div>
-                    <div class="nav-text">Configurações</div>
-                </a>
-                <a href="gateway.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-usd"></i></div>
-                    <div class="nav-text">Gateway</div>
-                </a>
-                <a href="banners.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-images"></i></div>
-                    <div class="nav-text">Banners</div>
-                </a>
-                <a href="cartelas.php" class="nav-item active">
-                    <div class="nav-icon"><i class="fas fa-diamond"></i></div>
-                    <div class="nav-text">Raspadinhas</div>
-                </a>
-                <a href="../logout" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-sign-out-alt"></i></div>
-                    <div class="nav-text">Sair</div>
-                </a>
-            </div>
-        </nav>
-    </aside>
-    
-    <!-- Main Content -->
-    <main class="main-content" id="mainContent">
-        <!-- Enhanced Header -->
-        <header class="header">
-            <div class="header-content">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="menu-toggle" id="menuToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
-                
-                <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
-                    <div class="user-avatar">
-                        <?php= strtoupper(substr($nome, 0, 1)) ?>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Page Content -->
-        <div class="page-content">
-            <!-- Welcome Section -->
-            <section class="welcome-section">
-                <h2 class="welcome-title">Gerenciar Raspadinhas</h2>
-                <p class="welcome-subtitle">Crie e configure raspadinhas e seus prêmios de forma fácil e intuitiva</p>
-            </section>
-            
-            <!-- Stats Grid -->
-            <section class="stats-grid">
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-ticket"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format($total_raspadinhas, 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Total de Raspadinhas</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon purple">
-                            <i class="fas fa-gift"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format($total_premios, 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Total de Prêmios</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_raspadinhas, 2, ',', '.') ?></div>
-                    <div class="mini-stat-label">Valor Total Raspadinhas</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon purple">
-                            <i class="fas fa-trophy"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value">R$ <?php= number_format($valor_total_premios, 2, ',', '.') ?></div>
-                    <div class="mini-stat-label">Valor Total Prêmios</div>
-                </div>
-            </section>
-
-            <?php if (isset($_GET['raspadinha_id'])): ?>
-                <!-- Selected Raspadinha Header -->
-                <div class="selected-raspadinha">
-                    <div class="flex-1">
-                        <h3>🎯 Gerenciando: <?php= htmlspecialchars($raspadinha_selecionada['nome']) ?></h3>
-                        <p>Configure os prêmios desta raspadinha</p>
-                    </div>
-                    <a href="?" class="back-btn">
-                        <i class="fas fa-arrow-left"></i>
-                        Voltar
-                    </a>
-                </div>
-            <?php endif; ?>
-            
-            <!-- Main Content Grid -->
-            <div class="content-grid">
-                <!-- Form Section -->
-                <section class="form-section">
-                    <div class="form-header">
-                        <div class="form-icon-container">
-                            <i class="fas fa-<?php= isset($_GET['editar_raspadinha']) ? 'edit' : 'plus' ?>"></i>
-                        </div>
-                        <h3 class="form-title">
-                            <?php= isset($_GET['editar_raspadinha']) ? 'Editar' : 'Adicionar' ?> Raspadinha
-                        </h3>
-                    </div>
-                    
-                    <?php
-                    $raspadinha_edit = null;
-                    if (isset($_GET['editar_raspadinha'])) {
-                        $id = $_GET['id'];
-                        $raspadinha_edit = $pdo->prepare("SELECT * FROM raspadinhas WHERE id = ?");
-                        $raspadinha_edit->execute([$id]);
-                        $raspadinha_edit = $raspadinha_edit->fetch(PDO::FETCH_ASSOC);
-                    }
-                    ?>
-                    
-                    <form method="POST" enctype="multipart/form-data">
-                        <?php if ($raspadinha_edit): ?>
-                            <input type="hidden" name="id" value="<?php= $raspadinha_edit['id'] ?>">
-                        <?php endif; ?>
-                        
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-signature"></i>
-                                Nome da Raspadinha
-                            </label>
-                            <input type="text" name="nome" value="<?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome da raspadinha..." required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-align-left"></i>
-                                Descrição
-                            </label>
-                            <textarea name="descricao" class="form-input" rows="3" placeholder="Descreva a raspadinha..." required><?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['descricao']) : '' ?></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-dollar-sign"></i>
-                                Valor (R$)
-                            </label>
-                            <input type="text" name="valor" value="<?php= $raspadinha_edit ? htmlspecialchars($raspadinha_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-image"></i>
-                                Banner da Raspadinha
-                            </label>
-                            <input type="file" name="banner" accept="image/jpeg, image/png" class="form-input">
-                            <?php if ($raspadinha_edit && $raspadinha_edit['banner']): ?>
-                                <div class="current-image">
-                                    <p>Banner atual:</p>
-                                    <img src="<?php= htmlspecialchars($raspadinha_edit['banner']) ?>" alt="Banner atual">
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <button type="submit" name="<?php= $raspadinha_edit ? 'editar_raspadinha' : 'adicionar_raspadinha' ?>" class="form-button">
-                            <i class="fas fa-save"></i>
-                            <?php= $raspadinha_edit ? 'Atualizar' : 'Adicionar' ?> Raspadinha
-                        </button>
-                        
-                        <?php if ($raspadinha_edit): ?>
-                            <a href="?" class="cancel-button">
-                                <i class="fas fa-times"></i>
-                                Cancelar
-                            </a>
-                        <?php endif; ?>
-                    </form>
-                </section>
-                
-                <!-- List Section -->
-                <section class="form-section">
-                    <div class="form-header">
-                        <div class="form-icon-container">
-                            <i class="fas fa-list"></i>
-                        </div>
-                        <h3 class="form-title">Raspadinhas Cadastradas</h3>
-                    </div>
-                    
-                    <div class="scroll-container">
-                        <?php if (empty($raspadinhas)): ?>
-                            <div class="empty-state">
-                                <i class="fas fa-ticket"></i>
-                                <h3>Nenhuma raspadinha cadastrada</h3>
-                                <p>Comece criando sua primeira raspadinha</p>
-                            </div>
-                        <?php else: ?>
-                            <?php foreach ($raspadinhas as $raspadinha): ?>
-                                <div class="raspadinha-card">
-                                    <div class="raspadinha-header">
-                                        <div class="flex-1">
-                                            <h3 class="raspadinha-name"><?php= htmlspecialchars($raspadinha['nome']) ?></h3>
-                                            <p class="raspadinha-description"><?php= htmlspecialchars($raspadinha['descricao']) ?></p>
-                                        </div>
-                                        <?php if ($raspadinha['banner']): ?>
-                                            <img src="<?php= htmlspecialchars($raspadinha['banner']) ?>" alt="Banner" class="raspadinha-banner">
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <div class="raspadinha-value">
-                                        R$ <?php= number_format($raspadinha['valor'], 2, ',', '.') ?>
-                                    </div>
-                                    
-                                    <div class="raspadinha-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span><?php= date('d/m/Y H:i', strtotime($raspadinha['created_at'])) ?></span>
-                                    </div>
-                                    
-                                    <div class="action-buttons">
-                                        <a href="?raspadinha_id=<?php= $raspadinha['id'] ?>" class="action-btn btn-manage">
-                                            <i class="fas fa-cog"></i>
-                                            Gerenciar
-                                        </a>
-                                        <a href="?editar_raspadinha&id=<?php= $raspadinha['id'] ?>" class="action-btn btn-edit">
-                                            <i class="fas fa-edit"></i>
-                                            Editar
-                                        </a>
-                                        <a href="?excluir_raspadinha&id=<?php= $raspadinha['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir esta raspadinha e todos os seus prêmios?')" class="action-btn btn-delete">
-                                            <i class="fas fa-trash"></i>
-                                            Excluir
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </section>
-            </div>
-
-            <?php if (isset($_GET['raspadinha_id'])): ?>
-                <!-- Prêmios Section -->
-                <div class="content-grid">
-                    <!-- Add Prize Form -->
-                    <section class="form-section">
-                        <div class="form-header">
-                            <div class="form-icon-container">
-                                <i class="fas fa-<?php= isset($_GET['editar_premio']) ? 'edit' : 'gift' ?>"></i>
-                            </div>
-                            <h3 class="form-title">
-                                <?php= isset($_GET['editar_premio']) ? 'Editar' : 'Adicionar' ?> Prêmio
-                            </h3>
-                        </div>
-                        
-                        <?php
-                        $premio_edit = null;
-                        if (isset($_GET['editar_premio'])) {
-                            $id = $_GET['id'];
-                            $premio_edit = $pdo->prepare("SELECT * FROM raspadinha_premios WHERE id = ?");
-                            $premio_edit->execute([$id]);
-                            $premio_edit = $premio_edit->fetch(PDO::FETCH_ASSOC);
-                        }
-                        ?>
-                        
-                        <form method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="raspadinha_id" value="<?php= $_GET['raspadinha_id'] ?>">
-                            <?php if ($premio_edit): ?>
-                                <input type="hidden" name="id" value="<?php= $premio_edit['id'] ?>">
-                            <?php endif; ?>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-tag"></i>
-                                    Nome do Prêmio
-                                </label>
-                                <input type="text" name="nome" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['nome']) : '' ?>" class="form-input" placeholder="Digite o nome do prêmio..." required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-dollar-sign"></i>
-                                    Valor (R$)
-                                </label>
-                                <input type="text" name="valor" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['valor']) : '' ?>" class="form-input" placeholder="0,00" required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-percentage"></i>
-                                    Probabilidade (0.00 - 100.00)
-                                </label>
-                                <input type="text" name="probabilidade" value="<?php= $premio_edit ? htmlspecialchars($premio_edit['probabilidade']) : '' ?>" class="form-input" placeholder="5.00" required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-image"></i>
-                                    Ícone do Prêmio
-                                </label>
-                                <input type="file" name="icone" accept="image/jpeg, image/png" class="form-input">
-                                <?php if ($premio_edit && $premio_edit['icone']): ?>
-                                    <div class="current-image">
-                                        <p>Ícone atual:</p>
-                                        <img src="<?php= htmlspecialchars($premio_edit['icone']) ?>" alt="Ícone atual">
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <button type="submit" name="<?php= $premio_edit ? 'editar_premio' : 'adicionar_premio' ?>" class="form-button">
-                                <i class="fas fa-save"></i>
-                                <?php= $premio_edit ? 'Atualizar' : 'Adicionar' ?> Prêmio
-                            </button>
-                            
-                            <?php if ($premio_edit): ?>
-                                <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>" class="cancel-button">
-                                    <i class="fas fa-times"></i>
-                                    Cancelar
-                                </a>
-                            <?php endif; ?>
-                        </form>
-                    </section>
-
-                    <!-- Prizes List -->
-                    <section class="form-section">
-                        <div class="form-header">
-                            <div class="form-icon-container">
-                                <i class="fas fa-gift"></i>
-                            </div>
-                            <h3 class="form-title">Prêmios Cadastrados</h3>
-                        </div>
-                        
-                        <div class="scroll-container">
-                            <?php if (empty($premios)): ?>
-                                <div class="empty-state">
-                                    <i class="fas fa-gift"></i>
-                                    <h3>Nenhum prêmio cadastrado</h3>
-                                    <p>Adicione prêmios para esta raspadinha</p>
-                                </div>
-                            <?php else: ?>
-                                <?php foreach ($premios as $premio): ?>
-                                    <div class="prize-card">
-                                        <div class="prize-header">
-                                            <div class="prize-name">
-                                                <?php if ($premio['icone']): ?>
-                                                    <img src="<?php= htmlspecialchars($premio['icone']) ?>" alt="Ícone" class="prize-icon">
-                                                <?php endif; ?>
-                                                <?php= htmlspecialchars($premio['nome']) ?>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="prize-info">
-                                            <div class="prize-stat">
-                                                <i class="fas fa-dollar-sign"></i>
-                                                <span>R$ <?php= number_format($premio['valor'], 2, ',', '.') ?></span>
-                                            </div>
-                                            <div class="prize-stat">
-                                                <i class="fas fa-percentage"></i>
-                                                <span><?php= number_format($premio['probabilidade'], 2, ',', '.') ?>%</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="prize-actions">
-                                            <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>&editar_premio&id=<?php= $premio['id'] ?>" class="prize-action-btn prize-edit-btn">
-                                                <i class="fas fa-edit"></i>
-                                                Editar
-                                            </a>
-                                            <a href="?raspadinha_id=<?php= $_GET['raspadinha_id'] ?>&excluir_premio&id=<?php= $premio['id'] ?>" onclick="return confirm('Tem certeza que deseja excluir este prêmio?')" class="prize-action-btn prize-delete-btn">
-                                                <i class="fas fa-trash"></i>
-                                                Excluir
-                                            </a>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                    </section>
-                </div>
-            <?php endif; ?>
-        </div>
-    </main>
-    
-    <script>
-        // Mobile menu toggle with smooth animations
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const overlay = document.getElementById('overlay');
-        
-        menuToggle.addEventListener('click', () => {
-            const isHidden = sidebar.classList.contains('hidden');
-            
-            if (isHidden) {
-                sidebar.classList.remove('hidden');
-                overlay.classList.add('active');
-            } else {
-                sidebar.classList.add('hidden');
-                overlay.classList.add('active');
-            }
-        });
-        
-        overlay.addEventListener('click', () => {
-            sidebar.classList.add('hidden');
-            overlay.classList.remove('active');
-        });
-        
-        // Close sidebar on window resize if it's mobile
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-                overlay.classList.remove('active');
-            } else {
-                sidebar.classList.remove('hidden');
-                overlay.classList.remove('active');
-            }
-        });
-        
-        // Enhanced hover effects for nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateX(8px)';
-            });
-            
-            item.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateX(0)';
-                }
-            });
-        });
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('%c🎯 Raspadinhas carregadas!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Auto-format currency inputs
-            const currencyInputs = document.querySelectorAll('input[name="valor"]');
-            currencyInputs.forEach(input => {
-                input.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/[^\d,]/g, '');
-                    e.target.value = value;
-                });
-            });
-            
-            // Auto-format percentage inputs
-            const percentageInputs = document.querySelectorAll('input[name="probabilidade"]');
-            percentageInputs.forEach(input => {
-                input.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/[^\d,]/g, '');
-                    e.target.value = value;
-                });
-            });
-
-            // Check if mobile on load
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-            }
-            
-            // Animate cards on load
-            const raspadinhaCards = document.querySelectorAll('.raspadinha-card, .prize-card');
-            raspadinhaCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-            
-            // Animate stats cards
-            const statCards = document.querySelectorAll('.mini-stat-card');
-            statCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 150);
-            });
-
-            // Scroll to top when editing (smooth behavior)
-            const currentUrl = new URL(window.location.href);
-            const hasEditParams = currentUrl.searchParams.has('editar_raspadinha') || 
-                                 currentUrl.searchParams.has('editar_premio');
-            
-            if (hasEditParams) {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        });
-        
-        // Smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
-    </script>
-</body>
+<?php<?php 
+include<?php '../includes/session.php';<?php 
+include<?php '../conexao.php';<?php 
+include<?php '../includes/notiflix.php';<?php 
+<?php 
+$usuarioId<?php =<?php $_SESSION['usuario_id'];<?php 
+$admin<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php admin<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+<?php 
+if<?php ($admin<?php !=<?php 1)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php não<?php é<?php um<?php administrador!'];<?php 
+<?php header("Location:<?php /");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$nome<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php nome<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+$nome<?php =<?php $nome<?php ?<?php explode('<?php ',<?php $nome)[0]<?php :<?php null;<?php 
+<?php 
+if<?php (isset($_POST['adicionar_raspadinha']))<?php {<?php 
+<?php $nome<?php =<?php $_POST['nome'];<?php 
+<?php $descricao<?php =<?php $_POST['descricao'];<?php 
+<?php $valor<?php =<?php str_replace(',',<?php '.',<?php $_POST['valor']);<?php 
+<?php 
+<?php $banner<?php =<?php '';<?php 
+<?php if<?php (isset($_FILES['banner'])<?php &&<?php $_FILES['banner']['error']<?php ==<?php 0)<?php {<?php 
+<?php $allowed<?php =<?php ['jpg',<?php 'jpeg',<?php 'png'];<?php 
+<?php $ext<?php =<?php pathinfo($_FILES['banner']['name'],<?php PATHINFO_EXTENSION);<?php 
+<?php 
+<?php if<?php (in_array(strtolower($ext),<?php $allowed))<?php {<?php 
+<?php $uploadDir<?php =<?php '../assets/img/banners/';<?php 
+<?php if<?php (!file_exists($uploadDir))<?php {<?php 
+<?php mkdir($uploadDir,<?php 0777,<?php true);<?php 
+<?php }<?php 
+<?php 
+<?php $newName<?php =<?php uniqid()<?php .<?php '.'<?php .<?php $ext;<?php 
+<?php $uploadPath<?php =<?php $uploadDir<?php .<?php $newName;<?php 
+<?php 
+<?php if<?php (move_uploaded_file($_FILES['banner']['tmp_name'],<?php $uploadPath))<?php {<?php 
+<?php $banner<?php =<?php '/assets/img/banners/'<?php .<?php $newName;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php fazer<?php upload<?php do<?php banner!';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Formato<?php de<?php arquivo<?php inválido!<?php Use<?php apenas<?php JPG<?php ou<?php PNG.';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("INSERT<?php INTO<?php raspadinhas<?php (nome,<?php descricao,<?php banner,<?php valor)<?php VALUES<?php (?,<?php ?,<?php ?,<?php ?)");<?php 
+<?php if<?php ($stmt->execute([$nome,<?php $descricao,<?php $banner,<?php $valor]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Raspadinha<?php adicionada<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php adicionar<?php raspadinha!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_POST['editar_raspadinha']))<?php {<?php 
+<?php $id<?php =<?php $_POST['id'];<?php 
+<?php $nome<?php =<?php $_POST['nome'];<?php 
+<?php $descricao<?php =<?php $_POST['descricao'];<?php 
+<?php $valor<?php =<?php str_replace(',',<?php '.',<?php $_POST['valor']);<?php 
+<?php 
+<?php $raspadinha<?php =<?php $pdo->prepare("SELECT<?php banner<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $raspadinha->execute([$id]);<?php 
+<?php $raspadinha<?php =<?php $raspadinha->fetch(PDO::FETCH_ASSOC);<?php 
+<?php $banner<?php =<?php $raspadinha['banner'];<?php 
+<?php 
+<?php if<?php (isset($_FILES['banner'])<?php &&<?php $_FILES['banner']['error']<?php ==<?php 0)<?php {<?php 
+<?php $allowed<?php =<?php ['jpg',<?php 'jpeg',<?php 'png'];<?php 
+<?php $ext<?php =<?php pathinfo($_FILES['banner']['name'],<?php PATHINFO_EXTENSION);<?php 
+<?php 
+<?php if<?php (in_array(strtolower($ext),<?php $allowed))<?php {<?php 
+<?php $uploadDir<?php =<?php '../assets/img/banners/';<?php 
+<?php $newName<?php =<?php uniqid()<?php .<?php '.'<?php .<?php $ext;<?php 
+<?php $uploadPath<?php =<?php $uploadDir<?php .<?php $newName;<?php 
+<?php 
+<?php if<?php (move_uploaded_file($_FILES['banner']['tmp_name'],<?php $uploadPath))<?php {<?php 
+<?php if<?php ($banner<?php &&<?php file_exists('../'<?php .<?php $banner))<?php {<?php 
+<?php unlink('../'<?php .<?php $banner);<?php 
+<?php }<?php 
+<?php $banner<?php =<?php '/assets/img/banners/'<?php .<?php $newName;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php fazer<?php upload<?php do<?php novo<?php banner!';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Formato<?php de<?php arquivo<?php inválido!<?php Use<?php apenas<?php JPG<?php ou<?php PNG.';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php raspadinhas<?php SET<?php nome<?php =<?php ?,<?php descricao<?php =<?php ?,<?php banner<?php =<?php ?,<?php valor<?php =<?php ?<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$nome,<?php $descricao,<?php $banner,<?php $valor,<?php $id]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Raspadinha<?php atualizada<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php atualizar<?php raspadinha!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_GET['excluir_raspadinha']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php 
+<?php $raspadinha<?php =<?php $pdo->prepare("SELECT<?php banner<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $raspadinha->execute([$id]);<?php 
+<?php $raspadinha<?php =<?php $raspadinha->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+<?php $pdo->prepare("DELETE<?php FROM<?php raspadinha_premios<?php WHERE<?php raspadinha_id<?php =<?php ?")->execute([$id]);<?php 
+<?php 
+<?php if<?php ($pdo->prepare("DELETE<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?")->execute([$id]))<?php {<?php 
+<?php if<?php ($raspadinha['banner']<?php &&<?php file_exists('../'<?php .<?php $raspadinha['banner']))<?php {<?php 
+<?php unlink('../'<?php .<?php $raspadinha['banner']);<?php 
+<?php }<?php 
+<?php $_SESSION['success']<?php =<?php 'Raspadinha<?php excluída<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php excluir<?php raspadinha!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_POST['adicionar_premio']))<?php {<?php 
+<?php $raspadinha_id<?php =<?php $_POST['raspadinha_id'];<?php 
+<?php $nome<?php =<?php $_POST['nome'];<?php 
+<?php $valor<?php =<?php str_replace(',',<?php '.',<?php $_POST['valor']);<?php 
+<?php $probabilidade<?php =<?php str_replace(',',<?php '.',<?php $_POST['probabilidade']);<?php 
+<?php 
+<?php $icone<?php =<?php '';<?php 
+<?php if<?php (isset($_FILES['icone'])<?php &&<?php $_FILES['icone']['error']<?php ==<?php 0)<?php {<?php 
+<?php $allowed<?php =<?php ['jpg',<?php 'jpeg',<?php 'png'];<?php 
+<?php $ext<?php =<?php pathinfo($_FILES['icone']['name'],<?php PATHINFO_EXTENSION);<?php 
+<?php 
+<?php if<?php (in_array(strtolower($ext),<?php $allowed))<?php {<?php 
+<?php $uploadDir<?php =<?php '../assets/img/icons/';<?php 
+<?php if<?php (!file_exists($uploadDir))<?php {<?php 
+<?php mkdir($uploadDir,<?php 0777,<?php true);<?php 
+<?php }<?php 
+<?php 
+<?php $newName<?php =<?php uniqid()<?php .<?php '.'<?php .<?php $ext;<?php 
+<?php $uploadPath<?php =<?php $uploadDir<?php .<?php $newName;<?php 
+<?php 
+<?php if<?php (move_uploaded_file($_FILES['icone']['tmp_name'],<?php $uploadPath))<?php {<?php 
+<?php $icone<?php =<?php '/assets/img/icons/'<?php .<?php $newName;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php fazer<?php upload<?php do<?php ícone!';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Formato<?php de<?php arquivo<?php inválido!<?php Use<?php apenas<?php JPG<?php ou<?php PNG.';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("INSERT<?php INTO<?php raspadinha_premios<?php (raspadinha_id,<?php nome,<?php icone,<?php valor,<?php probabilidade)<?php VALUES<?php (?,<?php ?,<?php ?,<?php ?,<?php ?)");<?php 
+<?php if<?php ($stmt->execute([$raspadinha_id,<?php $nome,<?php $icone,<?php $valor,<?php $probabilidade]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Prêmio<?php adicionado<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php adicionar<?php prêmio!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_POST['editar_premio']))<?php {<?php 
+<?php $id<?php =<?php $_POST['id'];<?php 
+<?php $raspadinha_id<?php =<?php $_POST['raspadinha_id'];<?php 
+<?php $nome<?php =<?php $_POST['nome'];<?php 
+<?php $valor<?php =<?php str_replace(',',<?php '.',<?php $_POST['valor']);<?php 
+<?php $probabilidade<?php =<?php str_replace(',',<?php '.',<?php $_POST['probabilidade']);<?php 
+<?php 
+<?php $premio<?php =<?php $pdo->prepare("SELECT<?php icone<?php FROM<?php raspadinha_premios<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $premio->execute([$id]);<?php 
+<?php $premio<?php =<?php $premio->fetch(PDO::FETCH_ASSOC);<?php 
+<?php $icone<?php =<?php $premio['icone'];<?php 
+<?php 
+<?php if<?php (isset($_FILES['icone'])<?php &&<?php $_FILES['icone']['error']<?php ==<?php 0)<?php {<?php 
+<?php $allowed<?php =<?php ['jpg',<?php 'jpeg',<?php 'png'];<?php 
+<?php $ext<?php =<?php pathinfo($_FILES['icone']['name'],<?php PATHINFO_EXTENSION);<?php 
+<?php 
+<?php if<?php (in_array(strtolower($ext),<?php $allowed))<?php {<?php 
+<?php $uploadDir<?php =<?php '../assets/img/icons/';<?php 
+<?php $newName<?php =<?php uniqid()<?php .<?php '.'<?php .<?php $ext;<?php 
+<?php $uploadPath<?php =<?php $uploadDir<?php .<?php $newName;<?php 
+<?php 
+<?php if<?php (move_uploaded_file($_FILES['icone']['tmp_name'],<?php $uploadPath))<?php {<?php 
+<?php if<?php ($icone<?php &&<?php file_exists('../'<?php .<?php $icone))<?php {<?php 
+<?php unlink('../'<?php .<?php $icone);<?php 
+<?php }<?php 
+<?php $icone<?php =<?php '/assets/img/icons/'<?php .<?php $newName;<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php fazer<?php upload<?php do<?php novo<?php ícone!';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Formato<?php de<?php arquivo<?php inválido!<?php Use<?php apenas<?php JPG<?php ou<?php PNG.';<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php raspadinha_premios<?php SET<?php nome<?php =<?php ?,<?php icone<?php =<?php ?,<?php valor<?php =<?php ?,<?php probabilidade<?php =<?php ?<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$nome,<?php $icone,<?php $valor,<?php $probabilidade,<?php $id]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Prêmio<?php atualizado<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php atualizar<?php prêmio!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_GET['excluir_premio']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php $raspadinha_id<?php =<?php $_GET['raspadinha_id'];<?php 
+<?php 
+<?php $premio<?php =<?php $pdo->prepare("SELECT<?php icone<?php FROM<?php raspadinha_premios<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $premio->execute([$id]);<?php 
+<?php $premio<?php =<?php $premio->fetch(PDO::FETCH_ASSOC);<?php 
+<?php 
+<?php if<?php ($pdo->prepare("DELETE<?php FROM<?php raspadinha_premios<?php WHERE<?php id<?php =<?php ?")->execute([$id]))<?php {<?php 
+<?php if<?php ($premio['icone']<?php &&<?php file_exists('../'<?php .<?php $premio['icone']))<?php {<?php 
+<?php unlink('../'<?php .<?php $premio['icone']);<?php 
+<?php }<?php 
+<?php $_SESSION['success']<?php =<?php 'Prêmio<?php excluído<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php excluir<?php prêmio!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF'].'?raspadinha_id='.$raspadinha_id);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$raspadinhas<?php =<?php $pdo->query("SELECT<?php *<?php FROM<?php raspadinhas<?php ORDER<?php BY<?php created_at<?php DESC")->fetchAll(PDO::FETCH_ASSOC);<?php 
+<?php 
+//<?php Calculate<?php statistics<?php 
+$total_raspadinhas<?php =<?php count($raspadinhas);<?php 
+$valor_total_raspadinhas<?php =<?php array_sum(array_column($raspadinhas,<?php 'valor'));<?php 
+<?php 
+$premios<?php =<?php [];<?php 
+$raspadinha_selecionada<?php =<?php null;<?php 
+if<?php (isset($_GET['raspadinha_id']))<?php {<?php 
+<?php $raspadinha_id<?php =<?php $_GET['raspadinha_id'];<?php 
+<?php $premios<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinha_premios<?php WHERE<?php raspadinha_id<?php =<?php ?<?php ORDER<?php BY<?php probabilidade<?php DESC");<?php 
+<?php $premios->execute([$raspadinha_id]);<?php 
+<?php $premios<?php =<?php $premios->fetchAll(PDO::FETCH_ASSOC);<?php 
+<?php 
+<?php $raspadinha_selecionada<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $raspadinha_selecionada->execute([$raspadinha_id]);<?php 
+<?php $raspadinha_selecionada<?php =<?php $raspadinha_selecionada->fetch(PDO::FETCH_ASSOC);<?php 
+}<?php 
+<?php 
+$total_premios<?php =<?php 0;<?php 
+$valor_total_premios<?php =<?php 0;<?php 
+if<?php (!empty($premios))<?php {<?php 
+<?php $total_premios<?php =<?php count($premios);<?php 
+<?php $valor_total_premios<?php =<?php array_sum(array_column($premios,<?php 'valor'));<?php 
+}<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite<?php ??<?php 'Admin';<?php ?><?php -<?php Gerenciar<?php Raspadinhas</title><?php 
+<?php 
+<?php <!--<?php TailwindCSS<?php --><?php 
+<?php <script<?php src="https://cdn.tailwindcss.com"></script><?php 
+<?php 
+<?php <!--<?php Font<?php Awesome<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><?php 
+<?php 
+<?php <!--<?php Notiflix<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Google<?php Fonts<?php --><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php *<?php {<?php 
+<?php margin:<?php 0;<?php 
+<?php padding:<?php 0;<?php 
+<?php box-sizing:<?php border-box;<?php 
+<?php }<?php 
+<?php 
+<?php body<?php {<?php 
+<?php font-family:<?php 'Inter',<?php -apple-system,<?php BlinkMacSystemFont,<?php sans-serif;<?php 
+<?php background:<?php #000000;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php overflow-x:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Advanced<?php Sidebar<?php Styles<?php -<?php Same<?php as<?php depositos.php<?php */<?php 
+<?php .sidebar<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 320px;<?php 
+<?php height:<?php 100vh;<?php 
+<?php background:<?php linear-gradient(145deg,<?php #0a0a0a<?php 0%,<?php #141414<?php 25%,<?php #1a1a1a<?php 50%,<?php #0f0f0f<?php 100%);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-right:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transition:<?php all<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 0<?php 50px<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php 
+<?php inset<?php 1px<?php 0<?php 0<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 20%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.1)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 60%,<?php rgba(59,<?php 130,<?php 246,<?php 0.05)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar.hidden<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Enhanced<?php Sidebar<?php Header<?php */<?php 
+<?php .sidebar-header<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php padding:<?php 2.5rem<?php 2rem;<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php }<?php 
+<?php 
+<?php .logo<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e<?php 0%,<?php #16a34a<?php 100%);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3),<?php 
+<?php 0<?php 4px<?php 8px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -2px;<?php 
+<?php left:<?php -2px;<?php 
+<?php right:<?php -2px;<?php 
+<?php bottom:<?php -2px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a,<?php #22c55e);<?php 
+<?php border-radius:<?php 18px;<?php 
+<?php z-index:<?php -1;<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .logo:hover<?php .logo-icon::after<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-text<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-title<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-subtitle<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Advanced<?php Navigation<?php */<?php 
+<?php .nav-menu<?php {<?php 
+<?php padding:<?php 2rem<?php 0;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section<?php {<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section-title<?php {<?php 
+<?php padding:<?php 0<?php 2rem<?php 0.75rem<?php 2rem;<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php padding:<?php 1rem<?php 2rem;<?php 
+<?php color:<?php #a1a1aa;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php position:<?php relative;<?php 
+<?php margin:<?php 0.25rem<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 0;<?php 
+<?php top:<?php 0;<?php 
+<?php bottom:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 0<?php 4px<?php 4px<?php 0;<?php 
+<?php transform:<?php scaleY(0);<?php 
+<?php transition:<?php transform<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover::before,<?php 
+<?php .nav-item.active::before<?php {<?php 
+<?php transform:<?php scaleY(1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover,<?php 
+<?php .nav-item.active<?php {<?php 
+<?php color:<?php #ffffff;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.05)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php translateX(4px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-icon<?php {<?php 
+<?php width:<?php 24px;<?php 
+<?php height:<?php 24px;<?php 
+<?php margin-right:<?php 1rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-text<?php {<?php 
+<?php font-size:<?php 0.95rem;<?php 
+<?php flex:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Content<?php */<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 320px;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php transition:<?php margin-left<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 10%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.03)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.02)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 40%,<?php rgba(59,<?php 130,<?php 246,<?php 0.01)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content.expanded<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Enhanced<?php Header<?php */<?php 
+<?php .header<?php {<?php 
+<?php position:<?php sticky;<?php 
+<?php top:<?php 0;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.95);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php padding:<?php 1.5rem<?php 2.5rem;<?php 
+<?php z-index:<?php 100;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .header-content<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php none;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(34,<?php 197,<?php 94,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php scale(1.05);<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-avatar<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Page<?php Content<?php */<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-section<?php {<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff<?php 0%,<?php #fff<?php 50%,<?php #fff<?php 100%);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-subtitle<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-weight:<?php 400;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Stats<?php Cards<?php */<?php 
+<?php .stats-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(280px,<?php 1fr));<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 3px;<?php 
+<?php background:<?php linear-gradient(90deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php box-shadow:<?php 0<?php 15px<?php 35px<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-icon<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-icon.purple<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(147,<?php 51,<?php 234,<?php 0.2)<?php 0%,<?php rgba(147,<?php 51,<?php 234,<?php 0.1)<?php 100%);<?php 
+<?php border-color:<?php rgba(147,<?php 51,<?php 234,<?php 0.3);<?php 
+<?php color:<?php #9333ea;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-value<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-label<?php {<?php 
+<?php color:<?php #a1a1aa;<?php 
+<?php font-size:<?php 0.875rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Form<?php Section<?php */<?php 
+<?php .form-section<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php }<?php 
+<?php 
+<?php .form-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-icon-container<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.125rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-title<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php }<?php 
+<?php 
+<?php .form-group<?php {<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-label<?php {<?php 
+<?php display:<?php block;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 0.75rem<?php 1rem;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .form-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .form-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .form-button<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border:<?php none;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 0.875rem<?php 1.5rem;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .form-button:hover<?php {<?php 
+<?php transform:<?php translateY(-1px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 16px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .cancel-button<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.3);<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 0.75rem<?php 1.5rem;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php text-align:<?php center;<?php 
+<?php display:<?php block;<?php 
+<?php margin-top:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .cancel-button:hover<?php {<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Raspadinha<?php Cards<?php */<?php 
+<?php .raspadinha-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php width:<?php 100px;<?php 
+<?php height:<?php 100px;<?php 
+<?php background:<?php radial-gradient(circle,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 70%);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-card:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-card:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 40px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-name<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-description<?php {<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-banner<?php {<?php 
+<?php width:<?php 80px;<?php 
+<?php height:<?php 50px;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php object-fit:<?php cover;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-value<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-date<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.875rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php padding-top:<?php 1rem;<?php 
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-date<?php i<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .action-buttons<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php margin-top:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .action-btn<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php padding:<?php 0.75rem<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php text-align:<?php center;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .action-btn:hover<?php {<?php 
+<?php transform:<?php translateY(-1px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-manage<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #3b82f6,<?php #2563eb);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-edit<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #f59e0b,<?php #d97706);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-delete<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Prize<?php Cards<?php */<?php 
+<?php .prize-card<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-card:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.15);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php }<?php 
+<?php 
+<?php .prize-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php center;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-name<?php {<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php white;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-icon<?php {<?php 
+<?php width:<?php 32px;<?php 
+<?php height:<?php 32px;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php object-fit:<?php cover;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php .prize-info<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-stat<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-stat<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php width:<?php 16px;<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-actions<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-action-btn<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php padding:<?php 0.5rem<?php 1rem;<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php font-size:<?php 0.85rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php text-align:<?php center;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-edit-btn<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #f59e0b,<?php #d97706);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-delete-btn<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .prize-action-btn:hover<?php {<?php 
+<?php transform:<?php translateY(-1px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Selected<?php Raspadinha<?php Header<?php */<?php 
+<?php .selected-raspadinha<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .selected-raspadinha<?php h3<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.3rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php margin:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .selected-raspadinha<?php p<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php margin:<?php 0.5rem<?php 0<?php 0<?php 0;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .back-btn<?php {<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.3);<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php padding:<?php 0.75rem<?php 1.5rem;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .back-btn:hover<?php {<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.4);<?php 
+<?php transform:<?php translateY(-1px);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Content<?php Grid<?php */<?php 
+<?php .content-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(400px,<?php 1fr));<?php 
+<?php gap:<?php 2rem;<?php /*<?php Aumentar<?php de<?php 1.5rem<?php para<?php 2rem<?php ou<?php mais<?php */<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php /*<?php Adicionar<?php esta<?php linha<?php */<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Current<?php Image<?php Preview<?php */<?php 
+<?php .current-image<?php {<?php 
+<?php margin-top:<?php 0.5rem;<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php border-radius:<?php 8px;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .current-image<?php p<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .current-image<?php img<?php {<?php 
+<?php max-width:<?php 100%;<?php 
+<?php height:<?php auto;<?php 
+<?php border-radius:<?php 6px;<?php 
+<?php max-height:<?php 100px;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Empty<?php States<?php */<?php 
+<?php .empty-state<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php padding:<?php 4rem<?php 2rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.3)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.4)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php backdrop-filter:<?php blur(10px);<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php i<?php {<?php 
+<?php font-size:<?php 4rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php opacity:<?php 0.3;<?php 
+<?php color:<?php #374151;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php h3<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php p<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 400;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Scroll<?php Container<?php */<?php 
+<?php .scroll-container<?php {<?php 
+<?php max-height:<?php 500px;<?php 
+<?php overflow-y:<?php auto;<?php 
+<?php overflow-x:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .scroll-container::-webkit-scrollbar<?php {<?php 
+<?php width:<?php 8px;<?php 
+<?php }<?php 
+<?php 
+<?php .scroll-container::-webkit-scrollbar-track<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.1);<?php 
+<?php border-radius:<?php 4px;<?php 
+<?php }<?php 
+<?php 
+<?php .scroll-container::-webkit-scrollbar-thumb<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 4px;<?php 
+<?php }<?php 
+<?php 
+<?php .scroll-container::-webkit-scrollbar-thumb:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Mobile<?php Styles<?php */<?php 
+<?php @media<?php (max-width:<?php 1024px)<?php {<?php 
+<?php .sidebar<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php width:<?php 300px;<?php 
+<?php z-index:<?php 1001;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar:not(.hidden)<?php {<?php 
+<?php transform:<?php translateX(0);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php block;<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php span<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(250px,<?php 1fr));<?php 
+<?php }<?php 
+<?php 
+<?php .content-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinhas-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .header<?php {<?php 
+<?php padding:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 2.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-card<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-header<?php {<?php 
+<?php flex-direction:<?php column;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .action-buttons<?php {<?php 
+<?php flex-direction:<?php column;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 280px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 1.875rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .raspadinha-value<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 260px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Overlay<?php for<?php mobile<?php */<?php 
+<?php .overlay<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.7);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php opacity:<?php 0;<?php 
+<?php visibility:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(4px);<?php 
+<?php }<?php 
+<?php 
+<?php .overlay.active<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php visibility:<?php visible;<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <!--<?php Notifications<?php --><?php 
+<?php <?php<?php if<?php (isset($_SESSION['success'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.success('<?php=<?php $_SESSION['success']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['success']);<?php ?><?php 
+<?php <?php<?php elseif<?php (isset($_SESSION['failure'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.failure('<?php=<?php $_SESSION['failure']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['failure']);<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <!--<?php Overlay<?php for<?php mobile<?php --><?php 
+<?php <div<?php class="overlay"<?php id="overlay"></div><?php 
+<?php 
+<?php <!--<?php Advanced<?php Sidebar<?php --><?php 
+<?php <aside<?php class="sidebar"<?php id="sidebar"><?php 
+<?php <div<?php class="sidebar-header"><?php 
+<?php <a<?php href="#"<?php class="logo"><?php 
+<?php <div<?php class="logo-icon"><?php 
+<?php <i<?php class="fas<?php fa-bolt"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="logo-text"><?php 
+<?php <div<?php class="logo-title">Dashboard</div><?php 
+<?php </div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <nav<?php class="nav-menu"><?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Principal</div><?php 
+<?php <a<?php href="index.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-chart-pie"></i></div><?php 
+<?php <div<?php class="nav-text">Dashboard</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Gestão</div><?php 
+<?php <a<?php href="usuarios.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user"></i></div><?php 
+<?php <div<?php class="nav-text">Usuários</div><?php 
+<?php </a><?php 
+<?php <a<?php href="afiliados.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user-plus"></i></div><?php 
+<?php <div<?php class="nav-text">Afiliados</div><?php 
+<?php </a><?php 
+<?php <a<?php href="depositos.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-credit-card"></i></div><?php 
+<?php <div<?php class="nav-text">Depósitos</div><?php 
+<?php </a><?php 
+<?php <a<?php href="saques.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-money-bill-wave"></i></div><?php 
+<?php <div<?php class="nav-text">Saques</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Sistema</div><?php 
+<?php <a<?php href="config.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-cogs"></i></div><?php 
+<?php <div<?php class="nav-text">Configurações</div><?php 
+<?php </a><?php 
+<?php <a<?php href="gateway.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-usd"></i></div><?php 
+<?php <div<?php class="nav-text">Gateway</div><?php 
+<?php </a><?php 
+<?php <a<?php href="banners.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-images"></i></div><?php 
+<?php <div<?php class="nav-text">Banners</div><?php 
+<?php </a><?php 
+<?php <a<?php href="cartelas.php"<?php class="nav-item<?php active"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-diamond"></i></div><?php 
+<?php <div<?php class="nav-text">Raspadinhas</div><?php 
+<?php </a><?php 
+<?php <a<?php href="../logout"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-sign-out-alt"></i></div><?php 
+<?php <div<?php class="nav-text">Sair</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </nav><?php 
+<?php </aside><?php 
+<?php 
+<?php <!--<?php Main<?php Content<?php --><?php 
+<?php <main<?php class="main-content"<?php id="mainContent"><?php 
+<?php <!--<?php Enhanced<?php Header<?php --><?php 
+<?php <header<?php class="header"><?php 
+<?php <div<?php class="header-content"><?php 
+<?php <div<?php style="display:<?php flex;<?php align-items:<?php center;<?php gap:<?php 1rem;"><?php 
+<?php <button<?php class="menu-toggle"<?php id="menuToggle"><?php 
+<?php <i<?php class="fas<?php fa-bars"></i><?php 
+<?php </button><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="header-actions"><?php 
+<?php <span<?php style="color:<?php #a1a1aa;<?php font-size:<?php 0.9rem;<?php display:<?php none;">Bem-vindo,<?php <?php=<?php htmlspecialchars($nome)<?php ?></span><?php 
+<?php <div<?php class="user-avatar"><?php 
+<?php <?php=<?php strtoupper(substr($nome,<?php 0,<?php 1))<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </header><?php 
+<?php 
+<?php <!--<?php Page<?php Content<?php --><?php 
+<?php <div<?php class="page-content"><?php 
+<?php <!--<?php Welcome<?php Section<?php --><?php 
+<?php <section<?php class="welcome-section"><?php 
+<?php <h2<?php class="welcome-title">Gerenciar<?php Raspadinhas</h2><?php 
+<?php <p<?php class="welcome-subtitle">Crie<?php e<?php configure<?php raspadinhas<?php e<?php seus<?php prêmios<?php de<?php forma<?php fácil<?php e<?php intuitiva</p><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Stats<?php Grid<?php --><?php 
+<?php <section<?php class="stats-grid"><?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-ticket"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format($total_raspadinhas,<?php 0,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Total<?php de<?php Raspadinhas</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon<?php purple"><?php 
+<?php <i<?php class="fas<?php fa-gift"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format($total_premios,<?php 0,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Total<?php de<?php Prêmios</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-dollar-sign"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value">R$<?php <?php=<?php number_format($valor_total_raspadinhas,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Valor<?php Total<?php Raspadinhas</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon<?php purple"><?php 
+<?php <i<?php class="fas<?php fa-trophy"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value">R$<?php <?php=<?php number_format($valor_total_premios,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Valor<?php Total<?php Prêmios</div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php if<?php (isset($_GET['raspadinha_id'])):<?php ?><?php 
+<?php <!--<?php Selected<?php Raspadinha<?php Header<?php --><?php 
+<?php <div<?php class="selected-raspadinha"><?php 
+<?php <div<?php class="flex-1"><?php 
+<?php <h3>🎯<?php Gerenciando:<?php <?php=<?php htmlspecialchars($raspadinha_selecionada['nome'])<?php ?></h3><?php 
+<?php <p>Configure<?php os<?php prêmios<?php desta<?php raspadinha</p><?php 
+<?php </div><?php 
+<?php <a<?php href="?"<?php class="back-btn"><?php 
+<?php <i<?php class="fas<?php fa-arrow-left"></i><?php 
+<?php Voltar<?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <!--<?php Main<?php Content<?php Grid<?php --><?php 
+<?php <div<?php class="content-grid"><?php 
+<?php <!--<?php Form<?php Section<?php --><?php 
+<?php <section<?php class="form-section"><?php 
+<?php <div<?php class="form-header"><?php 
+<?php <div<?php class="form-icon-container"><?php 
+<?php <i<?php class="fas<?php fa-<?php=<?php isset($_GET['editar_raspadinha'])<?php ?<?php 'edit'<?php :<?php 'plus'<?php ?>"></i><?php 
+<?php </div><?php 
+<?php <h3<?php class="form-title"><?php 
+<?php <?php=<?php isset($_GET['editar_raspadinha'])<?php ?<?php 'Editar'<?php :<?php 'Adicionar'<?php ?><?php Raspadinha<?php 
+<?php </h3><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php 
+<?php $raspadinha_edit<?php =<?php null;<?php 
+<?php if<?php (isset($_GET['editar_raspadinha']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php $raspadinha_edit<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinhas<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $raspadinha_edit->execute([$id]);<?php 
+<?php $raspadinha_edit<?php =<?php $raspadinha_edit->fetch(PDO::FETCH_ASSOC);<?php 
+<?php }<?php 
+<?php ?><?php 
+<?php 
+<?php <form<?php method="POST"<?php enctype="multipart/form-data"><?php 
+<?php <?php<?php if<?php ($raspadinha_edit):<?php ?><?php 
+<?php <input<?php type="hidden"<?php name="id"<?php value="<?php=<?php $raspadinha_edit['id']<?php ?>"><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-signature"></i><?php 
+<?php Nome<?php da<?php Raspadinha<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="nome"<?php value="<?php=<?php $raspadinha_edit<?php ?<?php htmlspecialchars($raspadinha_edit['nome'])<?php :<?php ''<?php ?>"<?php class="form-input"<?php placeholder="Digite<?php o<?php nome<?php da<?php raspadinha..."<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-align-left"></i><?php 
+<?php Descrição<?php 
+<?php </label><?php 
+<?php <textarea<?php name="descricao"<?php class="form-input"<?php rows="3"<?php placeholder="Descreva<?php a<?php raspadinha..."<?php required><?php=<?php $raspadinha_edit<?php ?<?php htmlspecialchars($raspadinha_edit['descricao'])<?php :<?php ''<?php ?></textarea><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-dollar-sign"></i><?php 
+<?php Valor<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="valor"<?php value="<?php=<?php $raspadinha_edit<?php ?<?php htmlspecialchars($raspadinha_edit['valor'])<?php :<?php ''<?php ?>"<?php class="form-input"<?php placeholder="0,00"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-image"></i><?php 
+<?php Banner<?php da<?php Raspadinha<?php 
+<?php </label><?php 
+<?php <input<?php type="file"<?php name="banner"<?php accept="image/jpeg,<?php image/png"<?php class="form-input"><?php 
+<?php <?php<?php if<?php ($raspadinha_edit<?php &&<?php $raspadinha_edit['banner']):<?php ?><?php 
+<?php <div<?php class="current-image"><?php 
+<?php <p>Banner<?php atual:</p><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($raspadinha_edit['banner'])<?php ?>"<?php alt="Banner<?php atual"><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <button<?php type="submit"<?php name="<?php=<?php $raspadinha_edit<?php ?<?php 'editar_raspadinha'<?php :<?php 'adicionar_raspadinha'<?php ?>"<?php class="form-button"><?php 
+<?php <i<?php class="fas<?php fa-save"></i><?php 
+<?php <?php=<?php $raspadinha_edit<?php ?<?php 'Atualizar'<?php :<?php 'Adicionar'<?php ?><?php Raspadinha<?php 
+<?php </button><?php 
+<?php 
+<?php <?php<?php if<?php ($raspadinha_edit):<?php ?><?php 
+<?php <a<?php href="?"<?php class="cancel-button"><?php 
+<?php <i<?php class="fas<?php fa-times"></i><?php 
+<?php Cancelar<?php 
+<?php </a><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </form><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php List<?php Section<?php --><?php 
+<?php <section<?php class="form-section"><?php 
+<?php <div<?php class="form-header"><?php 
+<?php <div<?php class="form-icon-container"><?php 
+<?php <i<?php class="fas<?php fa-list"></i><?php 
+<?php </div><?php 
+<?php <h3<?php class="form-title">Raspadinhas<?php Cadastradas</h3><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="scroll-container"><?php 
+<?php <?php<?php if<?php (empty($raspadinhas)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="fas<?php fa-ticket"></i><?php 
+<?php <h3>Nenhuma<?php raspadinha<?php cadastrada</h3><?php 
+<?php <p>Comece<?php criando<?php sua<?php primeira<?php raspadinha</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <?php<?php foreach<?php ($raspadinhas<?php as<?php $raspadinha):<?php ?><?php 
+<?php <div<?php class="raspadinha-card"><?php 
+<?php <div<?php class="raspadinha-header"><?php 
+<?php <div<?php class="flex-1"><?php 
+<?php <h3<?php class="raspadinha-name"><?php=<?php htmlspecialchars($raspadinha['nome'])<?php ?></h3><?php 
+<?php <p<?php class="raspadinha-description"><?php=<?php htmlspecialchars($raspadinha['descricao'])<?php ?></p><?php 
+<?php </div><?php 
+<?php <?php<?php if<?php ($raspadinha['banner']):<?php ?><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($raspadinha['banner'])<?php ?>"<?php alt="Banner"<?php class="raspadinha-banner"><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="raspadinha-value"><?php 
+<?php R$<?php <?php=<?php number_format($raspadinha['valor'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="raspadinha-date"><?php 
+<?php <i<?php class="fas<?php fa-calendar"></i><?php 
+<?php <span><?php=<?php date('d/m/Y<?php H:i',<?php strtotime($raspadinha['created_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="action-buttons"><?php 
+<?php <a<?php href="?raspadinha_id=<?php=<?php $raspadinha['id']<?php ?>"<?php class="action-btn<?php btn-manage"><?php 
+<?php <i<?php class="fas<?php fa-cog"></i><?php 
+<?php Gerenciar<?php 
+<?php </a><?php 
+<?php <a<?php href="?editar_raspadinha&id=<?php=<?php $raspadinha['id']<?php ?>"<?php class="action-btn<?php btn-edit"><?php 
+<?php <i<?php class="fas<?php fa-edit"></i><?php 
+<?php Editar<?php 
+<?php </a><?php 
+<?php <a<?php href="?excluir_raspadinha&id=<?php=<?php $raspadinha['id']<?php ?>"<?php onclick="return<?php confirm('Tem<?php certeza<?php que<?php deseja<?php excluir<?php esta<?php raspadinha<?php e<?php todos<?php os<?php seus<?php prêmios?')"<?php class="action-btn<?php btn-delete"><?php 
+<?php <i<?php class="fas<?php fa-trash"></i><?php 
+<?php Excluir<?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php if<?php (isset($_GET['raspadinha_id'])):<?php ?><?php 
+<?php <!--<?php Prêmios<?php Section<?php --><?php 
+<?php <div<?php class="content-grid"><?php 
+<?php <!--<?php Add<?php Prize<?php Form<?php --><?php 
+<?php <section<?php class="form-section"><?php 
+<?php <div<?php class="form-header"><?php 
+<?php <div<?php class="form-icon-container"><?php 
+<?php <i<?php class="fas<?php fa-<?php=<?php isset($_GET['editar_premio'])<?php ?<?php 'edit'<?php :<?php 'gift'<?php ?>"></i><?php 
+<?php </div><?php 
+<?php <h3<?php class="form-title"><?php 
+<?php <?php=<?php isset($_GET['editar_premio'])<?php ?<?php 'Editar'<?php :<?php 'Adicionar'<?php ?><?php Prêmio<?php 
+<?php </h3><?php 
+<?php </div><?php 
+<?php 
+<?php <?php<?php 
+<?php $premio_edit<?php =<?php null;<?php 
+<?php if<?php (isset($_GET['editar_premio']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php $premio_edit<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php raspadinha_premios<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php $premio_edit->execute([$id]);<?php 
+<?php $premio_edit<?php =<?php $premio_edit->fetch(PDO::FETCH_ASSOC);<?php 
+<?php }<?php 
+<?php ?><?php 
+<?php 
+<?php <form<?php method="POST"<?php enctype="multipart/form-data"><?php 
+<?php <input<?php type="hidden"<?php name="raspadinha_id"<?php value="<?php=<?php $_GET['raspadinha_id']<?php ?>"><?php 
+<?php <?php<?php if<?php ($premio_edit):<?php ?><?php 
+<?php <input<?php type="hidden"<?php name="id"<?php value="<?php=<?php $premio_edit['id']<?php ?>"><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-tag"></i><?php 
+<?php Nome<?php do<?php Prêmio<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="nome"<?php value="<?php=<?php $premio_edit<?php ?<?php htmlspecialchars($premio_edit['nome'])<?php :<?php ''<?php ?>"<?php class="form-input"<?php placeholder="Digite<?php o<?php nome<?php do<?php prêmio..."<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-dollar-sign"></i><?php 
+<?php Valor<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="valor"<?php value="<?php=<?php $premio_edit<?php ?<?php htmlspecialchars($premio_edit['valor'])<?php :<?php ''<?php ?>"<?php class="form-input"<?php placeholder="0,00"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-percentage"></i><?php 
+<?php Probabilidade<?php (0.00<?php -<?php 100.00)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="probabilidade"<?php value="<?php=<?php $premio_edit<?php ?<?php htmlspecialchars($premio_edit['probabilidade'])<?php :<?php ''<?php ?>"<?php class="form-input"<?php placeholder="5.00"<?php required><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="form-group"><?php 
+<?php <label<?php class="form-label"><?php 
+<?php <i<?php class="fas<?php fa-image"></i><?php 
+<?php Ícone<?php do<?php Prêmio<?php 
+<?php </label><?php 
+<?php <input<?php type="file"<?php name="icone"<?php accept="image/jpeg,<?php image/png"<?php class="form-input"><?php 
+<?php <?php<?php if<?php ($premio_edit<?php &&<?php $premio_edit['icone']):<?php ?><?php 
+<?php <div<?php class="current-image"><?php 
+<?php <p>Ícone<?php atual:</p><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($premio_edit['icone'])<?php ?>"<?php alt="Ícone<?php atual"><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <button<?php type="submit"<?php name="<?php=<?php $premio_edit<?php ?<?php 'editar_premio'<?php :<?php 'adicionar_premio'<?php ?>"<?php class="form-button"><?php 
+<?php <i<?php class="fas<?php fa-save"></i><?php 
+<?php <?php=<?php $premio_edit<?php ?<?php 'Atualizar'<?php :<?php 'Adicionar'<?php ?><?php Prêmio<?php 
+<?php </button><?php 
+<?php 
+<?php <?php<?php if<?php ($premio_edit):<?php ?><?php 
+<?php <a<?php href="?raspadinha_id=<?php=<?php $_GET['raspadinha_id']<?php ?>"<?php class="cancel-button"><?php 
+<?php <i<?php class="fas<?php fa-times"></i><?php 
+<?php Cancelar<?php 
+<?php </a><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </form><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Prizes<?php List<?php --><?php 
+<?php <section<?php class="form-section"><?php 
+<?php <div<?php class="form-header"><?php 
+<?php <div<?php class="form-icon-container"><?php 
+<?php <i<?php class="fas<?php fa-gift"></i><?php 
+<?php </div><?php 
+<?php <h3<?php class="form-title">Prêmios<?php Cadastrados</h3><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="scroll-container"><?php 
+<?php <?php<?php if<?php (empty($premios)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="fas<?php fa-gift"></i><?php 
+<?php <h3>Nenhum<?php prêmio<?php cadastrado</h3><?php 
+<?php <p>Adicione<?php prêmios<?php para<?php esta<?php raspadinha</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <?php<?php foreach<?php ($premios<?php as<?php $premio):<?php ?><?php 
+<?php <div<?php class="prize-card"><?php 
+<?php <div<?php class="prize-header"><?php 
+<?php <div<?php class="prize-name"><?php 
+<?php <?php<?php if<?php ($premio['icone']):<?php ?><?php 
+<?php <img<?php src="<?php=<?php htmlspecialchars($premio['icone'])<?php ?>"<?php alt="Ícone"<?php class="prize-icon"><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php <?php=<?php htmlspecialchars($premio['nome'])<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="prize-info"><?php 
+<?php <div<?php class="prize-stat"><?php 
+<?php <i<?php class="fas<?php fa-dollar-sign"></i><?php 
+<?php <span>R$<?php <?php=<?php number_format($premio['valor'],<?php 2,<?php ',',<?php '.')<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="prize-stat"><?php 
+<?php <i<?php class="fas<?php fa-percentage"></i><?php 
+<?php <span><?php=<?php number_format($premio['probabilidade'],<?php 2,<?php ',',<?php '.')<?php ?>%</span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="prize-actions"><?php 
+<?php <a<?php href="?raspadinha_id=<?php=<?php $_GET['raspadinha_id']<?php ?>&editar_premio&id=<?php=<?php $premio['id']<?php ?>"<?php class="prize-action-btn<?php prize-edit-btn"><?php 
+<?php <i<?php class="fas<?php fa-edit"></i><?php 
+<?php Editar<?php 
+<?php </a><?php 
+<?php <a<?php href="?raspadinha_id=<?php=<?php $_GET['raspadinha_id']<?php ?>&excluir_premio&id=<?php=<?php $premio['id']<?php ?>"<?php onclick="return<?php confirm('Tem<?php certeza<?php que<?php deseja<?php excluir<?php este<?php prêmio?')"<?php class="prize-action-btn<?php prize-delete-btn"><?php 
+<?php <i<?php class="fas<?php fa-trash"></i><?php 
+<?php Excluir<?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </main><?php 
+<?php 
+<?php <script><?php 
+<?php //<?php Mobile<?php menu<?php toggle<?php with<?php smooth<?php animations<?php 
+<?php const<?php menuToggle<?php =<?php document.getElementById('menuToggle');<?php 
+<?php const<?php sidebar<?php =<?php document.getElementById('sidebar');<?php 
+<?php const<?php mainContent<?php =<?php document.getElementById('mainContent');<?php 
+<?php const<?php overlay<?php =<?php document.getElementById('overlay');<?php 
+<?php 
+<?php menuToggle.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php const<?php isHidden<?php =<?php sidebar.classList.contains('hidden');<?php 
+<?php 
+<?php if<?php (isHidden)<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php overlay.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Close<?php sidebar<?php on<?php window<?php resize<?php if<?php it's<?php mobile<?php 
+<?php window.addEventListener('resize',<?php ()<?php =><?php {<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Enhanced<?php hover<?php effects<?php for<?php nav<?php items<?php 
+<?php document.querySelectorAll('.nav-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('mouseenter',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(8px)';<?php 
+<?php });<?php 
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {<?php 
+<?php if<?php (!this.classList.contains('active'))<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(0)';<?php 
+<?php }<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php ()<?php =><?php {<?php 
+<?php console.log('%c🎯<?php Raspadinhas<?php carregadas!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php 
+<?php //<?php Auto-format<?php currency<?php inputs<?php 
+<?php const<?php currencyInputs<?php =<?php document.querySelectorAll('input[name="valor"]');<?php 
+<?php currencyInputs.forEach(input<?php =><?php {<?php 
+<?php input.addEventListener('input',<?php function(e)<?php {<?php 
+<?php let<?php value<?php =<?php e.target.value.replace(/[^\d,]/g,<?php '');<?php 
+<?php e.target.value<?php =<?php value;<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Auto-format<?php percentage<?php inputs<?php 
+<?php const<?php percentageInputs<?php =<?php document.querySelectorAll('input[name="probabilidade"]');<?php 
+<?php percentageInputs.forEach(input<?php =><?php {<?php 
+<?php input.addEventListener('input',<?php function(e)<?php {<?php 
+<?php let<?php value<?php =<?php e.target.value.replace(/[^\d,]/g,<?php '');<?php 
+<?php e.target.value<?php =<?php value;<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Check<?php if<?php mobile<?php on<?php load<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Animate<?php cards<?php on<?php load<?php 
+<?php const<?php raspadinhaCards<?php =<?php document.querySelectorAll('.raspadinha-card,<?php .prize-card');<?php 
+<?php raspadinhaCards.forEach((card,<?php index)<?php =><?php {<?php 
+<?php card.style.opacity<?php =<?php '0';<?php 
+<?php card.style.transform<?php =<?php 'translateY(20px)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';<?php 
+<?php card.style.opacity<?php =<?php '1';<?php 
+<?php card.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php },<?php index<?php *<?php 100);<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Animate<?php stats<?php cards<?php 
+<?php const<?php statCards<?php =<?php document.querySelectorAll('.mini-stat-card');<?php 
+<?php statCards.forEach((card,<?php index)<?php =><?php {<?php 
+<?php card.style.opacity<?php =<?php '0';<?php 
+<?php card.style.transform<?php =<?php 'translateY(20px)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';<?php 
+<?php card.style.opacity<?php =<?php '1';<?php 
+<?php card.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php },<?php index<?php *<?php 150);<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Scroll<?php to<?php top<?php when<?php editing<?php (smooth<?php behavior)<?php 
+<?php const<?php currentUrl<?php =<?php new<?php URL(window.location.href);<?php 
+<?php const<?php hasEditParams<?php =<?php currentUrl.searchParams.has('editar_raspadinha')<?php ||<?php 
+<?php currentUrl.searchParams.has('editar_premio');<?php 
+<?php 
+<?php if<?php (hasEditParams)<?php {<?php 
+<?php window.scrollTo({<?php top:<?php 0,<?php behavior:<?php 'smooth'<?php });<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Smooth<?php scroll<?php behavior<?php 
+<?php document.documentElement.style.scrollBehavior<?php =<?php 'smooth';<?php 
+<?php </script><?php 
+</body><?php 
 </html>

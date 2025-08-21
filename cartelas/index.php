@@ -1,703 +1,703 @@
 <?php
 @session_start();
-require_once '../conexao.php';
+require_once<?php '../conexao.php';
 
-// Ordenar por valor decrescente (maior para menor) primeiro
-$sql = "
-    SELECT r.*, 
-           MAX(p.valor) AS maior_premio
-      FROM raspadinhas r
- LEFT JOIN raspadinha_premios p ON p.raspadinha_id = r.id
-  GROUP BY r.id
-  ORDER BY r.valor DESC, r.created_at DESC
+//<?php Ordenar<?php por<?php valor<?php decrescente<?php (maior<?php para<?php menor)<?php primeiro
+$sql<?php =<?php "
+<?php SELECT<?php r.*,<?php 
+<?php MAX(p.valor)<?php AS<?php maior_premio
+<?php FROM<?php raspadinhas<?php r
+<?php LEFT<?php JOIN<?php raspadinha_premios<?php p<?php ON<?php p.raspadinha_id<?php =<?php r.id
+<?php GROUP<?php BY<?php r.id
+<?php ORDER<?php BY<?php r.valor<?php DESC,<?php r.created_at<?php DESC
 ";
-$cartelas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+$cartelas<?php =<?php $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE<?php html>
+<html<?php lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Raspadinhas</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
+<?php <meta<?php charset="UTF-8">
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0">
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Raspadinhas</title>
+<?php 
+<?php <!--<?php Fonts<?php -->
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com">
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin>
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet">
+<?php 
+<?php <!--<?php Icons<?php -->
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<?php 
+<?php <!--<?php Styles<?php -->
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php=<?php time();<?php ?>">
+<?php 
+<?php <!--<?php Scripts<?php -->
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet">
 
-    <style>
-        /* Page Specific Styles */
-        .cartelas-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 200px);
-        }
+<?php <style>
+<?php /*<?php Page<?php Specific<?php Styles<?php */
+<?php .cartelas-section<?php {
+<?php margin-top:<?php 100px;
+<?php padding:<?php 4rem<?php 0;
+<?php background:<?php #0a0a0a;
+<?php min-height:<?php calc(100vh<?php -<?php 200px);
+<?php }
 
-        .cartelas-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
+<?php .cartelas-container<?php {
+<?php max-width:<?php 1400px;
+<?php margin:<?php 0<?php auto;
+<?php padding:<?php 0<?php 2rem;
+<?php }
 
-        .page-header {
-            text-align: center;
-            margin-bottom: 4rem;
-        }
+<?php .page-header<?php {
+<?php text-align:<?php center;
+<?php margin-bottom:<?php 4rem;
+<?php }
 
-        .page-title {
-            font-size: 3rem;
-            font-weight: 900;
-            color: white;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #ffffff, #9ca3af);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+<?php .page-title<?php {
+<?php font-size:<?php 3rem;
+<?php font-weight:<?php 900;
+<?php color:<?php white;
+<?php margin-bottom:<?php 1rem;
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #9ca3af);
+<?php background-clip:<?php text;
+<?php -webkit-background-clip:<?php text;
+<?php -webkit-text-fill-color:<?php transparent;
+<?php }
 
-        .page-subtitle {
-            font-size: 1.2rem;
-            color: #6b7280;
-            max-width: 600px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
+<?php .page-subtitle<?php {
+<?php font-size:<?php 1.2rem;
+<?php color:<?php #6b7280;
+<?php max-width:<?php 600px;
+<?php margin:<?php 0<?php auto;
+<?php line-height:<?php 1.6;
+<?php }
 
-        .stats-bar {
-            display: flex;
-            justify-content: center;
-            gap: 3rem;
-            margin-top: 2rem;
-        }
+<?php .stats-bar<?php {
+<?php display:<?php flex;
+<?php justify-content:<?php center;
+<?php gap:<?php 3rem;
+<?php margin-top:<?php 2rem;
+<?php }
 
-        .stat-item {
-            text-align: center;
-        }
+<?php .stat-item<?php {
+<?php text-align:<?php center;
+<?php }
 
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #22c55e;
-            display: block;
-        }
+<?php .stat-number<?php {
+<?php font-size:<?php 2rem;
+<?php font-weight:<?php 800;
+<?php color:<?php #22c55e;
+<?php display:<?php block;
+<?php }
 
-        .stat-label {
-            color: #9ca3af;
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
-        }
+<?php .stat-label<?php {
+<?php color:<?php #9ca3af;
+<?php font-size:<?php 0.9rem;
+<?php margin-top:<?php 0.25rem;
+<?php }
 
-        .cartelas-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 2rem;
-            margin-bottom: 4rem;
-        }
+<?php .cartelas-grid<?php {
+<?php display:<?php grid;
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(350px,<?php 1fr));
+<?php gap:<?php 2rem;
+<?php margin-bottom:<?php 4rem;
+<?php }
 
-        .cartela-card {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            position: relative;
-            text-decoration: none;
-            color: inherit;
-            backdrop-filter: blur(20px);
-        }
+<?php .cartela-card<?php {
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php border-radius:<?php 24px;
+<?php overflow:<?php hidden;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php position:<?php relative;
+<?php text-decoration:<?php none;
+<?php color:<?php inherit;
+<?php backdrop-filter:<?php blur(20px);
+<?php }
 
-        .cartela-card:hover {
-            transform: translateY(-8px);
-            border-color: rgba(34, 197, 94, 0.3);
-            box-shadow: 0 20px 60px rgba(34, 197, 94, 0.2);
-        }
+<?php .cartela-card:hover<?php {
+<?php transform:<?php translateY(-8px);
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php }
 
-        .cartela-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
+<?php .cartela-image<?php {
+<?php width:<?php 100%;
+<?php height:<?php 200px;
+<?php object-fit:<?php cover;
+<?php transition:<?php transform<?php 0.3s<?php ease;
+<?php }
 
-        .cartela-card:hover .cartela-image {
-            transform: scale(1.05);
-        }
+<?php .cartela-card:hover<?php .cartela-image<?php {
+<?php transform:<?php scale(1.05);
+<?php }
 
-        .cartela-content {
-            padding: 1.5rem;
-            position: relative;
-        }
+<?php .cartela-content<?php {
+<?php padding:<?php 1.5rem;
+<?php position:<?php relative;
+<?php }
 
-        .price-badge {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.9rem;
-            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
-        }
+<?php .price-badge<?php {
+<?php position:<?php absolute;
+<?php top:<?php 1rem;
+<?php right:<?php 1rem;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php color:<?php white;
+<?php padding:<?php 0.5rem<?php 1rem;
+<?php border-radius:<?php 12px;
+<?php font-weight:<?php 700;
+<?php font-size:<?php 0.9rem;
+<?php box-shadow:<?php 0<?php 4px<?php 16px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php }
 
-        .cartela-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 0.5rem;
-            line-height: 1.3;
-        }
+<?php .cartela-title<?php {
+<?php font-size:<?php 1.3rem;
+<?php font-weight:<?php 700;
+<?php color:<?php white;
+<?php margin-bottom:<?php 0.5rem;
+<?php line-height:<?php 1.3;
+<?php }
 
-        .cartela-description {
-            color: #9ca3af;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            line-height: 1.5;
-        }
+<?php .cartela-description<?php {
+<?php color:<?php #9ca3af;
+<?php font-size:<?php 0.9rem;
+<?php margin-bottom:<?php 1rem;
+<?php line-height:<?php 1.5;
+<?php }
 
-        .prize-info {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
+<?php .prize-info<?php {
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php space-between;
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php border-radius:<?php 12px;
+<?php padding:<?php 1rem;
+<?php margin-bottom:<?php 1rem;
+<?php }
 
-        .prize-label {
-            color: #9ca3af;
-            font-size: 0.8rem;
-            margin-bottom: 0.25rem;
-        }
+<?php .prize-label<?php {
+<?php color:<?php #9ca3af;
+<?php font-size:<?php 0.8rem;
+<?php margin-bottom:<?php 0.25rem;
+<?php }
 
-        .prize-value {
-            color: #22c55e;
-            font-weight: 800;
-            font-size: 1.1rem;
-        }
+<?php .prize-value<?php {
+<?php color:<?php #22c55e;
+<?php font-weight:<?php 800;
+<?php font-size:<?php 1.1rem;
+<?php }
 
-        .play-button {
-            width: 100%;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border: none;
-            padding: 0.75rem;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
+<?php .play-button<?php {
+<?php width:<?php 100%;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php color:<?php white;
+<?php border:<?php none;
+<?php padding:<?php 0.75rem;
+<?php border-radius:<?php 12px;
+<?php font-weight:<?php 600;
+<?php cursor:<?php pointer;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php justify-content:<?php center;
+<?php gap:<?php 0.5rem;
+<?php text-decoration:<?php none;
+<?php }
 
-        .play-button:hover {
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
-        }
+<?php .play-button:hover<?php {
+<?php background:<?php linear-gradient(135deg,<?php #16a34a,<?php #15803d);
+<?php transform:<?php translateY(-2px);
+<?php box-shadow:<?php 0<?php 8px<?php 24px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);
+<?php }
 
-        .cartela-features {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
+<?php .cartela-features<?php {
+<?php display:<?php flex;
+<?php gap:<?php 0.5rem;
+<?php margin-bottom:<?php 1rem;
+<?php }
 
-        .feature-tag {
-            background: rgba(99, 102, 241, 0.1);
-            color: #a5b4fc;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
+<?php .feature-tag<?php {
+<?php background:<?php rgba(99,<?php 102,<?php 241,<?php 0.1);
+<?php color:<?php #a5b4fc;
+<?php padding:<?php 0.25rem<?php 0.5rem;
+<?php border-radius:<?php 6px;
+<?php font-size:<?php 0.75rem;
+<?php font-weight:<?php 500;
+<?php }
 
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #6b7280;
-        }
+<?php .empty-state<?php {
+<?php text-align:<?php center;
+<?php padding:<?php 4rem<?php 2rem;
+<?php color:<?php #6b7280;
+<?php }
 
-        .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
+<?php .empty-icon<?php {
+<?php font-size:<?php 4rem;
+<?php margin-bottom:<?php 1rem;
+<?php opacity:<?php 0.5;
+<?php }
 
-        .loading-skeleton {
-            background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
+<?php .loading-skeleton<?php {
+<?php background:<?php linear-gradient(90deg,<?php rgba(255,255,255,0.1)<?php 25%,<?php rgba(255,255,255,0.2)<?php 50%,<?php rgba(255,255,255,0.1)<?php 75%);
+<?php background-size:<?php 200%<?php 100%;
+<?php animation:<?php loading<?php 1.5s<?php infinite;
+<?php }
 
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
+<?php @keyframes<?php loading<?php {
+<?php 0%<?php {<?php background-position:<?php 200%<?php 0;<?php }
+<?php 100%<?php {<?php background-position:<?php -200%<?php 0;<?php }
+<?php }
 
-        /* Improved Filter Bar */
-        .filter-bar {
-            display: flex;
-            justify-content: center;
-            gap: 0.75rem;
-            margin-bottom: 3rem;
-            flex-wrap: wrap;
-        }
+<?php /*<?php Improved<?php Filter<?php Bar<?php */
+<?php .filter-bar<?php {
+<?php display:<?php flex;
+<?php justify-content:<?php center;
+<?php gap:<?php 0.75rem;
+<?php margin-bottom:<?php 3rem;
+<?php flex-wrap:<?php wrap;
+<?php }
 
-        .filter-btn {
-            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #9ca3af;
-            padding: 0.75rem 1.25rem;
-            border-radius: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
+<?php .filter-btn<?php {
+<?php background:<?php linear-gradient(145deg,<?php #1e1e1e,<?php #2a2a2a);
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);
+<?php color:<?php #9ca3af;
+<?php padding:<?php 0.75rem<?php 1.25rem;
+<?php border-radius:<?php 16px;
+<?php cursor:<?php pointer;
+<?php transition:<?php all<?php 0.3s<?php ease;
+<?php font-weight:<?php 600;
+<?php font-size:<?php 0.9rem;
+<?php display:<?php flex;
+<?php align-items:<?php center;
+<?php gap:<?php 0.5rem;
+<?php position:<?php relative;
+<?php overflow:<?php hidden;
+<?php backdrop-filter:<?php blur(20px);
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);
+<?php }
 
-        .filter-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            transition: left 0.3s ease;
-            z-index: -1;
-        }
+<?php .filter-btn::before<?php {
+<?php content:<?php '';
+<?php position:<?php absolute;
+<?php top:<?php 0;
+<?php left:<?php -100%;
+<?php width:<?php 100%;
+<?php height:<?php 100%;
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php transition:<?php left<?php 0.3s<?php ease;
+<?php z-index:<?php -1;
+<?php }
 
-        .filter-btn:hover {
-            color: #ffffff;
-            border-color: rgba(34, 197, 94, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.2);
-        }
+<?php .filter-btn:hover<?php {
+<?php color:<?php #ffffff;
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);
+<?php transform:<?php translateY(-2px);
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(34,<?php 197,<?php 94,<?php 0.2);
+<?php }
 
-        .filter-btn:hover::before {
-            left: 0;
-        }
+<?php .filter-btn:hover::before<?php {
+<?php left:<?php 0;
+<?php }
 
-        .filter-btn.active {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-color: #22c55e;
-            color: #ffffff;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
-        }
+<?php .filter-btn.active<?php {
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);
+<?php border-color:<?php #22c55e;
+<?php color:<?php #ffffff;
+<?php transform:<?php translateY(-2px);
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);
+<?php }
 
-        .filter-btn.active::before {
-            left: 0;
-        }
+<?php .filter-btn.active::before<?php {
+<?php left:<?php 0;
+<?php }
 
-        .filter-btn i {
-            font-size: 1rem;
-            transition: transform 0.3s ease;
-        }
+<?php .filter-btn<?php i<?php {
+<?php font-size:<?php 1rem;
+<?php transition:<?php transform<?php 0.3s<?php ease;
+<?php }
 
-        .filter-btn:hover i,
-        .filter-btn.active i {
-            transform: scale(1.1);
-        }
+<?php .filter-btn:hover<?php i,
+<?php .filter-btn.active<?php i<?php {
+<?php transform:<?php scale(1.1);
+<?php }
 
-        /* Filter button animations */
-        .filter-btn.low {
-            --hover-color: #22c55e;
-        }
+<?php /*<?php Filter<?php button<?php animations<?php */
+<?php .filter-btn.low<?php {
+<?php --hover-color:<?php #22c55e;
+<?php }
 
-        .filter-btn.medium {
-            --hover-color: #f59e0b;
-        }
+<?php .filter-btn.medium<?php {
+<?php --hover-color:<?php #f59e0b;
+<?php }
 
-        .filter-btn.high {
-            --hover-color: #ef4444;
-        }
+<?php .filter-btn.high<?php {
+<?php --hover-color:<?php #ef4444;
+<?php }
 
-        .filter-btn.medium::before {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-        }
+<?php .filter-btn.medium::before<?php {
+<?php background:<?php linear-gradient(135deg,<?php #f59e0b,<?php #d97706);
+<?php }
 
-        .filter-btn.high::before {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-        }
+<?php .filter-btn.high::before<?php {
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);
+<?php }
 
-        .filter-btn.medium.active {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-color: #f59e0b;
-            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
-        }
+<?php .filter-btn.medium.active<?php {
+<?php background:<?php linear-gradient(135deg,<?php #f59e0b,<?php #d97706);
+<?php border-color:<?php #f59e0b;
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(245,<?php 158,<?php 11,<?php 0.4);
+<?php }
 
-        .filter-btn.high.active {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            border-color: #ef4444;
-            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
-        }
+<?php .filter-btn.high.active<?php {
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);
+<?php border-color:<?php #ef4444;
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(239,<?php 68,<?php 68,<?php 0.4);
+<?php }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .page-title {
-                font-size: 2rem;
-            }
-            
-            .stats-bar {
-                gap: 1.5rem;
-                flex-wrap: wrap;
-            }
-            
-            .stat-number {
-                font-size: 1.5rem;
-            }
-            
-            .cartelas-grid {
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
-            }
-            
-            .cartela-content {
-                padding: 1rem;
-            }
-            
-            .filter-bar {
-                gap: 0.5rem;
-            }
-            
-            .filter-btn {
-                padding: 0.6rem 1rem;
-                font-size: 0.85rem;
-            }
-        }
+<?php /*<?php Responsive<?php */
+<?php @media<?php (max-width:<?php 768px)<?php {
+<?php .page-title<?php {
+<?php font-size:<?php 2rem;
+<?php }
+<?php 
+<?php .stats-bar<?php {
+<?php gap:<?php 1.5rem;
+<?php flex-wrap:<?php wrap;
+<?php }
+<?php 
+<?php .stat-number<?php {
+<?php font-size:<?php 1.5rem;
+<?php }
+<?php 
+<?php .cartelas-grid<?php {
+<?php grid-template-columns:<?php 1fr;
+<?php gap:<?php 1.5rem;
+<?php }
+<?php 
+<?php .cartela-content<?php {
+<?php padding:<?php 1rem;
+<?php }
+<?php 
+<?php .filter-bar<?php {
+<?php gap:<?php 0.5rem;
+<?php }
+<?php 
+<?php .filter-btn<?php {
+<?php padding:<?php 0.6rem<?php 1rem;
+<?php font-size:<?php 0.85rem;
+<?php }
+<?php }
 
-        @media (max-width: 480px) {
-            .cartelas-container {
-                padding: 0 1rem;
-            }
-            
-            .cartelas-grid {
-                grid-template-columns: 1fr;
-            }
+<?php @media<?php (max-width:<?php 480px)<?php {
+<?php .cartelas-container<?php {
+<?php padding:<?php 0<?php 1rem;
+<?php }
+<?php 
+<?php .cartelas-grid<?php {
+<?php grid-template-columns:<?php 1fr;
+<?php }
 
-            .filter-bar {
-                flex-direction: column;
-                align-items: center;
-            }
+<?php .filter-bar<?php {
+<?php flex-direction:<?php column;
+<?php align-items:<?php center;
+<?php }
 
-            .filter-btn {
-                width: 200px;
-                justify-content: center;
-            }
-        }
+<?php .filter-btn<?php {
+<?php width:<?php 200px;
+<?php justify-content:<?php center;
+<?php }
+<?php }
 
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
+<?php /*<?php Animations<?php */
+<?php .fade-in<?php {
+<?php animation:<?php fadeIn<?php 0.6s<?php ease-out<?php forwards;
+<?php }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+<?php @keyframes<?php fadeIn<?php {
+<?php from<?php {
+<?php opacity:<?php 0;
+<?php transform:<?php translateY(20px);
+<?php }
+<?php to<?php {
+<?php opacity:<?php 1;
+<?php transform:<?php translateY(0);
+<?php }
+<?php }
 
-        .stagger-animation .cartela-card {
-            opacity: 0;
-            animation: fadeIn 0.6s ease-out forwards;
-        }
+<?php .stagger-animation<?php .cartela-card<?php {
+<?php opacity:<?php 0;
+<?php animation:<?php fadeIn<?php 0.6s<?php ease-out<?php forwards;
+<?php }
 
-        .stagger-animation .cartela-card:nth-child(1) { animation-delay: 0.1s; }
-        .stagger-animation .cartela-card:nth-child(2) { animation-delay: 0.2s; }
-        .stagger-animation .cartela-card:nth-child(3) { animation-delay: 0.3s; }
-        .stagger-animation .cartela-card:nth-child(4) { animation-delay: 0.4s; }
-        .stagger-animation .cartela-card:nth-child(5) { animation-delay: 0.5s; }
-        .stagger-animation .cartela-card:nth-child(6) { animation-delay: 0.6s; }
+<?php .stagger-animation<?php .cartela-card:nth-child(1)<?php {<?php animation-delay:<?php 0.1s;<?php }
+<?php .stagger-animation<?php .cartela-card:nth-child(2)<?php {<?php animation-delay:<?php 0.2s;<?php }
+<?php .stagger-animation<?php .cartela-card:nth-child(3)<?php {<?php animation-delay:<?php 0.3s;<?php }
+<?php .stagger-animation<?php .cartela-card:nth-child(4)<?php {<?php animation-delay:<?php 0.4s;<?php }
+<?php .stagger-animation<?php .cartela-card:nth-child(5)<?php {<?php animation-delay:<?php 0.5s;<?php }
+<?php .stagger-animation<?php .cartela-card:nth-child(6)<?php {<?php animation-delay:<?php 0.6s;<?php }
 
-        /* Sparkle animation for premium buttons */
-        @keyframes sparkle {
-            0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-            50% { transform: scale(1.05) rotate(2deg); opacity: 0.9; }
-        }
+<?php /*<?php Sparkle<?php animation<?php for<?php premium<?php buttons<?php */
+<?php @keyframes<?php sparkle<?php {
+<?php 0%,<?php 100%<?php {<?php transform:<?php scale(1)<?php rotate(0deg);<?php opacity:<?php 1;<?php }
+<?php 50%<?php {<?php transform:<?php scale(1.05)<?php rotate(2deg);<?php opacity:<?php 0.9;<?php }
+<?php }
 
-        .filter-btn.high.active {
-            animation: sparkle 2s ease-in-out infinite;
-        }
-    </style>
+<?php .filter-btn.high.active<?php {
+<?php animation:<?php sparkle<?php 2s<?php ease-in-out<?php infinite;
+<?php }
+<?php </style>
 </head>
 <body>
-    <?php include('../inc/header.php'); ?>
-    <?php include('../components/modals.php'); ?>
+<?php <?php<?php include('../inc/header.php');<?php ?>
+<?php <?php<?php include('../components/modals.php');<?php ?>
 
-    <section class="cartelas-section">
-        <div class="cartelas-container">
-            <!-- Page Header -->
-            <div class="page-header fade-in">
-                <h1 class="page-title">Escolha sua Raspadinha</h1>
-                <p class="page-subtitle">
-                    Centenas de prêmios esperando por você! Raspe e ganhe na hora com PIX instantâneo.
-                </p>
-                
-                <div class="stats-bar">
-                    <div class="stat-item">
-                        <span class="stat-number"><?php= count($cartelas); ?></span>
-                        <span class="stat-label">Raspadinhas</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">R$ <?php= number_format(array_sum(array_column($cartelas, 'maior_premio')), 0, ',', '.'); ?></span>
-                        <span class="stat-label">Em Prêmios</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">24/7</span>
-                        <span class="stat-label">Disponível</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Enhanced Filter Bar -->
-            <div class="filter-bar fade-in">
-                <button class="filter-btn active" data-filter="all">
-                    <i class="bi bi-grid-3x3-gap-fill"></i>
-                    <span>Todas as Raspadinhas</span>
-                </button>
-                <button class="filter-btn low" data-filter="low">
-                    <i class="bi bi-coin"></i>
-                    <span>Até R$ 10</span>
-                </button>
-                <button class="filter-btn medium" data-filter="medium">
-                    <i class="bi bi-cash-stack"></i>
-                    <span>R$ 10 - R$ 50</span>
-                </button>
-                <button class="filter-btn high" data-filter="high">
-                    <i class="bi bi-gem"></i>
-                    <span>Acima de R$ 50</span>
-                </button>
-            </div>
+<?php <section<?php class="cartelas-section">
+<?php <div<?php class="cartelas-container">
+<?php <!--<?php Page<?php Header<?php -->
+<?php <div<?php class="page-header<?php fade-in">
+<?php <h1<?php class="page-title">Escolha<?php sua<?php Raspadinha</h1>
+<?php <p<?php class="page-subtitle">
+<?php Centenas<?php de<?php prêmios<?php esperando<?php por<?php você!<?php Raspe<?php e<?php ganhe<?php na<?php hora<?php com<?php PIX<?php instantâneo.
+<?php </p>
+<?php 
+<?php <div<?php class="stats-bar">
+<?php <div<?php class="stat-item">
+<?php <span<?php class="stat-number"><?php=<?php count($cartelas);<?php ?></span>
+<?php <span<?php class="stat-label">Raspadinhas</span>
+<?php </div>
+<?php <div<?php class="stat-item">
+<?php <span<?php class="stat-number">R$<?php <?php=<?php number_format(array_sum(array_column($cartelas,<?php 'maior_premio')),<?php 0,<?php ',',<?php '.');<?php ?></span>
+<?php <span<?php class="stat-label">Em<?php Prêmios</span>
+<?php </div>
+<?php <div<?php class="stat-item">
+<?php <span<?php class="stat-number">24/7</span>
+<?php <span<?php class="stat-label">Disponível</span>
+<?php </div>
+<?php </div>
+<?php </div>
+<?php 
+<?php <!--<?php Enhanced<?php Filter<?php Bar<?php -->
+<?php <div<?php class="filter-bar<?php fade-in">
+<?php <button<?php class="filter-btn<?php active"<?php data-filter="all">
+<?php <i<?php class="bi<?php bi-grid-3x3-gap-fill"></i>
+<?php <span>Todas<?php as<?php Raspadinhas</span>
+<?php </button>
+<?php <button<?php class="filter-btn<?php low"<?php data-filter="low">
+<?php <i<?php class="bi<?php bi-coin"></i>
+<?php <span>Até<?php R$<?php 10</span>
+<?php </button>
+<?php <button<?php class="filter-btn<?php medium"<?php data-filter="medium">
+<?php <i<?php class="bi<?php bi-cash-stack"></i>
+<?php <span>R$<?php 10<?php -<?php R$<?php 50</span>
+<?php </button>
+<?php <button<?php class="filter-btn<?php high"<?php data-filter="high">
+<?php <i<?php class="bi<?php bi-gem"></i>
+<?php <span>Acima<?php de<?php R$<?php 50</span>
+<?php </button>
+<?php </div>
 
-            <!-- Cartelas Grid -->
-            <?php if (empty($cartelas)): ?>
-                <div class="empty-state">
-                    <i class="bi bi-grid-3x3-gap empty-icon"></i>
-                    <h3 style="color: white; margin-bottom: 1rem;">Nenhuma raspadinha disponível</h3>
-                    <p>Novas raspadinhas em breve! Fique atento às atualizações.</p>
-                </div>
-            <?php else: ?>
-                <div class="cartelas-grid stagger-animation" id="cartelasGrid">
-                    <?php foreach ($cartelas as $c): ?>
-                        <a href="/raspadinhas/show.php?id=<?php= $c['id']; ?>" 
-                           class="cartela-card" 
-                           data-price="<?php= $c['valor']; ?>"
-                           data-aos="fade-up">
-                            
-                            <div style="position: relative; overflow: hidden;">
-                                <img src="<?php= htmlspecialchars($c['banner']); ?>"
-                                     alt="Banner <?php= htmlspecialchars($c['nome']); ?>"
-                                     class="cartela-image" 
-                                     loading="lazy"
-                                     onerror="this.src='/assets/img/placeholder-raspadinha.jpg'">
-                                
-                                <div class="price-badge">
-                                    <i class="bi bi-tag-fill"></i>
-                                    R$ <?php= number_format($c['valor'], 2, ',', '.'); ?>
-                                </div>
-                            </div>
+<?php <!--<?php Cartelas<?php Grid<?php -->
+<?php <?php<?php if<?php (empty($cartelas)):<?php ?>
+<?php <div<?php class="empty-state">
+<?php <i<?php class="bi<?php bi-grid-3x3-gap<?php empty-icon"></i>
+<?php <h3<?php style="color:<?php white;<?php margin-bottom:<?php 1rem;">Nenhuma<?php raspadinha<?php disponível</h3>
+<?php <p>Novas<?php raspadinhas<?php em<?php breve!<?php Fique<?php atento<?php às<?php atualizações.</p>
+<?php </div>
+<?php <?php<?php else:<?php ?>
+<?php <div<?php class="cartelas-grid<?php stagger-animation"<?php id="cartelasGrid">
+<?php <?php<?php foreach<?php ($cartelas<?php as<?php $c):<?php ?>
+<?php <a<?php href="/raspadinhas/show.php?id=<?php=<?php $c['id'];<?php ?>"<?php 
+<?php class="cartela-card"<?php 
+<?php data-price="<?php=<?php $c['valor'];<?php ?>"
+<?php data-aos="fade-up">
+<?php 
+<?php <div<?php style="position:<?php relative;<?php overflow:<?php hidden;">
+<?php <img<?php src="<?php=<?php htmlspecialchars($c['banner']);<?php ?>"
+<?php alt="Banner<?php <?php=<?php htmlspecialchars($c['nome']);<?php ?>"
+<?php class="cartela-image"<?php 
+<?php loading="lazy"
+<?php onerror="this.src='/assets/img/placeholder-raspadinha.jpg'">
+<?php 
+<?php <div<?php class="price-badge">
+<?php <i<?php class="bi<?php bi-tag-fill"></i>
+<?php R$<?php <?php=<?php number_format($c['valor'],<?php 2,<?php ',',<?php '.');<?php ?>
+<?php </div>
+<?php </div>
 
-                            <div class="cartela-content">
-                                <div class="cartela-features">
-                                    <span class="feature-tag">
-                                        <i class="bi bi-lightning-fill"></i>
-                                        PIX Instantâneo
-                                    </span>
-                                    <?php if($c['maior_premio'] >= 1000): ?>
-                                        <span class="feature-tag">
-                                            <i class="bi bi-star-fill"></i>
-                                            Premium
-                                        </span>
-                                    <?php endif; ?>
-                                </div>
+<?php <div<?php class="cartela-content">
+<?php <div<?php class="cartela-features">
+<?php <span<?php class="feature-tag">
+<?php <i<?php class="bi<?php bi-lightning-fill"></i>
+<?php PIX<?php Instantâneo
+<?php </span>
+<?php <?php<?php if($c['maior_premio']<?php >=<?php 1000):<?php ?>
+<?php <span<?php class="feature-tag">
+<?php <i<?php class="bi<?php bi-star-fill"></i>
+<?php Premium
+<?php </span>
+<?php <?php<?php endif;<?php ?>
+<?php </div>
 
-                                <h2 class="cartela-title">
-                                    <?php= htmlspecialchars($c['nome']); ?>
-                                </h2>
-                                
-                                <p class="cartela-description">
-                                    <?php= htmlspecialchars($c['descricao']); ?>
-                                </p>
+<?php <h2<?php class="cartela-title">
+<?php <?php=<?php htmlspecialchars($c['nome']);<?php ?>
+<?php </h2>
+<?php 
+<?php <p<?php class="cartela-description">
+<?php <?php=<?php htmlspecialchars($c['descricao']);<?php ?>
+<?php </p>
 
-                                <div class="prize-info">
-                                    <div>
-                                        <div class="prize-label">Prêmio máximo</div>
-                                        <div class="prize-value">
-                                            <i class="bi bi-trophy-fill"></i>
-                                            R$ <?php= number_format($c['maior_premio'], 0, ',', '.'); ?>
-                                        </div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div class="prize-label">Via PIX</div>
-                                        <div style="color: #22c55e; font-size: 0.9rem;">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            Instantâneo
-                                        </div>
-                                    </div>
-                                </div>
+<?php <div<?php class="prize-info">
+<?php <div>
+<?php <div<?php class="prize-label">Prêmio<?php máximo</div>
+<?php <div<?php class="prize-value">
+<?php <i<?php class="bi<?php bi-trophy-fill"></i>
+<?php R$<?php <?php=<?php number_format($c['maior_premio'],<?php 0,<?php ',',<?php '.');<?php ?>
+<?php </div>
+<?php </div>
+<?php <div<?php style="text-align:<?php right;">
+<?php <div<?php class="prize-label">Via<?php PIX</div>
+<?php <div<?php style="color:<?php #22c55e;<?php font-size:<?php 0.9rem;">
+<?php <i<?php class="bi<?php bi-check-circle-fill"></i>
+<?php Instantâneo
+<?php </div>
+<?php </div>
+<?php </div>
 
-                                <div class="play-button">
-                                    <i class="bi bi-play-circle-fill"></i>
-                                    Jogar Agora
-                                </div>
-                            </div>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-        </div>
-    </section>
+<?php <div<?php class="play-button">
+<?php <i<?php class="bi<?php bi-play-circle-fill"></i>
+<?php Jogar<?php Agora
+<?php </div>
+<?php </div>
+<?php </a>
+<?php <?php<?php endforeach;<?php ?>
+<?php </div>
+<?php <?php<?php endif;<?php ?>
+<?php </div>
+<?php </section>
 
-    <?php include('../inc/footer.php'); ?>
+<?php <?php<?php include('../inc/footer.php');<?php ?>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Filter functionality
-            const filterBtns = document.querySelectorAll('.filter-btn');
-            const cartelasGrid = document.getElementById('cartelasGrid');
-            const cartelas = document.querySelectorAll('.cartela-card');
+<?php <script>
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {
+<?php //<?php Filter<?php functionality
+<?php const<?php filterBtns<?php =<?php document.querySelectorAll('.filter-btn');
+<?php const<?php cartelasGrid<?php =<?php document.getElementById('cartelasGrid');
+<?php const<?php cartelas<?php =<?php document.querySelectorAll('.cartela-card');
 
-            filterBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // Update active button
-                    filterBtns.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
+<?php filterBtns.forEach(btn<?php =><?php {
+<?php btn.addEventListener('click',<?php ()<?php =><?php {
+<?php //<?php Update<?php active<?php button
+<?php filterBtns.forEach(b<?php =><?php b.classList.remove('active'));
+<?php btn.classList.add('active');
 
-                    const filter = btn.dataset.filter;
-                    
-                    cartelas.forEach(cartela => {
-                        const price = parseFloat(cartela.dataset.price);
-                        let show = false;
+<?php const<?php filter<?php =<?php btn.dataset.filter;
+<?php 
+<?php cartelas.forEach(cartela<?php =><?php {
+<?php const<?php price<?php =<?php parseFloat(cartela.dataset.price);
+<?php let<?php show<?php =<?php false;
 
-                        switch(filter) {
-                            case 'all':
-                                show = true;
-                                break;
-                            case 'low':
-                                show = price <= 10;
-                                break;
-                            case 'medium':
-                                show = price > 10 && price <= 50;
-                                break;
-                            case 'high':
-                                show = price > 50;
-                                break;
-                        }
+<?php switch(filter)<?php {
+<?php case<?php 'all':
+<?php show<?php =<?php true;
+<?php break;
+<?php case<?php 'low':
+<?php show<?php =<?php price<?php <=<?php 10;
+<?php break;
+<?php case<?php 'medium':
+<?php show<?php =<?php price<?php ><?php 10<?php &&<?php price<?php <=<?php 50;
+<?php break;
+<?php case<?php 'high':
+<?php show<?php =<?php price<?php ><?php 50;
+<?php break;
+<?php }
 
-                        if (show) {
-                            cartela.style.display = 'block';
-                            cartela.style.animation = 'fadeIn 0.5s ease-out forwards';
-                        } else {
-                            cartela.style.display = 'none';
-                        }
-                    });
+<?php if<?php (show)<?php {
+<?php cartela.style.display<?php =<?php 'block';
+<?php cartela.style.animation<?php =<?php 'fadeIn<?php 0.5s<?php ease-out<?php forwards';
+<?php }<?php else<?php {
+<?php cartela.style.display<?php =<?php 'none';
+<?php }
+<?php });
 
-                    // Add click feedback
-                    btn.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        btn.style.transform = '';
-                    }, 150);
-                });
-            });
+<?php //<?php Add<?php click<?php feedback
+<?php btn.style.transform<?php =<?php 'scale(0.95)';
+<?php setTimeout(()<?php =><?php {
+<?php btn.style.transform<?php =<?php '';
+<?php },<?php 150);
+<?php });
+<?php });
 
-            // Image lazy loading fallback
-            const images = document.querySelectorAll('.cartela-image');
-            images.forEach(img => {
-                img.addEventListener('error', function() {
-                    this.src = '/assets/img/placeholder-raspadinha.jpg';
-                });
-            });
+<?php //<?php Image<?php lazy<?php loading<?php fallback
+<?php const<?php images<?php =<?php document.querySelectorAll('.cartela-image');
+<?php images.forEach(img<?php =><?php {
+<?php img.addEventListener('error',<?php function()<?php {
+<?php this.src<?php =<?php '/assets/img/placeholder-raspadinha.jpg';
+<?php });
+<?php });
 
-            // Smooth scroll animations
-            const observerOptions = {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            };
+<?php //<?php Smooth<?php scroll<?php animations
+<?php const<?php observerOptions<?php =<?php {
+<?php threshold:<?php 0.1,
+<?php rootMargin:<?php '0px<?php 0px<?php -50px<?php 0px'
+<?php };
 
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1';
-                        entry.target.style.transform = 'translateY(0)';
-                    }
-                });
-            }, observerOptions);
+<?php const<?php observer<?php =<?php new<?php IntersectionObserver((entries)<?php =><?php {
+<?php entries.forEach(entry<?php =><?php {
+<?php if<?php (entry.isIntersecting)<?php {
+<?php entry.target.style.opacity<?php =<?php '1';
+<?php entry.target.style.transform<?php =<?php 'translateY(0)';
+<?php }
+<?php });
+<?php },<?php observerOptions);
 
-            // Performance optimization: only observe visible cards
-            const visibleCards = Array.from(cartelas).slice(0, 6);
-            visibleCards.forEach(card => observer.observe(card));
+<?php //<?php Performance<?php optimization:<?php only<?php observe<?php visible<?php cards
+<?php const<?php visibleCards<?php =<?php Array.from(cartelas).slice(0,<?php 6);
+<?php visibleCards.forEach(card<?php =><?php observer.observe(card));
 
-            // Add hover sound effect (optional)
-            cartelas.forEach(card => {
-                card.addEventListener('mouseenter', () => {
-                    // Optional: Add subtle hover sound
-                    // new Audio('/assets/sounds/hover.mp3').play().catch(() => {});
-                });
-            });
+<?php //<?php Add<?php hover<?php sound<?php effect<?php (optional)
+<?php cartelas.forEach(card<?php =><?php {
+<?php card.addEventListener('mouseenter',<?php ()<?php =><?php {
+<?php //<?php Optional:<?php Add<?php subtle<?php hover<?php sound
+<?php //<?php new<?php Audio('/assets/sounds/hover.mp3').play().catch(()<?php =><?php {});
+<?php });
+<?php });
 
-            // Enhanced button interactions
-            filterBtns.forEach(btn => {
-                btn.addEventListener('mouseenter', () => {
-                    if (!btn.classList.contains('active')) {
-                        btn.style.transform = 'translateY(-3px) scale(1.02)';
-                    }
-                });
+<?php //<?php Enhanced<?php button<?php interactions
+<?php filterBtns.forEach(btn<?php =><?php {
+<?php btn.addEventListener('mouseenter',<?php ()<?php =><?php {
+<?php if<?php (!btn.classList.contains('active'))<?php {
+<?php btn.style.transform<?php =<?php 'translateY(-3px)<?php scale(1.02)';
+<?php }
+<?php });
 
-                btn.addEventListener('mouseleave', () => {
-                    if (!btn.classList.contains('active')) {
-                        btn.style.transform = '';
-                    }
-                });
-            });
+<?php btn.addEventListener('mouseleave',<?php ()<?php =><?php {
+<?php if<?php (!btn.classList.contains('active'))<?php {
+<?php btn.style.transform<?php =<?php '';
+<?php }
+<?php });
+<?php });
 
-            console.log('%c🎮 Raspadinhas carregadas!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            console.log(`Total de ${cartelas.length} raspadinhas disponíveis`);
-        });
+<?php console.log('%c🎮<?php Raspadinhas<?php carregadas!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');
+<?php console.log(`Total<?php de<?php ${cartelas.length}<?php raspadinhas<?php disponíveis`);
+<?php });
 
-        // Notiflix configuration
-        Notiflix.Notify.init({
-            width: '300px',
-            position: 'right-top',
-            distance: '20px',
-            opacity: 1,
-            borderRadius: '12px',
-            timeout: 4000,
-            success: {
-                background: '#22c55e',
-                textColor: '#fff',
-            }
-        });
-    </script>
+<?php //<?php Notiflix<?php configuration
+<?php Notiflix.Notify.init({
+<?php width:<?php '300px',
+<?php position:<?php 'right-top',
+<?php distance:<?php '20px',
+<?php opacity:<?php 1,
+<?php borderRadius:<?php '12px',
+<?php timeout:<?php 4000,
+<?php success:<?php {
+<?php background:<?php '#22c55e',
+<?php textColor:<?php '#fff',
+<?php }
+<?php });
+<?php </script>
 </body>
 </html>

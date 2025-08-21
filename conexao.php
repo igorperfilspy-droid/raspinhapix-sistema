@@ -1,70 +1,70 @@
 <?php
-// CONEXÃO OTIMIZADA PARA RAILWAY
-// Configurações do banco (Railway usa variáveis de ambiente)
-$host = $_ENV['DB_HOST'] ?? getenv('MYSQL_HOST') ?? $_ENV['MYSQL_HOST'] ?? 'localhost';
-$port = $_ENV['DB_PORT'] ?? getenv('MYSQL_PORT') ?? $_ENV['MYSQL_PORT'] ?? '3306';
-$dbname = $_ENV['DB_NAME'] ?? getenv('MYSQL_DATABASE') ?? $_ENV['MYSQL_DATABASE'] ?? 'raspinhapix';
-$username = $_ENV['DB_USER'] ?? getenv('MYSQL_USER') ?? $_ENV['MYSQL_USER'] ?? 'root';
-$password = $_ENV['DB_PASS'] ?? getenv('MYSQL_PASSWORD') ?? $_ENV['MYSQL_PASSWORD'] ?? '';
+//<?php CONEXÃO<?php OTIMIZADA<?php PARA<?php RAILWAY
+//<?php Configurações<?php do<?php banco<?php (Railway<?php usa<?php variáveis<?php de<?php ambiente)
+$host<?php =<?php $_ENV['DB_HOST']<?php ??<?php getenv('MYSQL_HOST')<?php ??<?php $_ENV['MYSQL_HOST']<?php ??<?php 'localhost';
+$port<?php =<?php $_ENV['DB_PORT']<?php ??<?php getenv('MYSQL_PORT')<?php ??<?php $_ENV['MYSQL_PORT']<?php ??<?php '3306';
+$dbname<?php =<?php $_ENV['DB_NAME']<?php ??<?php getenv('MYSQL_DATABASE')<?php ??<?php $_ENV['MYSQL_DATABASE']<?php ??<?php 'raspinhapix';
+$username<?php =<?php $_ENV['DB_USER']<?php ??<?php getenv('MYSQL_USER')<?php ??<?php $_ENV['MYSQL_USER']<?php ??<?php 'root';
+$password<?php =<?php $_ENV['DB_PASS']<?php ??<?php getenv('MYSQL_PASSWORD')<?php ??<?php $_ENV['MYSQL_PASSWORD']<?php ??<?php '';
 
-// URL do site (Railway)
-$urlSite = $_ENV['RAILWAY_STATIC_URL'] ?? $_ENV['RAILWAY_PUBLIC_DOMAIN'] ?? 'https://localhost';
+//<?php URL<?php do<?php site<?php (Railway)
+$urlSite<?php =<?php $_ENV['RAILWAY_STATIC_URL']<?php ??<?php $_ENV['RAILWAY_PUBLIC_DOMAIN']<?php ??<?php 'https://localhost';
 
-try {
-    // Conexão PDO com configurações otimizadas para Railway
-    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
-    $options = [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
-    ];
-    
-    $pdo = new PDO($dsn, $username, $password, $options);
-    
-    // Log de sucesso (apenas em desenvolvimento)
-    if (($_ENV['RAILWAY_ENVIRONMENT'] ?? 'production') === 'development') {
-        error_log("Conexão Railway estabelecida com sucesso!");
-    }
-    
-} catch(PDOException $e) {
-    // Log do erro
-    error_log("Erro de conexão Railway: " . $e->getMessage());
-    
-    // Em produção, mostrar erro genérico
-    if (($_ENV['RAILWAY_ENVIRONMENT'] ?? 'production') === 'production') {
-        die("Erro de conexão com o banco de dados. Tente novamente em alguns minutos.");
-    } else {
-        die("Erro de conexão: " . $e->getMessage());
-    }
+try<?php {
+<?php //<?php Conexão<?php PDO<?php com<?php configurações<?php otimizadas<?php para<?php Railway
+<?php $dsn<?php =<?php "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
+<?php $options<?php =<?php [
+<?php PDO::ATTR_ERRMODE<?php =><?php PDO::ERRMODE_EXCEPTION,
+<?php PDO::ATTR_DEFAULT_FETCH_MODE<?php =><?php PDO::FETCH_ASSOC,
+<?php PDO::ATTR_EMULATE_PREPARES<?php =><?php false,
+<?php PDO::MYSQL_ATTR_INIT_COMMAND<?php =><?php "SET<?php NAMES<?php utf8mb4<?php COLLATE<?php utf8mb4_unicode_ci"
+<?php ];
+<?php 
+<?php $pdo<?php =<?php new<?php PDO($dsn,<?php $username,<?php $password,<?php $options);
+<?php 
+<?php //<?php Log<?php de<?php sucesso<?php (apenas<?php em<?php desenvolvimento)
+<?php if<?php (($_ENV['RAILWAY_ENVIRONMENT']<?php ??<?php 'production')<?php ===<?php 'development')<?php {
+<?php error_log("Conexão<?php Railway<?php estabelecida<?php com<?php sucesso!");
+<?php }
+<?php 
+}<?php catch(PDOException<?php $e)<?php {
+<?php //<?php Log<?php do<?php erro
+<?php error_log("Erro<?php de<?php conexão<?php Railway:<?php "<?php .<?php $e->getMessage());
+<?php 
+<?php //<?php Em<?php produção,<?php mostrar<?php erro<?php genérico
+<?php if<?php (($_ENV['RAILWAY_ENVIRONMENT']<?php ??<?php 'production')<?php ===<?php 'production')<?php {
+<?php die("Erro<?php de<?php conexão<?php com<?php o<?php banco<?php de<?php dados.<?php Tente<?php novamente<?php em<?php alguns<?php minutos.");
+<?php }<?php else<?php {
+<?php die("Erro<?php de<?php conexão:<?php "<?php .<?php $e->getMessage());
+<?php }
 }
 
-// Buscar configurações do site
-try {
-    $site = $pdo->query("SELECT nome_site, logo, deposito_min, saque_min, cpa_padrao, revshare_padrao FROM config LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    $nomeSite = $site['nome_site'] ?? 'RaspinhaPix'; 
-    $logoSite = $site['logo'] ?? '';
-    $depositoMin = $site['deposito_min'] ?? 10;
-    $saqueMin = $site['saque_min'] ?? 50;
-    $cpaPadrao = $site['cpa_padrao'] ?? 10;
-    $revshare_padrao = $site['revshare_padrao'] ?? 10;
-} catch(PDOException $e) {
-    // Valores padrão caso a tabela config não exista ainda
-    $nomeSite = 'RaspinhaPix';
-    $logoSite = '';
-    $depositoMin = 10;
-    $saqueMin = 50;
-    $cpaPadrao = 10;
-    $revshare_padrao = 10;
-    error_log("Erro ao buscar configurações: " . $e->getMessage());
+//<?php Buscar<?php configurações<?php do<?php site
+try<?php {
+<?php $site<?php =<?php $pdo->query("SELECT<?php nome_site,<?php logo,<?php deposito_min,<?php saque_min,<?php cpa_padrao,<?php revshare_padrao<?php FROM<?php config<?php LIMIT<?php 1")->fetch(PDO::FETCH_ASSOC);
+<?php $nomeSite<?php =<?php $site['nome_site']<?php ??<?php 'RaspinhaPix';<?php 
+<?php $logoSite<?php =<?php $site['logo']<?php ??<?php '';
+<?php $depositoMin<?php =<?php $site['deposito_min']<?php ??<?php 10;
+<?php $saqueMin<?php =<?php $site['saque_min']<?php ??<?php 50;
+<?php $cpaPadrao<?php =<?php $site['cpa_padrao']<?php ??<?php 10;
+<?php $revshare_padrao<?php =<?php $site['revshare_padrao']<?php ??<?php 10;
+}<?php catch(PDOException<?php $e)<?php {
+<?php //<?php Valores<?php padrão<?php caso<?php a<?php tabela<?php config<?php não<?php exista<?php ainda
+<?php $nomeSite<?php =<?php 'RaspinhaPix';
+<?php $logoSite<?php =<?php '';
+<?php $depositoMin<?php =<?php 10;
+<?php $saqueMin<?php =<?php 50;
+<?php $cpaPadrao<?php =<?php 10;
+<?php $revshare_padrao<?php =<?php 10;
+<?php error_log("Erro<?php ao<?php buscar<?php configurações:<?php "<?php .<?php $e->getMessage());
 }
 
-// Configurações globais para Railway
-define('SITE_URL', $urlSite);
-define('IS_RAILWAY', true);
-define('ENVIRONMENT', $_ENV['RAILWAY_ENVIRONMENT'] ?? 'production');
+//<?php Configurações<?php globais<?php para<?php Railway
+define('SITE_URL',<?php $urlSite);
+define('IS_RAILWAY',<?php true);
+define('ENVIRONMENT',<?php $_ENV['RAILWAY_ENVIRONMENT']<?php ??<?php 'production');
 
-// Timezone
+//<?php Timezone
 date_default_timezone_set('America/Sao_Paulo');
 ?>
 

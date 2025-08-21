@@ -1,295 +1,295 @@
-<?php
-/**
- * DigitoPay Withdraw Webhook - Versão Final
- * callback/digitopay_withdraw.php
- * 
- * Este webhook recebe notificações da DigitoPay sobre o status dos saques
- * e atualiza automaticamente o status no banco de dados
- */
-
-header('Content-Type: application/json');
-
-// Log detalhado para debug (opcional - remover em produção se não precisar)
-$enableDebugLog = true;
-$logFile = __DIR__ . '/../logs/digitopay_webhook.log';
-
-function writeLog($message) {
-    global $logFile, $enableDebugLog;
-    if (!$enableDebugLog) return;
-    
-    if (!is_dir(dirname($logFile))) {
-        mkdir(dirname($logFile), 0755, true);
-    }
-    
-    $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($logFile, "[$timestamp] $message\n", FILE_APPEND);
-}
-
-// Log do acesso
-writeLog("=== WEBHOOK ACCESSED ===");
-writeLog("Method: " . $_SERVER['REQUEST_METHOD']);
-writeLog("User-Agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'));
-writeLog("Raw Input: " . file_get_contents('php://input'));
-
-// Verificar método HTTP
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    $response = ['error' => 'Método não permitido', 'allowed' => 'POST'];
-    writeLog("ERROR: Método inválido - " . $_SERVER['REQUEST_METHOD']);
-    echo json_encode($response);
-    exit;
-}
-
-try {
-    require_once __DIR__ . '/../conexao.php';
-    
-    // Receber e validar dados do webhook
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true);
-    
-    writeLog("Parsed webhook data: " . json_encode($data));
-    
-    if (!$data) {
-        throw new Exception('Dados JSON inválidos recebidos');
-    }
-    
-    // Verificar campos obrigatórios
-    if (!isset($data['id']) || !isset($data['status'])) {
-        throw new Exception('Campos obrigatórios não encontrados (id, status)');
-    }
-    
-    $transactionId = $data['id'];
-    $status = strtoupper(trim($data['status']));
-    $idempotencyKey = $data['idempotencyKey'] ?? null;
-    
-    writeLog("Processing - Transaction ID: $transactionId, Status: $status, Idempotency: $idempotencyKey");
-    
-    // Mapeamento completo de status DigitoPay para sistema interno
-    $statusMap = [
-        'REALIZADO' => 'PAID',
-        'CANCELADO' => 'CANCELLED',
-        'ERRO' => 'FAILED',
-        'PENDENTE' => 'PENDING',
-        'EM PROCESSAMENTO' => 'PROCESSING',
-        'ANALISE' => 'PROCESSING',
-        'APPROVED' => 'PAID',
-        'REJECTED' => 'CANCELLED',
-        'COMPLETED' => 'PAID',
-        'FAILED' => 'FAILED',
-        'PROCESSING' => 'PROCESSING',
-        'SUCCESS' => 'PAID',
-        'CONFIRMED' => 'PAID'
-    ];
-    
-    $newStatus = $statusMap[$status] ?? 'PROCESSING';
-    writeLog("Status mapping: $status -> $newStatus");
-    
-    // Buscar o saque no banco usando múltiplos critérios
-    $saque = null;
-    $searchMethod = '';
-    
-    // 1. Buscar por transaction_id_digitopay (mais confiável)
-    if ($transactionId) {
-        $stmt = $pdo->prepare("
-            SELECT id, user_id, valor, status, gateway 
-            FROM saques 
-            WHERE transaction_id_digitopay = :transaction_id
-            AND gateway = 'digitopay'
-            LIMIT 1
-        ");
-        $stmt->execute([':transaction_id' => $transactionId]);
-        $saque = $stmt->fetch();
-        if ($saque) $searchMethod = 'transaction_id_digitopay';
-    }
-    
-    // 2. Buscar por idempotency_key se não encontrou
-    if (!$saque && $idempotencyKey) {
-        $stmt = $pdo->prepare("
-            SELECT id, user_id, valor, status, gateway 
-            FROM saques 
-            WHERE digitopay_idempotency_key = :idempotency_key
-            AND gateway = 'digitopay'
-            LIMIT 1
-        ");
-        $stmt->execute([':idempotency_key' => $idempotencyKey]);
-        $saque = $stmt->fetch();
-        if ($saque) $searchMethod = 'idempotency_key';
-    }
-    
-    // 3. Último recurso: saque mais recente em processamento (últimas 2 horas)
-    if (!$saque) {
-        $stmt = $pdo->prepare("
-            SELECT id, user_id, valor, status, gateway 
-            FROM saques 
-            WHERE gateway = 'digitopay' 
-            AND status IN ('PROCESSING', 'EM PROCESSAMENTO', 'PENDING')
-            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-            ORDER BY updated_at DESC
-            LIMIT 1
-        ");
-        $stmt->execute();
-        $saque = $stmt->fetch();
-        if ($saque) $searchMethod = 'recent_processing';
-    }
-    
-    writeLog("Search result: " . ($saque ? "Found via $searchMethod" : "Not found"));
-    writeLog("Saque data: " . json_encode($saque));
-    
-    if (!$saque) {
-        $error = "Saque não encontrado para transactionId: $transactionId";
-        writeLog("ERROR: $error");
-        
-        // Retornar sucesso mesmo assim para evitar reenvios desnecessários
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'Webhook recebido mas saque não encontrado',
-            'transaction_id' => $transactionId
-        ]);
-        exit;
-    }
-    
-    // Verificar se já está no status final
-    if ($saque['status'] === $newStatus) {
-        writeLog("Status já atualizado: {$saque['status']}");
-        echo json_encode([
-            'status' => 'success', 
-            'message' => 'Status já processado',
-            'saque_id' => $saque['id'],
-            'current_status' => $saque['status']
-        ]);
-        exit;
-    }
-    
-    // Iniciar transação para atualização
-    $pdo->beginTransaction();
-    
-    try {
-        // Atualizar status do saque
-        $stmt = $pdo->prepare("
-            UPDATE saques 
-            SET status = :status,
-                transaction_id_digitopay = COALESCE(transaction_id_digitopay, :transaction_id),
-                digitopay_idempotency_key = COALESCE(digitopay_idempotency_key, :idempotency_key),
-                webhook_data = :webhook_data,
-                updated_at = NOW()
-            WHERE id = :id
-        ");
-        
-        $updateResult = $stmt->execute([
-            ':status' => $newStatus,
-            ':transaction_id' => $transactionId,
-            ':idempotency_key' => $idempotencyKey,
-            ':webhook_data' => $input,
-            ':id' => $saque['id']
-        ]);
-        
-        if (!$updateResult) {
-            throw new Exception('Falha ao atualizar status do saque no banco');
-        }
-        
-        writeLog("Status updated: {$saque['status']} -> $newStatus for saque ID {$saque['id']}");
-        
-        // Processar estorno se saque foi cancelado ou falhou
-        if (in_array($newStatus, ['CANCELLED', 'FAILED'])) {
-            writeLog("Processing refund for failed/cancelled withdrawal");
-            
-            // Verificar se estorno já foi processado
-            $stmt = $pdo->prepare("
-                SELECT COUNT(*) as count 
-                FROM transacoes 
-                WHERE tipo = 'REFUND' 
-                AND referencia = :transaction_id 
-                AND status = 'COMPLETED'
-            ");
-            $stmt->execute([':transaction_id' => $transactionId]);
-            $jaEstornado = $stmt->fetchColumn();
-            
-            if ($jaEstornado == 0) {
-                // Buscar saldo atual do usuário
-                $stmt = $pdo->prepare("SELECT saldo FROM usuarios WHERE id = :user_id FOR UPDATE");
-                $stmt->execute([':user_id' => $saque['user_id']]);
-                $saldoAtual = $stmt->fetchColumn();
-                
-                if ($saldoAtual === false) {
-                    throw new Exception('Usuário não encontrado para estorno');
-                }
-                
-                // Devolver valor para o usuário
-                $novoSaldo = $saldoAtual + $saque['valor'];
-                $stmt = $pdo->prepare("
-                    UPDATE usuarios 
-                    SET saldo = :novo_saldo, updated_at = NOW()
-                    WHERE id = :user_id
-                ");
-                $stmt->execute([
-                    ':novo_saldo' => $novoSaldo,
-                    ':user_id' => $saque['user_id']
-                ]);
-                
-                // Registrar transação de estorno
-                $stmt = $pdo->prepare("
-                    INSERT INTO transacoes (
-                        user_id, tipo, valor, saldo_anterior, saldo_posterior, 
-                        status, referencia, gateway, descricao, created_at
-                    ) VALUES (
-                        :user_id, 'REFUND', :valor, :saldo_anterior, :saldo_posterior,
-                        'COMPLETED', :referencia, 'digitopay', :descricao, NOW()
-                    )
-                ");
-                
-                $descricao = 'Estorno automático - Saque DigitoPay ' . 
-                           ($newStatus === 'CANCELLED' ? 'cancelado' : 'falhou') . 
-                           ' - ' . $transactionId;
-                
-                $stmt->execute([
-                    ':user_id' => $saque['user_id'],
-                    ':valor' => $saque['valor'],
-                    ':saldo_anterior' => $saldoAtual,
-                    ':saldo_posterior' => $novoSaldo,
-                    ':referencia' => $transactionId,
-                    ':descricao' => $descricao
-                ]);
-                
-                writeLog("Refund processed: R$ {$saque['valor']} returned to user {$saque['user_id']}");
-            } else {
-                writeLog("Refund already processed for transaction $transactionId");
-            }
-        }
-        
-        $pdo->commit();
-        writeLog("Transaction committed successfully");
-        
-    } catch (Exception $e) {
-        $pdo->rollback();
-        writeLog("Transaction rolled back: " . $e->getMessage());
-        throw new Exception('Erro ao processar webhook: ' . $e->getMessage());
-    }
-    
-    // Resposta de sucesso
-    $response = [
-        'status' => 'success', 
-        'message' => 'Webhook processado com sucesso',
-        'transaction_id' => $transactionId,
-        'saque_id' => $saque['id'],
-        'old_status' => $saque['status'],
-        'new_status' => $newStatus,
-        'search_method' => $searchMethod,
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
-    
-    writeLog("SUCCESS: " . json_encode($response));
-    echo json_encode($response);
-    
-} catch (Exception $e) {
-    http_response_code(400);
-    
-    $error = [
-        'status' => 'error', 
-        'message' => $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
-    
-    writeLog("ERROR: " . json_encode($error));
-    echo json_encode($error);
-}
+<?php<?php 
+/**<?php 
+<?php *<?php DigitoPay<?php Withdraw<?php Webhook<?php -<?php Versão<?php Final<?php 
+<?php *<?php callback/digitopay_withdraw.php<?php 
+<?php *<?php 
+<?php *<?php Este<?php webhook<?php recebe<?php notificações<?php da<?php DigitoPay<?php sobre<?php o<?php status<?php dos<?php saques<?php 
+<?php *<?php e<?php atualiza<?php automaticamente<?php o<?php status<?php no<?php banco<?php de<?php dados<?php 
+<?php */<?php 
+<?php 
+header('Content-Type:<?php application/json');<?php 
+<?php 
+//<?php Log<?php detalhado<?php para<?php debug<?php (opcional<?php -<?php remover<?php em<?php produção<?php se<?php não<?php precisar)<?php 
+$enableDebugLog<?php =<?php true;<?php 
+$logFile<?php =<?php __DIR__<?php .<?php '/../logs/digitopay_webhook.log';<?php 
+<?php 
+function<?php writeLog($message)<?php {<?php 
+<?php global<?php $logFile,<?php $enableDebugLog;<?php 
+<?php if<?php (!$enableDebugLog)<?php return;<?php 
+<?php 
+<?php if<?php (!is_dir(dirname($logFile)))<?php {<?php 
+<?php mkdir(dirname($logFile),<?php 0755,<?php true);<?php 
+<?php }<?php 
+<?php 
+<?php $timestamp<?php =<?php date('Y-m-d<?php H:i:s');<?php 
+<?php file_put_contents($logFile,<?php "[$timestamp]<?php $message\n",<?php FILE_APPEND);<?php 
+}<?php 
+<?php 
+//<?php Log<?php do<?php acesso<?php 
+writeLog("===<?php WEBHOOK<?php ACCESSED<?php ===");<?php 
+writeLog("Method:<?php "<?php .<?php $_SERVER['REQUEST_METHOD']);<?php 
+writeLog("User-Agent:<?php "<?php .<?php ($_SERVER['HTTP_USER_AGENT']<?php ??<?php 'Unknown'));<?php 
+writeLog("Raw<?php Input:<?php "<?php .<?php file_get_contents('php://input'));<?php 
+<?php 
+//<?php Verificar<?php método<?php HTTP<?php 
+if<?php ($_SERVER['REQUEST_METHOD']<?php !==<?php 'POST')<?php {<?php 
+<?php http_response_code(405);<?php 
+<?php $response<?php =<?php ['error'<?php =><?php 'Método<?php não<?php permitido',<?php 'allowed'<?php =><?php 'POST'];<?php 
+<?php writeLog("ERROR:<?php Método<?php inválido<?php -<?php "<?php .<?php $_SERVER['REQUEST_METHOD']);<?php 
+<?php echo<?php json_encode($response);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+try<?php {<?php 
+<?php require_once<?php __DIR__<?php .<?php '/../conexao.php';<?php 
+<?php 
+<?php //<?php Receber<?php e<?php validar<?php dados<?php do<?php webhook<?php 
+<?php $input<?php =<?php file_get_contents('php://input');<?php 
+<?php $data<?php =<?php json_decode($input,<?php true);<?php 
+<?php 
+<?php writeLog("Parsed<?php webhook<?php data:<?php "<?php .<?php json_encode($data));<?php 
+<?php 
+<?php if<?php (!$data)<?php {<?php 
+<?php throw<?php new<?php Exception('Dados<?php JSON<?php inválidos<?php recebidos');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Verificar<?php campos<?php obrigatórios<?php 
+<?php if<?php (!isset($data['id'])<?php ||<?php !isset($data['status']))<?php {<?php 
+<?php throw<?php new<?php Exception('Campos<?php obrigatórios<?php não<?php encontrados<?php (id,<?php status)');<?php 
+<?php }<?php 
+<?php 
+<?php $transactionId<?php =<?php $data['id'];<?php 
+<?php $status<?php =<?php strtoupper(trim($data['status']));<?php 
+<?php $idempotencyKey<?php =<?php $data['idempotencyKey']<?php ??<?php null;<?php 
+<?php 
+<?php writeLog("Processing<?php -<?php Transaction<?php ID:<?php $transactionId,<?php Status:<?php $status,<?php Idempotency:<?php $idempotencyKey");<?php 
+<?php 
+<?php //<?php Mapeamento<?php completo<?php de<?php status<?php DigitoPay<?php para<?php sistema<?php interno<?php 
+<?php $statusMap<?php =<?php [<?php 
+<?php 'REALIZADO'<?php =><?php 'PAID',<?php 
+<?php 'CANCELADO'<?php =><?php 'CANCELLED',<?php 
+<?php 'ERRO'<?php =><?php 'FAILED',<?php 
+<?php 'PENDENTE'<?php =><?php 'PENDING',<?php 
+<?php 'EM<?php PROCESSAMENTO'<?php =><?php 'PROCESSING',<?php 
+<?php 'ANALISE'<?php =><?php 'PROCESSING',<?php 
+<?php 'APPROVED'<?php =><?php 'PAID',<?php 
+<?php 'REJECTED'<?php =><?php 'CANCELLED',<?php 
+<?php 'COMPLETED'<?php =><?php 'PAID',<?php 
+<?php 'FAILED'<?php =><?php 'FAILED',<?php 
+<?php 'PROCESSING'<?php =><?php 'PROCESSING',<?php 
+<?php 'SUCCESS'<?php =><?php 'PAID',<?php 
+<?php 'CONFIRMED'<?php =><?php 'PAID'<?php 
+<?php ];<?php 
+<?php 
+<?php $newStatus<?php =<?php $statusMap[$status]<?php ??<?php 'PROCESSING';<?php 
+<?php writeLog("Status<?php mapping:<?php $status<?php -><?php $newStatus");<?php 
+<?php 
+<?php //<?php Buscar<?php o<?php saque<?php no<?php banco<?php usando<?php múltiplos<?php critérios<?php 
+<?php $saque<?php =<?php null;<?php 
+<?php $searchMethod<?php =<?php '';<?php 
+<?php 
+<?php //<?php 1.<?php Buscar<?php por<?php transaction_id_digitopay<?php (mais<?php confiável)<?php 
+<?php if<?php ($transactionId)<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php id,<?php user_id,<?php valor,<?php status,<?php gateway<?php 
+<?php FROM<?php saques<?php 
+<?php WHERE<?php transaction_id_digitopay<?php =<?php :transaction_id<?php 
+<?php AND<?php gateway<?php =<?php 'digitopay'<?php 
+<?php LIMIT<?php 1<?php 
+<?php ");<?php 
+<?php $stmt->execute([':transaction_id'<?php =><?php $transactionId]);<?php 
+<?php $saque<?php =<?php $stmt->fetch();<?php 
+<?php if<?php ($saque)<?php $searchMethod<?php =<?php 'transaction_id_digitopay';<?php 
+<?php }<?php 
+<?php 
+<?php //<?php 2.<?php Buscar<?php por<?php idempotency_key<?php se<?php não<?php encontrou<?php 
+<?php if<?php (!$saque<?php &&<?php $idempotencyKey)<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php id,<?php user_id,<?php valor,<?php status,<?php gateway<?php 
+<?php FROM<?php saques<?php 
+<?php WHERE<?php digitopay_idempotency_key<?php =<?php :idempotency_key<?php 
+<?php AND<?php gateway<?php =<?php 'digitopay'<?php 
+<?php LIMIT<?php 1<?php 
+<?php ");<?php 
+<?php $stmt->execute([':idempotency_key'<?php =><?php $idempotencyKey]);<?php 
+<?php $saque<?php =<?php $stmt->fetch();<?php 
+<?php if<?php ($saque)<?php $searchMethod<?php =<?php 'idempotency_key';<?php 
+<?php }<?php 
+<?php 
+<?php //<?php 3.<?php Último<?php recurso:<?php saque<?php mais<?php recente<?php em<?php processamento<?php (últimas<?php 2<?php horas)<?php 
+<?php if<?php (!$saque)<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php id,<?php user_id,<?php valor,<?php status,<?php gateway<?php 
+<?php FROM<?php saques<?php 
+<?php WHERE<?php gateway<?php =<?php 'digitopay'<?php 
+<?php AND<?php status<?php IN<?php ('PROCESSING',<?php 'EM<?php PROCESSAMENTO',<?php 'PENDING')<?php 
+<?php AND<?php created_at<?php >=<?php DATE_SUB(NOW(),<?php INTERVAL<?php 2<?php HOUR)<?php 
+<?php ORDER<?php BY<?php updated_at<?php DESC<?php 
+<?php LIMIT<?php 1<?php 
+<?php ");<?php 
+<?php $stmt->execute();<?php 
+<?php $saque<?php =<?php $stmt->fetch();<?php 
+<?php if<?php ($saque)<?php $searchMethod<?php =<?php 'recent_processing';<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("Search<?php result:<?php "<?php .<?php ($saque<?php ?<?php "Found<?php via<?php $searchMethod"<?php :<?php "Not<?php found"));<?php 
+<?php writeLog("Saque<?php data:<?php "<?php .<?php json_encode($saque));<?php 
+<?php 
+<?php if<?php (!$saque)<?php {<?php 
+<?php $error<?php =<?php "Saque<?php não<?php encontrado<?php para<?php transactionId:<?php $transactionId";<?php 
+<?php writeLog("ERROR:<?php $error");<?php 
+<?php 
+<?php //<?php Retornar<?php sucesso<?php mesmo<?php assim<?php para<?php evitar<?php reenvios<?php desnecessários<?php 
+<?php echo<?php json_encode([<?php 
+<?php 'status'<?php =><?php 'success',<?php 
+<?php 'message'<?php =><?php 'Webhook<?php recebido<?php mas<?php saque<?php não<?php encontrado',<?php 
+<?php 'transaction_id'<?php =><?php $transactionId<?php 
+<?php ]);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Verificar<?php se<?php já<?php está<?php no<?php status<?php final<?php 
+<?php if<?php ($saque['status']<?php ===<?php $newStatus)<?php {<?php 
+<?php writeLog("Status<?php já<?php atualizado:<?php {$saque['status']}");<?php 
+<?php echo<?php json_encode([<?php 
+<?php 'status'<?php =><?php 'success',<?php 
+<?php 'message'<?php =><?php 'Status<?php já<?php processado',<?php 
+<?php 'saque_id'<?php =><?php $saque['id'],<?php 
+<?php 'current_status'<?php =><?php $saque['status']<?php 
+<?php ]);<?php 
+<?php exit;<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Iniciar<?php transação<?php para<?php atualização<?php 
+<?php $pdo->beginTransaction();<?php 
+<?php 
+<?php try<?php {<?php 
+<?php //<?php Atualizar<?php status<?php do<?php saque<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php UPDATE<?php saques<?php 
+<?php SET<?php status<?php =<?php :status,<?php 
+<?php transaction_id_digitopay<?php =<?php COALESCE(transaction_id_digitopay,<?php :transaction_id),<?php 
+<?php digitopay_idempotency_key<?php =<?php COALESCE(digitopay_idempotency_key,<?php :idempotency_key),<?php 
+<?php webhook_data<?php =<?php :webhook_data,<?php 
+<?php updated_at<?php =<?php NOW()<?php 
+<?php WHERE<?php id<?php =<?php :id<?php 
+<?php ");<?php 
+<?php 
+<?php $updateResult<?php =<?php $stmt->execute([<?php 
+<?php ':status'<?php =><?php $newStatus,<?php 
+<?php ':transaction_id'<?php =><?php $transactionId,<?php 
+<?php ':idempotency_key'<?php =><?php $idempotencyKey,<?php 
+<?php ':webhook_data'<?php =><?php $input,<?php 
+<?php ':id'<?php =><?php $saque['id']<?php 
+<?php ]);<?php 
+<?php 
+<?php if<?php (!$updateResult)<?php {<?php 
+<?php throw<?php new<?php Exception('Falha<?php ao<?php atualizar<?php status<?php do<?php saque<?php no<?php banco');<?php 
+<?php }<?php 
+<?php 
+<?php writeLog("Status<?php updated:<?php {$saque['status']}<?php -><?php $newStatus<?php for<?php saque<?php ID<?php {$saque['id']}");<?php 
+<?php 
+<?php //<?php Processar<?php estorno<?php se<?php saque<?php foi<?php cancelado<?php ou<?php falhou<?php 
+<?php if<?php (in_array($newStatus,<?php ['CANCELLED',<?php 'FAILED']))<?php {<?php 
+<?php writeLog("Processing<?php refund<?php for<?php failed/cancelled<?php withdrawal");<?php 
+<?php 
+<?php //<?php Verificar<?php se<?php estorno<?php já<?php foi<?php processado<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php COUNT(*)<?php as<?php count<?php 
+<?php FROM<?php transacoes<?php 
+<?php WHERE<?php tipo<?php =<?php 'REFUND'<?php 
+<?php AND<?php referencia<?php =<?php :transaction_id<?php 
+<?php AND<?php status<?php =<?php 'COMPLETED'<?php 
+<?php ");<?php 
+<?php $stmt->execute([':transaction_id'<?php =><?php $transactionId]);<?php 
+<?php $jaEstornado<?php =<?php $stmt->fetchColumn();<?php 
+<?php 
+<?php if<?php ($jaEstornado<?php ==<?php 0)<?php {<?php 
+<?php //<?php Buscar<?php saldo<?php atual<?php do<?php usuário<?php 
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php saldo<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php :user_id<?php FOR<?php UPDATE");<?php 
+<?php $stmt->execute([':user_id'<?php =><?php $saque['user_id']]);<?php 
+<?php $saldoAtual<?php =<?php $stmt->fetchColumn();<?php 
+<?php 
+<?php if<?php ($saldoAtual<?php ===<?php false)<?php {<?php 
+<?php throw<?php new<?php Exception('Usuário<?php não<?php encontrado<?php para<?php estorno');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Devolver<?php valor<?php para<?php o<?php usuário<?php 
+<?php $novoSaldo<?php =<?php $saldoAtual<?php +<?php $saque['valor'];<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php UPDATE<?php usuarios<?php 
+<?php SET<?php saldo<?php =<?php :novo_saldo,<?php updated_at<?php =<?php NOW()<?php 
+<?php WHERE<?php id<?php =<?php :user_id<?php 
+<?php ");<?php 
+<?php $stmt->execute([<?php 
+<?php ':novo_saldo'<?php =><?php $novoSaldo,<?php 
+<?php ':user_id'<?php =><?php $saque['user_id']<?php 
+<?php ]);<?php 
+<?php 
+<?php //<?php Registrar<?php transação<?php de<?php estorno<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php INSERT<?php INTO<?php transacoes<?php (<?php 
+<?php user_id,<?php tipo,<?php valor,<?php saldo_anterior,<?php saldo_posterior,<?php 
+<?php status,<?php referencia,<?php gateway,<?php descricao,<?php created_at<?php 
+<?php )<?php VALUES<?php (<?php 
+<?php :user_id,<?php 'REFUND',<?php :valor,<?php :saldo_anterior,<?php :saldo_posterior,<?php 
+<?php 'COMPLETED',<?php :referencia,<?php 'digitopay',<?php :descricao,<?php NOW()<?php 
+<?php )<?php 
+<?php ");<?php 
+<?php 
+<?php $descricao<?php =<?php 'Estorno<?php automático<?php -<?php Saque<?php DigitoPay<?php '<?php .<?php 
+<?php ($newStatus<?php ===<?php 'CANCELLED'<?php ?<?php 'cancelado'<?php :<?php 'falhou')<?php .<?php 
+<?php '<?php -<?php '<?php .<?php $transactionId;<?php 
+<?php 
+<?php $stmt->execute([<?php 
+<?php ':user_id'<?php =><?php $saque['user_id'],<?php 
+<?php ':valor'<?php =><?php $saque['valor'],<?php 
+<?php ':saldo_anterior'<?php =><?php $saldoAtual,<?php 
+<?php ':saldo_posterior'<?php =><?php $novoSaldo,<?php 
+<?php ':referencia'<?php =><?php $transactionId,<?php 
+<?php ':descricao'<?php =><?php $descricao<?php 
+<?php ]);<?php 
+<?php 
+<?php writeLog("Refund<?php processed:<?php R$<?php {$saque['valor']}<?php returned<?php to<?php user<?php {$saque['user_id']}");<?php 
+<?php }<?php else<?php {<?php 
+<?php writeLog("Refund<?php already<?php processed<?php for<?php transaction<?php $transactionId");<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php $pdo->commit();<?php 
+<?php writeLog("Transaction<?php committed<?php successfully");<?php 
+<?php 
+<?php }<?php catch<?php (Exception<?php $e)<?php {<?php 
+<?php $pdo->rollback();<?php 
+<?php writeLog("Transaction<?php rolled<?php back:<?php "<?php .<?php $e->getMessage());<?php 
+<?php throw<?php new<?php Exception('Erro<?php ao<?php processar<?php webhook:<?php '<?php .<?php $e->getMessage());<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Resposta<?php de<?php sucesso<?php 
+<?php $response<?php =<?php [<?php 
+<?php 'status'<?php =><?php 'success',<?php 
+<?php 'message'<?php =><?php 'Webhook<?php processado<?php com<?php sucesso',<?php 
+<?php 'transaction_id'<?php =><?php $transactionId,<?php 
+<?php 'saque_id'<?php =><?php $saque['id'],<?php 
+<?php 'old_status'<?php =><?php $saque['status'],<?php 
+<?php 'new_status'<?php =><?php $newStatus,<?php 
+<?php 'search_method'<?php =><?php $searchMethod,<?php 
+<?php 'timestamp'<?php =><?php date('Y-m-d<?php H:i:s')<?php 
+<?php ];<?php 
+<?php 
+<?php writeLog("SUCCESS:<?php "<?php .<?php json_encode($response));<?php 
+<?php echo<?php json_encode($response);<?php 
+<?php 
+}<?php catch<?php (Exception<?php $e)<?php {<?php 
+<?php http_response_code(400);<?php 
+<?php 
+<?php $error<?php =<?php [<?php 
+<?php 'status'<?php =><?php 'error',<?php 
+<?php 'message'<?php =><?php $e->getMessage(),<?php 
+<?php 'timestamp'<?php =><?php date('Y-m-d<?php H:i:s')<?php 
+<?php ];<?php 
+<?php 
+<?php writeLog("ERROR:<?php "<?php .<?php json_encode($error));<?php 
+<?php echo<?php json_encode($error);<?php 
+}<?php 
 ?>

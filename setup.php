@@ -1,151 +1,151 @@
 <?php
-// =====================================================
-// SETUP AUTOMÁTICO PARA RAILWAY - RASPINHAPIX
-// Execute este arquivo UMA VEZ SÓ para configurar o banco
-// =====================================================
+//<?php =====================================================
+//<?php SETUP<?php AUTOMÁTICO<?php PARA<?php RAILWAY<?php -<?php RASPINHAPIX
+//<?php Execute<?php este<?php arquivo<?php UMA<?php VEZ<?php SÓ<?php para<?php configurar<?php o<?php banco
+//<?php =====================================================
 
-// Incluir conexão
-include 'conexao.php';
+//<?php Incluir<?php conexão
+include<?php 'conexao.php';
 
-// Verificar se já foi executado
-$check = $pdo->query("SHOW TABLES LIKE 'config'")->rowCount();
-if ($check > 0) {
-    $config_check = $pdo->query("SELECT COUNT(*) FROM config")->fetchColumn();
-    if ($config_check > 0) {
-        die("
-        <h1>✅ SISTEMA JÁ CONFIGURADO!</h1>
-        <p>O banco de dados já está configurado e funcionando.</p>
-        <p><strong>IMPORTANTE:</strong> Delete este arquivo setup.php por segurança!</p>
-        <p><a href='/'>Acessar o Sistema</a></p>
-        ");
-    }
+//<?php Verificar<?php se<?php já<?php foi<?php executado
+$check<?php =<?php $pdo->query("SHOW<?php TABLES<?php LIKE<?php 'config'")->rowCount();
+if<?php ($check<?php ><?php 0)<?php {
+<?php $config_check<?php =<?php $pdo->query("SELECT<?php COUNT(*)<?php FROM<?php config")->fetchColumn();
+<?php if<?php ($config_check<?php ><?php 0)<?php {
+<?php die("
+<?php <h1>✅<?php SISTEMA<?php JÁ<?php CONFIGURADO!</h1>
+<?php <p>O<?php banco<?php de<?php dados<?php já<?php está<?php configurado<?php e<?php funcionando.</p>
+<?php <p><strong>IMPORTANTE:</strong><?php Delete<?php este<?php arquivo<?php setup.php<?php por<?php segurança!</p>
+<?php <p><a<?php href='/'>Acessar<?php o<?php Sistema</a></p>
+<?php ");
+<?php }
 }
 
-echo "<h1>🚀 CONFIGURANDO RASPINHAPIX NO RAILWAY</h1>";
-echo "<p>Executando configuração automática...</p>";
+echo<?php "<h1>🚀<?php CONFIGURANDO<?php RASPINHAPIX<?php NO<?php RAILWAY</h1>";
+echo<?php "<p>Executando<?php configuração<?php automática...</p>";
 
-try {
-    // Ler o arquivo SQL original
-    $sql_file = 'database_complete.sql';
-    if (!file_exists($sql_file)) {
-        die("<p style='color:red'>❌ Arquivo database_complete.sql não encontrado!</p>");
-    }
-    
-    $sql_content = file_get_contents($sql_file);
-    
-    // Limpar comandos problemáticos
-    $sql_content = str_replace('START TRANSACTION;', '', $sql_content);
-    $sql_content = str_replace('COMMIT;', '', $sql_content);
-    $sql_content = str_replace('SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";', '', $sql_content);
-    $sql_content = str_replace('SET time_zone = "+00:00";', '', $sql_content);
-    
-    // Remover comentários e linhas vazias
-    $lines = explode("\n", $sql_content);
-    $clean_lines = [];
-    
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (empty($line) || strpos($line, '--') === 0 || strpos($line, '/*') === 0 || strpos($line, '*/') !== false) {
-            continue;
-        }
-        if (strpos($line, '/*!') === 0) {
-            continue;
-        }
-        $clean_lines[] = $line;
-    }
-    
-    $clean_sql = implode("\n", $clean_lines);
-    
-    // Dividir em comandos individuais
-    $commands = explode(';', $clean_sql);
-    
-    $success_count = 0;
-    $error_count = 0;
-    
-    echo "<h2>📋 Executando comandos SQL...</h2>";
-    echo "<div style='max-height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #f9f9f9;'>";
-    
-    foreach ($commands as $command) {
-        $command = trim($command);
-        if (empty($command)) continue;
-        
-        try {
-            $pdo->exec($command);
-            $success_count++;
-            echo "<p style='color: green;'>✅ Comando executado com sucesso</p>";
-        } catch (PDOException $e) {
-            $error_count++;
-            echo "<p style='color: orange;'>⚠️ Aviso: " . htmlspecialchars($e->getMessage()) . "</p>";
-        }
-    }
-    
-    echo "</div>";
-    
-    // Verificar se as tabelas principais foram criadas
-    $tables_check = [
-        'config' => 'Configurações do sistema',
-        'usuarios' => 'Usuários',
-        'raspadinhas' => 'Raspadinhas',
-        'raspadinha_premios' => 'Prêmios das raspadinhas',
-        'depositos' => 'Depósitos',
-        'saques' => 'Saques'
-    ];
-    
-    echo "<h2>🔍 Verificando tabelas criadas:</h2>";
-    $all_ok = true;
-    
-    foreach ($tables_check as $table => $desc) {
-        $exists = $pdo->query("SHOW TABLES LIKE '$table'")->rowCount();
-        if ($exists > 0) {
-            $count = $pdo->query("SELECT COUNT(*) FROM $table")->fetchColumn();
-            echo "<p style='color: green;'>✅ $desc ($table): $count registros</p>";
-        } else {
-            echo "<p style='color: red;'>❌ $desc ($table): Não encontrada</p>";
-            $all_ok = false;
-        }
-    }
-    
-    // Verificar usuário admin
-    $admin_check = $pdo->query("SELECT COUNT(*) FROM usuarios WHERE admin = 1")->fetchColumn();
-    if ($admin_check == 0) {
-        // Criar usuário admin se não existir
-        $pdo->exec("INSERT INTO usuarios (nome, email, senha, admin, saldo, created_at) VALUES ('Administrador', 'admin@raspinhapix.com', MD5('123456'), 1, 0, NOW())");
-        echo "<p style='color: blue;'>👤 Usuário admin criado: admin@raspinhapix.com / senha: 123456</p>";
-    }
-    
-    // Verificar configurações
-    $config_check = $pdo->query("SELECT COUNT(*) FROM config")->fetchColumn();
-    if ($config_check == 0) {
-        // Inserir configuração padrão se não existir
-        $pdo->exec("INSERT INTO config (nome_site, logo, deposito_min, saque_min, cpa_padrao, revshare_padrao) VALUES ('RaspinhaPix', '/assets/upload/logo.png', 10, 50, 0, 10)");
-        echo "<p style='color: blue;'>⚙️ Configurações padrão inseridas</p>";
-    }
-    
-    echo "<h2>📊 Resumo da Configuração:</h2>";
-    echo "<p>✅ Comandos executados com sucesso: $success_count</p>";
-    echo "<p>⚠️ Avisos/Erros: $error_count</p>";
-    
-    if ($all_ok) {
-        echo "
-        <div style='background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0;'>
-            <h2 style='color: #155724;'>🎉 CONFIGURAÇÃO CONCLUÍDA COM SUCESSO!</h2>
-            <p><strong>Seu sistema RaspinhaPix está funcionando!</strong></p>
-            <p><strong>Login Admin:</strong> admin@raspinhapix.com</p>
-            <p><strong>Senha Admin:</strong> 123456</p>
-            <p><strong>IMPORTANTE:</strong> Delete este arquivo setup.php por segurança!</p>
-            <p><a href='/' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>🚀 Acessar o Sistema</a></p>
-        </div>";
-    } else {
-        echo "
-        <div style='background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 20px 0;'>
-            <h2 style='color: #721c24;'>⚠️ CONFIGURAÇÃO INCOMPLETA</h2>
-            <p>Algumas tabelas não foram criadas corretamente.</p>
-            <p>Verifique os erros acima e tente novamente.</p>
-        </div>";
-    }
-    
-} catch (Exception $e) {
-    echo "<p style='color: red;'>❌ Erro geral: " . htmlspecialchars($e->getMessage()) . "</p>";
+try<?php {
+<?php //<?php Ler<?php o<?php arquivo<?php SQL<?php original
+<?php $sql_file<?php =<?php 'database_complete.sql';
+<?php if<?php (!file_exists($sql_file))<?php {
+<?php die("<p<?php style='color:red'>❌<?php Arquivo<?php database_complete.sql<?php não<?php encontrado!</p>");
+<?php }
+<?php 
+<?php $sql_content<?php =<?php file_get_contents($sql_file);
+<?php 
+<?php //<?php Limpar<?php comandos<?php problemáticos
+<?php $sql_content<?php =<?php str_replace('START<?php TRANSACTION;',<?php '',<?php $sql_content);
+<?php $sql_content<?php =<?php str_replace('COMMIT;',<?php '',<?php $sql_content);
+<?php $sql_content<?php =<?php str_replace('SET<?php SQL_MODE<?php =<?php "NO_AUTO_VALUE_ON_ZERO";',<?php '',<?php $sql_content);
+<?php $sql_content<?php =<?php str_replace('SET<?php time_zone<?php =<?php "+00:00";',<?php '',<?php $sql_content);
+<?php 
+<?php //<?php Remover<?php comentários<?php e<?php linhas<?php vazias
+<?php $lines<?php =<?php explode("\n",<?php $sql_content);
+<?php $clean_lines<?php =<?php [];
+<?php 
+<?php foreach<?php ($lines<?php as<?php $line)<?php {
+<?php $line<?php =<?php trim($line);
+<?php if<?php (empty($line)<?php ||<?php strpos($line,<?php '--')<?php ===<?php 0<?php ||<?php strpos($line,<?php '/*')<?php ===<?php 0<?php ||<?php strpos($line,<?php '*/')<?php !==<?php false)<?php {
+<?php continue;
+<?php }
+<?php if<?php (strpos($line,<?php '/*!')<?php ===<?php 0)<?php {
+<?php continue;
+<?php }
+<?php $clean_lines[]<?php =<?php $line;
+<?php }
+<?php 
+<?php $clean_sql<?php =<?php implode("\n",<?php $clean_lines);
+<?php 
+<?php //<?php Dividir<?php em<?php comandos<?php individuais
+<?php $commands<?php =<?php explode(';',<?php $clean_sql);
+<?php 
+<?php $success_count<?php =<?php 0;
+<?php $error_count<?php =<?php 0;
+<?php 
+<?php echo<?php "<h2>📋<?php Executando<?php comandos<?php SQL...</h2>";
+<?php echo<?php "<div<?php style='max-height:<?php 400px;<?php overflow-y:<?php scroll;<?php border:<?php 1px<?php solid<?php #ccc;<?php padding:<?php 10px;<?php background:<?php #f9f9f9;'>";
+<?php 
+<?php foreach<?php ($commands<?php as<?php $command)<?php {
+<?php $command<?php =<?php trim($command);
+<?php if<?php (empty($command))<?php continue;
+<?php 
+<?php try<?php {
+<?php $pdo->exec($command);
+<?php $success_count++;
+<?php echo<?php "<p<?php style='color:<?php green;'>✅<?php Comando<?php executado<?php com<?php sucesso</p>";
+<?php }<?php catch<?php (PDOException<?php $e)<?php {
+<?php $error_count++;
+<?php echo<?php "<p<?php style='color:<?php orange;'>⚠️<?php Aviso:<?php "<?php .<?php htmlspecialchars($e->getMessage())<?php .<?php "</p>";
+<?php }
+<?php }
+<?php 
+<?php echo<?php "</div>";
+<?php 
+<?php //<?php Verificar<?php se<?php as<?php tabelas<?php principais<?php foram<?php criadas
+<?php $tables_check<?php =<?php [
+<?php 'config'<?php =><?php 'Configurações<?php do<?php sistema',
+<?php 'usuarios'<?php =><?php 'Usuários',
+<?php 'raspadinhas'<?php =><?php 'Raspadinhas',
+<?php 'raspadinha_premios'<?php =><?php 'Prêmios<?php das<?php raspadinhas',
+<?php 'depositos'<?php =><?php 'Depósitos',
+<?php 'saques'<?php =><?php 'Saques'
+<?php ];
+<?php 
+<?php echo<?php "<h2>🔍<?php Verificando<?php tabelas<?php criadas:</h2>";
+<?php $all_ok<?php =<?php true;
+<?php 
+<?php foreach<?php ($tables_check<?php as<?php $table<?php =><?php $desc)<?php {
+<?php $exists<?php =<?php $pdo->query("SHOW<?php TABLES<?php LIKE<?php '$table'")->rowCount();
+<?php if<?php ($exists<?php ><?php 0)<?php {
+<?php $count<?php =<?php $pdo->query("SELECT<?php COUNT(*)<?php FROM<?php $table")->fetchColumn();
+<?php echo<?php "<p<?php style='color:<?php green;'>✅<?php $desc<?php ($table):<?php $count<?php registros</p>";
+<?php }<?php else<?php {
+<?php echo<?php "<p<?php style='color:<?php red;'>❌<?php $desc<?php ($table):<?php Não<?php encontrada</p>";
+<?php $all_ok<?php =<?php false;
+<?php }
+<?php }
+<?php 
+<?php //<?php Verificar<?php usuário<?php admin
+<?php $admin_check<?php =<?php $pdo->query("SELECT<?php COUNT(*)<?php FROM<?php usuarios<?php WHERE<?php admin<?php =<?php 1")->fetchColumn();
+<?php if<?php ($admin_check<?php ==<?php 0)<?php {
+<?php //<?php Criar<?php usuário<?php admin<?php se<?php não<?php existir
+<?php $pdo->exec("INSERT<?php INTO<?php usuarios<?php (nome,<?php email,<?php senha,<?php admin,<?php saldo,<?php created_at)<?php VALUES<?php ('Administrador',<?php 'admin@raspinhapix.com',<?php MD5('123456'),<?php 1,<?php 0,<?php NOW())");
+<?php echo<?php "<p<?php style='color:<?php blue;'>👤<?php Usuário<?php admin<?php criado:<?php admin@raspinhapix.com<?php /<?php senha:<?php 123456</p>";
+<?php }
+<?php 
+<?php //<?php Verificar<?php configurações
+<?php $config_check<?php =<?php $pdo->query("SELECT<?php COUNT(*)<?php FROM<?php config")->fetchColumn();
+<?php if<?php ($config_check<?php ==<?php 0)<?php {
+<?php //<?php Inserir<?php configuração<?php padrão<?php se<?php não<?php existir
+<?php $pdo->exec("INSERT<?php INTO<?php config<?php (nome_site,<?php logo,<?php deposito_min,<?php saque_min,<?php cpa_padrao,<?php revshare_padrao)<?php VALUES<?php ('RaspinhaPix',<?php '/assets/upload/logo.png',<?php 10,<?php 50,<?php 0,<?php 10)");
+<?php echo<?php "<p<?php style='color:<?php blue;'>⚙️<?php Configurações<?php padrão<?php inseridas</p>";
+<?php }
+<?php 
+<?php echo<?php "<h2>📊<?php Resumo<?php da<?php Configuração:</h2>";
+<?php echo<?php "<p>✅<?php Comandos<?php executados<?php com<?php sucesso:<?php $success_count</p>";
+<?php echo<?php "<p>⚠️<?php Avisos/Erros:<?php $error_count</p>";
+<?php 
+<?php if<?php ($all_ok)<?php {
+<?php echo<?php "
+<?php <div<?php style='background:<?php #d4edda;<?php border:<?php 1px<?php solid<?php #c3e6cb;<?php padding:<?php 15px;<?php border-radius:<?php 5px;<?php margin:<?php 20px<?php 0;'>
+<?php <h2<?php style='color:<?php #155724;'>🎉<?php CONFIGURAÇÃO<?php CONCLUÍDA<?php COM<?php SUCESSO!</h2>
+<?php <p><strong>Seu<?php sistema<?php RaspinhaPix<?php está<?php funcionando!</strong></p>
+<?php <p><strong>Login<?php Admin:</strong><?php admin@raspinhapix.com</p>
+<?php <p><strong>Senha<?php Admin:</strong><?php 123456</p>
+<?php <p><strong>IMPORTANTE:</strong><?php Delete<?php este<?php arquivo<?php setup.php<?php por<?php segurança!</p>
+<?php <p><a<?php href='/'<?php style='background:<?php #007bff;<?php color:<?php white;<?php padding:<?php 10px<?php 20px;<?php text-decoration:<?php none;<?php border-radius:<?php 5px;'>🚀<?php Acessar<?php o<?php Sistema</a></p>
+<?php </div>";
+<?php }<?php else<?php {
+<?php echo<?php "
+<?php <div<?php style='background:<?php #f8d7da;<?php border:<?php 1px<?php solid<?php #f5c6cb;<?php padding:<?php 15px;<?php border-radius:<?php 5px;<?php margin:<?php 20px<?php 0;'>
+<?php <h2<?php style='color:<?php #721c24;'>⚠️<?php CONFIGURAÇÃO<?php INCOMPLETA</h2>
+<?php <p>Algumas<?php tabelas<?php não<?php foram<?php criadas<?php corretamente.</p>
+<?php <p>Verifique<?php os<?php erros<?php acima<?php e<?php tente<?php novamente.</p>
+<?php </div>";
+<?php }
+<?php 
+}<?php catch<?php (Exception<?php $e)<?php {
+<?php echo<?php "<p<?php style='color:<?php red;'>❌<?php Erro<?php geral:<?php "<?php .<?php htmlspecialchars($e->getMessage())<?php .<?php "</p>";
 }
 ?>
 

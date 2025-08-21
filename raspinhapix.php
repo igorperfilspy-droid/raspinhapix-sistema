@@ -1,29 +1,29 @@
 @session_start();
 include('./conexao.php');
-// Capturar UTMs da URL e salvar na sessão
-if (isset($_GET["utm_source"])) $_SESSION["utm_source"] = $_GET["utm_source"];
-if (isset($_GET["utm_medium"])) $_SESSION["utm_medium"] = $_GET["utm_medium"];
-if (isset($_GET["utm_campaign"])) $_SESSION["utm_campaign"] = $_GET["utm_campaign"];
-if (isset($_GET["utm_term"])) $_SESSION["utm_term"] = $_GET["utm_term"];
-if (isset($_GET["utm_content"])) $_SESSION["utm_content"] = $_GET["utm_content"];
-if (isset($_GET["click_id"])) $_SESSION["click_id"] = $_GET["click_id"];
+//<?php Capturar<?php UTMs<?php da<?php URL<?php e<?php salvar<?php na<?php sessão
+if<?php (isset($_GET["utm_source"]))<?php $_SESSION["utm_source"]<?php =<?php $_GET["utm_source"];
+if<?php (isset($_GET["utm_medium"]))<?php $_SESSION["utm_medium"]<?php =<?php $_GET["utm_medium"];
+if<?php (isset($_GET["utm_campaign"]))<?php $_SESSION["utm_campaign"]<?php =<?php $_GET["utm_campaign"];
+if<?php (isset($_GET["utm_term"]))<?php $_SESSION["utm_term"]<?php =<?php $_GET["utm_term"];
+if<?php (isset($_GET["utm_content"]))<?php $_SESSION["utm_content"]<?php =<?php $_GET["utm_content"];
+if<?php (isset($_GET["click_id"]))<?php $_SESSION["click_id"]<?php =<?php $_GET["click_id"];
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE<?php html>
+<html<?php lang="pt-BR">
 <head>
 
-    <!-- xTracky Integration -->
-    <script 
-        src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
-        data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
-        data-click-id-param="click_id">
-    </script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Raspadinhas Online</title>
-    <meta name="description" content="Raspe e ganhe prêmios incríveis! PIX na conta instantâneo.">
-    
-    <!-- Preload Critical Resources -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<?php <!--<?php xTracky<?php Integration<?php -->
+<?php <script<?php 
+<?php src="https://cdn.jsdelivr.net/gh/xTracky/static/utm-handler.js"
+<?php data-token="bf9188a4-c1ad-4101-bc6b-af11ab9c33b8"
+<?php data-click-id-param="click_id">
+<?php </script>
+<?php <meta<?php charset="UTF-8">
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0">
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Raspadinhas<?php Online</title>
+<?php <meta<?php name="description"<?php content="Raspe<?php e<?php ganhe<?php prêmios<?php incríveis!<?php PIX<?php na<?php conta<?php instantâneo.">
+<?php 
+<?php <!--<?php Preload<?php Critical<?php Resources<?php -->
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com">
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin>

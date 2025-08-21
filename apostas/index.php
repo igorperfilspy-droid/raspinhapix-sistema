@@ -1,656 +1,656 @@
-<?php
-@session_start();
-
-if (file_exists('./conexao.php')) {
-    include('./conexao.php');
-} elseif (file_exists('../conexao.php')) {
-    include('../conexao.php');
-} elseif (file_exists('../../conexao.php')) {
-    include('../../conexao.php');
-}
-
-if (!isset($_SESSION['usuario_id'])) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você precisa estar logado para acessar esta página!'];
-    header("Location: /login");
-    exit;
-}
-
-$usuario_id = $_SESSION['usuario_id'];
-$porPagina = 10; // apostas por página
-$paginaAtual = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
-$offset = ($paginaAtual - 1) * $porPagina;
-
-// Obter total de apostas
-try {
-    $stmtTotal = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE user_id = :user_id");
-    $stmtTotal->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmtTotal->execute();
-    $totalApostas = $stmtTotal->fetchColumn();
-    $totalPaginas = ceil($totalApostas / $porPagina);
-} catch (PDOException $e) {
-    $totalApostas = 0;
-    $totalPaginas = 1;
-}
-
-// Buscar apostas paginadas
-try {
-    $stmt = $pdo->prepare("
-        SELECT o.created_at, o.resultado, o.valor_ganho, r.nome, r.valor AS valor_apostado
-        FROM orders o
-        JOIN raspadinhas r ON o.raspadinha_id = r.id
-        WHERE o.user_id = :user_id
-        ORDER BY o.created_at DESC
-        LIMIT :limit OFFSET :offset
-    ");
-    $stmt->bindParam(':user_id', $usuario_id, PDO::PARAM_INT);
-    $stmt->bindParam(':limit', $porPagina, PDO::PARAM_INT);
-    $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $apostas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $apostas = [];
-    $_SESSION['message'] = ['type' => 'failure', 'text' => 'Erro ao carregar apostas'];
-}
-?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite;?> - Minhas Apostas</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/assets/style/globalStyles.css?id=<?php= time(); ?>">
-    
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-
-    <style>
-        /* Page Styles */
-        .apostas-section {
-            margin-top: 100px;
-            padding: 4rem 0;
-            background: #0a0a0a;
-            min-height: calc(100vh - 200px);
-        }
-
-        .apostas-container {
-            max-width: 850px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* Header Card */
-        .header-card {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 163, 74, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 24px;
-            padding: 2rem;
-            margin-bottom: 3rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200px;
-            height: 200px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.1), transparent);
-            border-radius: 50%;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .header-card::after {
-            content: '';
-            position: absolute;
-            bottom: -50%;
-            left: -50%;
-            width: 150px;
-            height: 150px;
-            background: linear-gradient(45deg, rgba(34, 197, 94, 0.05), transparent);
-            border-radius: 50%;
-            animation: float 8s ease-in-out infinite reverse;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
-        }
-
-        .header-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 163, 74, 0.1));
-            border-radius: 50%;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            position: relative;
-            z-index: 2;
-        }
-
-        .header-icon i {
-            font-size: 2rem;
-            color: #22c55e;
-        }
-
-        .header-title {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 900;
-            text-align: center;
-            margin-bottom: 1rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .header-subtitle {
-            color: #e5e7eb;
-            font-size: 1.1rem;
-            text-align: center;
-            opacity: 0.8;
-            position: relative;
-            z-index: 2;
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-card {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            border-color: rgba(34, 197, 94, 0.4);
-            transform: translateY(-2px);
-        }
-
-        .stat-icon {
-            font-size: 2rem;
-            color: #22c55e;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            color: #9ca3af;
-            font-size: 0.9rem;
-        }
-
-        /* Main Container */
-        .main-container {
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .main-title {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #9ca3af;
-        }
-
-        .empty-state i {
-            font-size: 4rem;
-            color: #22c55e;
-            margin-bottom: 1.5rem;
-            opacity: 0.7;
-        }
-
-        .empty-state h3 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            color: #e5e7eb;
-        }
-
-        .empty-state p {
-            font-size: 1rem;
-            opacity: 0.8;
-        }
-
-        /* Bet Items */
-        .bet-item {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(34, 197, 94, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .bet-item::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .bet-item.win::before {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            opacity: 1;
-        }
-
-        .bet-item.lose::before {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            opacity: 1;
-        }
-
-        .bet-item:hover {
-            border-color: rgba(34, 197, 94, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .bet-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .bet-date {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #9ca3af;
-            font-size: 0.9rem;
-        }
-
-        .bet-date i {
-            color: #22c55e;
-        }
-
-        .bet-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .bet-status.win {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 163, 74, 0.1));
-            color: #22c55e;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .bet-status.lose {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.1));
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .bet-content {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .bet-details {
-            color: #e5e7eb;
-        }
-
-        .bet-game {
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .bet-values {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            font-size: 0.9rem;
-        }
-
-        .bet-value {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .bet-value-label {
-            color: #9ca3af;
-        }
-
-        .bet-value-amount {
-            font-weight: 600;
-        }
-
-        .bet-value-amount.win {
-            color: #22c55e;
-        }
-
-        .bet-value-amount.lose {
-            color: #ef4444;
-        }
-
-        .bet-summary {
-            text-align: right;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .bet-summary-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .bet-summary-label {
-            color: #9ca3af;
-            font-size: 0.8rem;
-        }
-
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .pagination-item {
-            padding: 0.75rem 1rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .pagination-item:hover {
-            transform: translateY(-1px);
-        }
-
-        .pagination-item.active {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            border-color: rgba(34, 197, 94, 0.3);
-            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2);
-        }
-
-        .pagination-item:not(.active) {
-            background: rgba(0, 0, 0, 0.3);
-            color: #9ca3af;
-        }
-
-        .pagination-item:not(.active):hover {
-            background: rgba(34, 197, 94, 0.1);
-            color: #22c55e;
-            border-color: rgba(34, 197, 94, 0.2);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .apostas-container {
-                padding: 0 1rem;
-            }
-            
-            .header-title {
-                font-size: 2rem;
-            }
-            
-            .main-container {
-                padding: 1.5rem;
-            }
-            
-            .bet-content {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-            
-            .bet-summary {
-                text-align: center;
-            }
-            
-            .bet-values {
-                font-size: 0.8rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .header-title {
-                font-size: 1.8rem;
-            }
-            
-            .bet-header {
-                flex-direction: column;
-                gap: 0.5rem;
-                align-items: stretch;
-            }
-            
-            .bet-status {
-                align-self: flex-end;
-            }
-        }
-
-        /* Loading Animation */
-        .loading-pulse {
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-    </style>
-</head>
-<body>
-    <?php include('../inc/header.php'); ?>
-
-    <section class="apostas-section">
-        <div class="apostas-container">
-            <!-- Header Card -->
-            <div class="header-card">
-                <div class="header-icon">
-                    <i class="bi bi-dice-5"></i>
-                </div>
-                <h1 class="header-title">Minhas Apostas</h1>
-                <p class="header-subtitle">Acompanhe seu histórico de jogos e resultados</p>
-            </div>
-
-            <!-- Main Container -->
-            <div class="main-container">
-                <!-- Stats Grid -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="bi bi-collection"></i>
-                        </div>
-                        <div class="stat-value"><?php= $totalApostas ?></div>
-                        <div class="stat-label">Total de Apostas</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="bi bi-file-earmark-text"></i>
-                        </div>
-                        <div class="stat-value"><?php= $paginaAtual ?>/<?php= $totalPaginas ?></div>
-                        <div class="stat-label">Página Atual</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="bi bi-grid-3x3"></i>
-                        </div>
-                        <div class="stat-value"><?php= count($apostas) ?></div>
-                        <div class="stat-label">Nesta Página</div>
-                    </div>
-                </div>
-
-                <h2 class="main-title">
-                    <i class="bi bi-trophy"></i>
-                    Histórico de Jogos
-                </h2>
-
-                <?php if (empty($apostas)): ?>
-                    <div class="empty-state">
-                        <i class="bi bi-dice-1"></i>
-                        <h3>Nenhuma aposta encontrada</h3>
-                        <p>Quando você jogar uma raspadinha, ela aparecerá aqui</p>
-                    </div>
-                <?php else: ?>
-                    <div class="bets-list">
-                        <?php foreach ($apostas as $aposta): ?>
-                            <?php
-                                $data = date('d/m/Y H:i', strtotime($aposta['created_at']));
-                                $isWin = ($aposta['resultado'] === 'gain');
-                                $status = $isWin ? 'GANHOU' : 'PERDEU';
-                                $statusClass = $isWin ? 'win' : 'lose';
-                                $valorGanho = number_format($aposta['valor_ganho'], 2, ',', '.');
-                                $valorApostado = number_format($aposta['valor_apostado'], 2, ',', '.');
-                            ?>
-                            <div class="bet-item <?php= $statusClass ?>">
-                                <div class="bet-header">
-                                    <div class="bet-date">
-                                        <i class="bi bi-calendar-event"></i>
-                                        <span><?php= $data ?></span>
-                                    </div>
-                                    <div class="bet-status <?php= $statusClass ?>">
-                                        <i class="bi bi-<?php= $isWin ? 'trophy-fill' : 'x-circle-fill' ?>"></i>
-                                        <?php= $status ?>
-                                    </div>
-                                </div>
-                                
-                                <div class="bet-content">
-                                    <div class="bet-details">
-                                        <div class="bet-game">
-                                            <i class="bi bi-gem"></i>
-                                            <?php= htmlspecialchars($aposta['nome']) ?>
-                                        </div>
-                                        <div class="bet-values">
-                                            <div class="bet-value">
-                                                <span class="bet-value-label">Valor Apostado:</span>
-                                                <span class="bet-value-amount">R$ <?php= $valorApostado ?></span>
-                                            </div>
-                                            <div class="bet-value">
-                                                <span class="bet-value-label">Valor Ganho:</span>
-                                                <span class="bet-value-amount <?php= $statusClass ?>">R$ <?php= $valorGanho ?></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="bet-summary">
-                                        <div class="bet-summary-value <?php= $statusClass ?>">
-                                            <?php= $isWin ? '+' : '' ?>R$ <?php= number_format($aposta['valor_ganho'] - $aposta['valor_apostado'], 2, ',', '.') ?>
-                                        </div>
-                                        <div class="bet-summary-label">
-                                            <?php= $isWin ? 'Lucro' : 'Perda' ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <!-- Pagination -->
-                    <?php if ($totalPaginas > 1): ?>
-                        <div class="pagination">
-                            <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                                <a href="?pagina=<?php= $i ?>" 
-                                   class="pagination-item <?php= $i == $paginaAtual ? 'active' : '' ?>">
-                                    <?php= $i ?>
-                                </a>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-    </section>
-
-    <?php include('../inc/footer.php'); ?>
-    <?php include('../components/modals.php'); ?>
-
-    <script>
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('%c🎲 Apostas carregadas!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Add hover effects to bet items
-            document.querySelectorAll('.bet-item').forEach(item => {
-                item.addEventListener('mouseenter', function() {
-                    this.style.transform = 'translateY(-2px)';
-                });
-                
-                item.addEventListener('mouseleave', function() {
-                    this.style.transform = 'translateY(0)';
-                });
-            });
-
-            // Add click effect to pagination
-            document.querySelectorAll('.pagination-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    if (!this.classList.contains('active')) {
-                        this.style.transform = 'scale(0.95)';
-                        setTimeout(() => {
-                            this.style.transform = '';
-                        }, 150);
-                    }
-                });
-            });
-        });
-    </script>
-</body>
+<?php<?php 
+@session_start();<?php 
+<?php 
+if<?php (file_exists('./conexao.php'))<?php {<?php 
+<?php include('./conexao.php');<?php 
+}<?php elseif<?php (file_exists('../conexao.php'))<?php {<?php 
+<?php include('../conexao.php');<?php 
+}<?php elseif<?php (file_exists('../../conexao.php'))<?php {<?php 
+<?php include('../../conexao.php');<?php 
+}<?php 
+<?php 
+if<?php (!isset($_SESSION['usuario_id']))<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php precisa<?php estar<?php logado<?php para<?php acessar<?php esta<?php página!'];<?php 
+<?php header("Location:<?php /login");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$usuario_id<?php =<?php $_SESSION['usuario_id'];<?php 
+$porPagina<?php =<?php 10;<?php //<?php apostas<?php por<?php página<?php 
+$paginaAtual<?php =<?php isset($_GET['pagina'])<?php ?<?php max(1,<?php intval($_GET['pagina']))<?php :<?php 1;<?php 
+$offset<?php =<?php ($paginaAtual<?php -<?php 1)<?php *<?php $porPagina;<?php 
+<?php 
+//<?php Obter<?php total<?php de<?php apostas<?php 
+try<?php {<?php 
+<?php $stmtTotal<?php =<?php $pdo->prepare("SELECT<?php COUNT(*)<?php FROM<?php orders<?php WHERE<?php user_id<?php =<?php :user_id");<?php 
+<?php $stmtTotal->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmtTotal->execute();<?php 
+<?php $totalApostas<?php =<?php $stmtTotal->fetchColumn();<?php 
+<?php $totalPaginas<?php =<?php ceil($totalApostas<?php /<?php $porPagina);<?php 
+}<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $totalApostas<?php =<?php 0;<?php 
+<?php $totalPaginas<?php =<?php 1;<?php 
+}<?php 
+<?php 
+//<?php Buscar<?php apostas<?php paginadas<?php 
+try<?php {<?php 
+<?php $stmt<?php =<?php $pdo->prepare("<?php 
+<?php SELECT<?php o.created_at,<?php o.resultado,<?php o.valor_ganho,<?php r.nome,<?php r.valor<?php AS<?php valor_apostado<?php 
+<?php FROM<?php orders<?php o<?php 
+<?php JOIN<?php raspadinhas<?php r<?php ON<?php o.raspadinha_id<?php =<?php r.id<?php 
+<?php WHERE<?php o.user_id<?php =<?php :user_id<?php 
+<?php ORDER<?php BY<?php o.created_at<?php DESC<?php 
+<?php LIMIT<?php :limit<?php OFFSET<?php :offset<?php 
+<?php ");<?php 
+<?php $stmt->bindParam(':user_id',<?php $usuario_id,<?php PDO::PARAM_INT);<?php 
+<?php $stmt->bindParam(':limit',<?php $porPagina,<?php PDO::PARAM_INT);<?php 
+<?php $stmt->bindParam(':offset',<?php $offset,<?php PDO::PARAM_INT);<?php 
+<?php $stmt->execute();<?php 
+<?php $apostas<?php =<?php $stmt->fetchAll(PDO::FETCH_ASSOC);<?php 
+}<?php catch<?php (PDOException<?php $e)<?php {<?php 
+<?php $apostas<?php =<?php [];<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'failure',<?php 'text'<?php =><?php 'Erro<?php ao<?php carregar<?php apostas'];<?php 
+}<?php 
+?><?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-br"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite;?><?php -<?php Minhas<?php Apostas</title><?php 
+<?php 
+<?php <!--<?php Fonts<?php --><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.googleapis.com"><?php 
+<?php <link<?php rel="preconnect"<?php href="https://fonts.gstatic.com"<?php crossorigin><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Icons<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"><?php 
+<?php 
+<?php <!--<?php Styles<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="/assets/style/globalStyles.css?id=<?php=<?php time();<?php ?>"><?php 
+<?php 
+<?php <!--<?php Scripts<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php /*<?php Page<?php Styles<?php */<?php 
+<?php .apostas-section<?php {<?php 
+<?php margin-top:<?php 100px;<?php 
+<?php padding:<?php 4rem<?php 0;<?php 
+<?php background:<?php #0a0a0a;<?php 
+<?php min-height:<?php calc(100vh<?php -<?php 200px);<?php 
+<?php }<?php 
+<?php 
+<?php .apostas-container<?php {<?php 
+<?php max-width:<?php 850px;<?php 
+<?php margin:<?php 0<?php auto;<?php 
+<?php padding:<?php 0<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Header<?php Card<?php */<?php 
+<?php .header-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(16,<?php 163,<?php 74,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -50%;<?php 
+<?php right:<?php -50%;<?php 
+<?php width:<?php 200px;<?php 
+<?php height:<?php 200px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 6s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php .header-card::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php -50%;<?php 
+<?php left:<?php -50%;<?php 
+<?php width:<?php 150px;<?php 
+<?php height:<?php 150px;<?php 
+<?php background:<?php linear-gradient(45deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.05),<?php transparent);<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php animation:<?php float<?php 8s<?php ease-in-out<?php infinite<?php reverse;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php float<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php transform:<?php translateY(0)<?php rotate(0deg);<?php }<?php 
+<?php 50%<?php {<?php transform:<?php translateY(-20px)<?php rotate(180deg);<?php }<?php 
+<?php }<?php 
+<?php 
+<?php .header-icon<?php {<?php 
+<?php width:<?php 80px;<?php 
+<?php height:<?php 80px;<?php 
+<?php margin:<?php 0<?php auto<?php 1.5rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2),<?php rgba(16,<?php 163,<?php 74,<?php 0.1));<?php 
+<?php border-radius:<?php 50%;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .header-icon<?php i<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 2.5rem;<?php 
+<?php font-weight:<?php 900;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .header-subtitle<?php {<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php text-align:<?php center;<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Stats<?php Cards<?php */<?php 
+<?php .stats-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(200px,<?php 1fr));<?php 
+<?php gap:<?php 1rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-card<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php text-align:<?php center;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-card:hover<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php }<?php 
+<?php 
+<?php .stat-icon<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-value<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stat-label<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Container<?php */<?php 
+<?php .main-container<?php {<?php 
+<?php background:<?php rgba(20,<?php 20,<?php 20,<?php 0.8);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 60px<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php .main-title<?php {<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php text-align:<?php center;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Empty<?php State<?php */<?php 
+<?php .empty-state<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php padding:<?php 4rem<?php 2rem;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php i<?php {<?php 
+<?php font-size:<?php 4rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php opacity:<?php 0.7;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php h3<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php p<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Bet<?php Items<?php */<?php 
+<?php .bet-item<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-item::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php height:<?php 100%;<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-item.win::before<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-item.lose::before<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-item:hover<?php {<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 10px<?php 30px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .bet-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php center;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-date<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-date<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-status<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php padding:<?php 0.5rem<?php 1rem;<?php 
+<?php border-radius:<?php 25px;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.5px;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-status.win<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2),<?php rgba(16,<?php 163,<?php 74,<?php 0.1));<?php 
+<?php color:<?php #22c55e;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .bet-status.lose<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(239,<?php 68,<?php 68,<?php 0.2),<?php rgba(220,<?php 38,<?php 38,<?php 0.1));<?php 
+<?php color:<?php #ef4444;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(239,<?php 68,<?php 68,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .bet-content<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php 1fr<?php auto;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php align-items:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-details<?php {<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-game<?php {<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-values<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 0.25rem;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-value<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-value-label<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-value-amount<?php {<?php 
+<?php font-weight:<?php 600;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-value-amount.win<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-value-amount.lose<?php {<?php 
+<?php color:<?php #ef4444;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-summary<?php {<?php 
+<?php text-align:<?php right;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .bet-summary-value<?php {<?php 
+<?php font-size:<?php 1.2rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-summary-label<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Pagination<?php */<?php 
+<?php .pagination<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php center;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php margin-top:<?php 2rem;<?php 
+<?php flex-wrap:<?php wrap;<?php 
+<?php }<?php 
+<?php 
+<?php .pagination-item<?php {<?php 
+<?php padding:<?php 0.75rem<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .pagination-item:hover<?php {<?php 
+<?php transform:<?php translateY(-1px);<?php 
+<?php }<?php 
+<?php 
+<?php .pagination-item.active<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 16px<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php .pagination-item:not(.active)<?php {<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php }<?php 
+<?php 
+<?php .pagination-item:not(.active):hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Responsive<?php */<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .apostas-container<?php {<?php 
+<?php padding:<?php 0<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php font-size:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .main-container<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-content<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-summary<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-values<?php {<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .header-title<?php {<?php 
+<?php font-size:<?php 1.8rem;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-header<?php {<?php 
+<?php flex-direction:<?php column;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php align-items:<?php stretch;<?php 
+<?php }<?php 
+<?php 
+<?php .bet-status<?php {<?php 
+<?php align-self:<?php flex-end;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Loading<?php Animation<?php */<?php 
+<?php .loading-pulse<?php {<?php 
+<?php animation:<?php pulse<?php 2s<?php ease-in-out<?php infinite;<?php 
+<?php }<?php 
+<?php 
+<?php @keyframes<?php pulse<?php {<?php 
+<?php 0%,<?php 100%<?php {<?php opacity:<?php 1;<?php }<?php 
+<?php 50%<?php {<?php opacity:<?php 0.5;<?php }<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <?php<?php include('../inc/header.php');<?php ?><?php 
+<?php 
+<?php <section<?php class="apostas-section"><?php 
+<?php <div<?php class="apostas-container"><?php 
+<?php <!--<?php Header<?php Card<?php --><?php 
+<?php <div<?php class="header-card"><?php 
+<?php <div<?php class="header-icon"><?php 
+<?php <i<?php class="bi<?php bi-dice-5"></i><?php 
+<?php </div><?php 
+<?php <h1<?php class="header-title">Minhas<?php Apostas</h1><?php 
+<?php <p<?php class="header-subtitle">Acompanhe<?php seu<?php histórico<?php de<?php jogos<?php e<?php resultados</p><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Main<?php Container<?php --><?php 
+<?php <div<?php class="main-container"><?php 
+<?php <!--<?php Stats<?php Grid<?php --><?php 
+<?php <div<?php class="stats-grid"><?php 
+<?php <div<?php class="stat-card"><?php 
+<?php <div<?php class="stat-icon"><?php 
+<?php <i<?php class="bi<?php bi-collection"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-value"><?php=<?php $totalApostas<?php ?></div><?php 
+<?php <div<?php class="stat-label">Total<?php de<?php Apostas</div><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-card"><?php 
+<?php <div<?php class="stat-icon"><?php 
+<?php <i<?php class="bi<?php bi-file-earmark-text"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-value"><?php=<?php $paginaAtual<?php ?>/<?php=<?php $totalPaginas<?php ?></div><?php 
+<?php <div<?php class="stat-label">Página<?php Atual</div><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-card"><?php 
+<?php <div<?php class="stat-icon"><?php 
+<?php <i<?php class="bi<?php bi-grid-3x3"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="stat-value"><?php=<?php count($apostas)<?php ?></div><?php 
+<?php <div<?php class="stat-label">Nesta<?php Página</div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <h2<?php class="main-title"><?php 
+<?php <i<?php class="bi<?php bi-trophy"></i><?php 
+<?php Histórico<?php de<?php Jogos<?php 
+<?php </h2><?php 
+<?php 
+<?php <?php<?php if<?php (empty($apostas)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="bi<?php bi-dice-1"></i><?php 
+<?php <h3>Nenhuma<?php aposta<?php encontrada</h3><?php 
+<?php <p>Quando<?php você<?php jogar<?php uma<?php raspadinha,<?php ela<?php aparecerá<?php aqui</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <div<?php class="bets-list"><?php 
+<?php <?php<?php foreach<?php ($apostas<?php as<?php $aposta):<?php ?><?php 
+<?php <?php<?php 
+<?php $data<?php =<?php date('d/m/Y<?php H:i',<?php strtotime($aposta['created_at']));<?php 
+<?php $isWin<?php =<?php ($aposta['resultado']<?php ===<?php 'gain');<?php 
+<?php $status<?php =<?php $isWin<?php ?<?php 'GANHOU'<?php :<?php 'PERDEU';<?php 
+<?php $statusClass<?php =<?php $isWin<?php ?<?php 'win'<?php :<?php 'lose';<?php 
+<?php $valorGanho<?php =<?php number_format($aposta['valor_ganho'],<?php 2,<?php ',',<?php '.');<?php 
+<?php $valorApostado<?php =<?php number_format($aposta['valor_apostado'],<?php 2,<?php ',',<?php '.');<?php 
+<?php ?><?php 
+<?php <div<?php class="bet-item<?php <?php=<?php $statusClass<?php ?>"><?php 
+<?php <div<?php class="bet-header"><?php 
+<?php <div<?php class="bet-date"><?php 
+<?php <i<?php class="bi<?php bi-calendar-event"></i><?php 
+<?php <span><?php=<?php $data<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="bet-status<?php <?php=<?php $statusClass<?php ?>"><?php 
+<?php <i<?php class="bi<?php bi-<?php=<?php $isWin<?php ?<?php 'trophy-fill'<?php :<?php 'x-circle-fill'<?php ?>"></i><?php 
+<?php <?php=<?php $status<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="bet-content"><?php 
+<?php <div<?php class="bet-details"><?php 
+<?php <div<?php class="bet-game"><?php 
+<?php <i<?php class="bi<?php bi-gem"></i><?php 
+<?php <?php=<?php htmlspecialchars($aposta['nome'])<?php ?><?php 
+<?php </div><?php 
+<?php <div<?php class="bet-values"><?php 
+<?php <div<?php class="bet-value"><?php 
+<?php <span<?php class="bet-value-label">Valor<?php Apostado:</span><?php 
+<?php <span<?php class="bet-value-amount">R$<?php <?php=<?php $valorApostado<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="bet-value"><?php 
+<?php <span<?php class="bet-value-label">Valor<?php Ganho:</span><?php 
+<?php <span<?php class="bet-value-amount<?php <?php=<?php $statusClass<?php ?>">R$<?php <?php=<?php $valorGanho<?php ?></span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="bet-summary"><?php 
+<?php <div<?php class="bet-summary-value<?php <?php=<?php $statusClass<?php ?>"><?php 
+<?php <?php=<?php $isWin<?php ?<?php '+'<?php :<?php ''<?php ?>R$<?php <?php=<?php number_format($aposta['valor_ganho']<?php -<?php $aposta['valor_apostado'],<?php 2,<?php ',',<?php '.')<?php ?><?php 
+<?php </div><?php 
+<?php <div<?php class="bet-summary-label"><?php 
+<?php <?php=<?php $isWin<?php ?<?php 'Lucro'<?php :<?php 'Perda'<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php </div><?php 
+<?php 
+<?php <!--<?php Pagination<?php --><?php 
+<?php <?php<?php if<?php ($totalPaginas<?php ><?php 1):<?php ?><?php 
+<?php <div<?php class="pagination"><?php 
+<?php <?php<?php for<?php ($i<?php =<?php 1;<?php $i<?php <=<?php $totalPaginas;<?php $i++):<?php ?><?php 
+<?php <a<?php href="?pagina=<?php=<?php $i<?php ?>"<?php 
+<?php class="pagination-item<?php <?php=<?php $i<?php ==<?php $paginaAtual<?php ?<?php 'active'<?php :<?php ''<?php ?>"><?php 
+<?php <?php=<?php $i<?php ?><?php 
+<?php </a><?php 
+<?php <?php<?php endfor;<?php ?><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <?php<?php include('../inc/footer.php');<?php ?><?php 
+<?php <?php<?php include('../components/modals.php');<?php ?><?php 
+<?php 
+<?php <script><?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php function()<?php {<?php 
+<?php console.log('%c🎲<?php Apostas<?php carregadas!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php 
+<?php //<?php Add<?php hover<?php effects<?php to<?php bet<?php items<?php 
+<?php document.querySelectorAll('.bet-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('mouseenter',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateY(-2px)';<?php 
+<?php });<?php 
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Add<?php click<?php effect<?php to<?php pagination<?php 
+<?php document.querySelectorAll('.pagination-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('click',<?php function()<?php {<?php 
+<?php if<?php (!this.classList.contains('active'))<?php {<?php 
+<?php this.style.transform<?php =<?php 'scale(0.95)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php this.style.transform<?php =<?php '';<?php 
+<?php },<?php 150);<?php 
+<?php }<?php 
+<?php });<?php 
+<?php });<?php 
+<?php });<?php 
+<?php </script><?php 
+</body><?php 
 </html>

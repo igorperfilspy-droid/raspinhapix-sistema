@@ -1,1516 +1,1516 @@
-<?php
-include '../includes/session.php';
-include '../conexao.php';
-include '../includes/notiflix.php';
-
-$usuarioId = $_SESSION['usuario_id'];
-$admin = ($stmt = $pdo->prepare("SELECT admin FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-
-if ($admin != 1) {
-    $_SESSION['message'] = ['type' => 'warning', 'text' => 'Você não é um administrador!'];
-    header("Location: /");
-    exit;
-}
-
-if (isset($_POST['atualizar_saldo'])) {
-    $id = $_POST['id'];
-    $saldo = str_replace(',', '.', $_POST['saldo']);
-    
-    $stmt = $pdo->prepare("UPDATE usuarios SET saldo = ? WHERE id = ?");
-    if ($stmt->execute([$saldo, $id])) {
-        $_SESSION['success'] = 'Saldo atualizado com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao atualizar saldo!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-if (isset($_GET['toggle_banido'])) {
-    $id = $_GET['id'];
-    $stmt = $pdo->prepare("UPDATE usuarios SET banido = IF(banido=1, 0, 1) WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $_SESSION['success'] = 'Status de banido alterado com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao alterar status!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-if (isset($_GET['toggle_influencer'])) {
-    $id = $_GET['id'];
-    $stmt = $pdo->prepare("UPDATE usuarios SET influencer = IF(influencer=1, 0, 1) WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $_SESSION['success'] = 'Status de influencer alterado com sucesso!';
-    } else {
-        $_SESSION['failure'] = 'Erro ao alterar status!';
-    }
-    header('Location: '.$_SERVER['PHP_SELF']);
-    exit;
-}
-
-$nome = ($stmt = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ?"))->execute([$usuarioId]) ? $stmt->fetchColumn() : null;
-$nome = $nome ? explode(' ', $nome)[0] : null;
-
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$query = "SELECT u.*, ui.email as email_indicador FROM usuarios u LEFT JOIN usuarios ui ON u.indicacao = ui.id WHERE 1=1";
-
-if (!empty($search)) {
-    $query .= " AND (u.nome LIKE :search OR u.email LIKE :search OR u.telefone LIKE :search)";
-}
-
-$query .= " ORDER BY u.created_at DESC";
-
-$stmt = $pdo->prepare($query);
-
-if (!empty($search)) {
-    $searchTerm = "%$search%";
-    $stmt->bindParam(':search', $searchTerm, PDO::PARAM_STR);
-}
-
-$stmt->execute();
-$usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Count stats
-$total_usuarios = count($usuarios);
-$usuarios_ativos = array_filter($usuarios, function($u) { return $u['banido'] == 0; });
-$influencers = array_filter($usuarios, function($u) { return $u['influencer'] == 1; });
-$total_saldo = array_sum(array_column($usuarios, 'saldo'));
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $nomeSite ?? 'Admin'; ?> - Gerenciar Usuários</title>
-    
-    <!-- TailwindCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Notiflix -->
-    <script src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css" rel="stylesheet">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #000000;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        /* Advanced Sidebar Styles */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: linear-gradient(145deg, #0a0a0a 0%, #141414 25%, #1a1a1a 50%, #0f0f0f 100%);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(34, 197, 94, 0.2);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            box-shadow: 
-                0 0 50px rgba(34, 197, 94, 0.1),
-                inset 1px 0 0 rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
-            opacity: 0.8;
-            pointer-events: none;
-        }
-        
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-        
-        /* Enhanced Sidebar Header */
-        .sidebar-header {
-            position: relative;
-            padding: 2.5rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            text-decoration: none;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #ffffff;
-            box-shadow: 
-                0 8px 20px rgba(34, 197, 94, 0.3),
-                0 4px 8px rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-        
-        .logo-icon::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(135deg, #22c55e, #16a34a, #22c55e);
-            border-radius: 18px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .logo:hover .logo-icon::after {
-            opacity: 1;
-        }
-        
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .logo-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ffffff;
-            line-height: 1.2;
-        }
-        
-        .logo-subtitle {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        /* Advanced Navigation */
-        .nav-menu {
-            padding: 2rem 0;
-            position: relative;
-        }
-        
-        .nav-section {
-            margin-bottom: 2rem;
-        }
-        
-        .nav-section-title {
-            padding: 0 2rem 0.75rem 2rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            position: relative;
-        }
-        
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem 2rem;
-            color: #a1a1aa;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            margin: 0.25rem 1rem;
-            border-radius: 12px;
-            font-weight: 500;
-        }
-        
-        .nav-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 0 4px 4px 0;
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .nav-item:hover::before,
-        .nav-item.active::before {
-            transform: scaleY(1);
-        }
-        
-        .nav-item:hover,
-        .nav-item.active {
-            color: #ffffff;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            transform: translateX(4px);
-            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.1);
-        }
-        
-        .nav-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            position: relative;
-        }
-        
-        .nav-text {
-            font-size: 0.95rem;
-            flex: 1;
-        }
-        
-        .nav-badge {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            min-width: 20px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-        
-        /* Sidebar Footer */
-        .sidebar-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 2rem;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .user-profile:hover {
-            background: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 1rem;
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
-        }
-        
-        .user-info {
-            flex: 1;
-        }
-        
-        .user-name {
-            font-weight: 600;
-            color: #ffffff;
-            font-size: 0.9rem;
-            line-height: 1.2;
-        }
-        
-        .user-role {
-            font-size: 0.75rem;
-            color: #22c55e;
-            font-weight: 500;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 320px;
-            min-height: 100vh;
-            transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: 
-                radial-gradient(circle at 10% 20%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.01) 0%, transparent 50%);
-        }
-        
-        .main-content.expanded {
-            margin-left: 0;
-        }
-        
-        /* Enhanced Header */
-        .header {
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 2.5rem;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .menu-toggle {
-            display: none;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-            padding: 0.75rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .menu-toggle:hover {
-            background: rgba(34, 197, 94, 0.2);
-            transform: scale(1.05);
-        }
-        
-        .header-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #ffffff, #a1a1aa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        /* Main Page Content */
-        .page-content {
-            padding: 2.5rem;
-        }
-        
-        .welcome-section {
-            margin-bottom: 3rem;
-        }
-        
-        .welcome-title {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(135deg, #ffffff 0%, #fff 50%, #fff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-        
-        .welcome-subtitle {
-            font-size: 1.25rem;
-            color: #6b7280;
-            font-weight: 400;
-        }
-        
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-        
-        .mini-stat-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 1.5rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-        }
-        
-        .mini-stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .mini-stat-card:hover::before {
-            opacity: 1;
-        }
-        
-        .mini-stat-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.3);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-        }
-        
-        .mini-stat-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        
-        .mini-stat-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1rem;
-        }
-        
-        .mini-stat-value {
-            font-size: 1.75rem;
-            font-weight: 800;
-            color: #ffffff;
-            margin-bottom: 0.25rem;
-        }
-        
-        .mini-stat-label {
-            color: #a1a1aa;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
-        /* Search Section */
-        .search-section {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            backdrop-filter: blur(20px);
-        }
-        
-        .search-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .search-icon-container {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1.125rem;
-        }
-        
-        .search-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #ffffff;
-        }
-        
-        .search-container {
-            position: relative;
-        }
-        
-        .search-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1rem 1rem 1rem 3rem;
-            color: white;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .search-input:focus {
-            outline: none;
-            border-color: rgba(34, 197, 94, 0.5);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-            background: rgba(0, 0, 0, 0.5);
-        }
-        
-        .search-input::placeholder {
-            color: #6b7280;
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            font-size: 1rem;
-        }
-        
-        /* User Cards */
-        .users-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-            gap: 1.5rem;
-        }
-        
-        .user-card {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .user-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .user-card:hover::before {
-            opacity: 1;
-        }
-        
-        .user-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(34, 197, 94, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        .user-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-        }
-        
-        .user-name {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 0.5rem;
-        }
-        
-        .user-badges {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        
-        .badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .badge.admin {
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-            color: white;
-            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-        }
-        
-        .badge.influencer {
-            background: linear-gradient(135deg, #ec4899, #db2777);
-            color: white;
-            box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3);
-        }
-        
-        .badge.banned {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-        }
-        
-        .user-info {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .info-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: #e5e7eb;
-            font-size: 0.9rem;
-            padding: 0.5rem 0;
-        }
-        
-        .info-icon {
-            width: 20px;
-            color: #22c55e;
-            text-align: center;
-        }
-        
-        .whatsapp-link {
-            color: #25d366;
-            margin-left: 0.5rem;
-            transition: all 0.3s ease;
-            padding: 0.25rem;
-            border-radius: 6px;
-        }
-        
-        .whatsapp-link:hover {
-            color: #128c7e;
-            background: rgba(37, 211, 102, 0.1);
-        }
-        
-        /* Action Buttons */
-        .action-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        
-        .action-btn {
-            padding: 0.75rem 1rem;
-            border-radius: 10px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .btn-balance {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-        }
-        
-        .btn-balance:hover {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
-        }
-        
-        .btn-ban {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        
-        .btn-ban:hover {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
-        }
-        
-        .btn-unban {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-        }
-        
-        .btn-unban:hover {
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
-        }
-        
-        .btn-influencer {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-        }
-        
-        .btn-influencer:hover {
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
-        }
-        
-        .btn-remove-inf {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-        }
-        
-        .btn-remove-inf:hover {
-            background: linear-gradient(135deg, #d97706, #b45309);
-            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
-        }
-        
-        .user-meta {
-            color: #9ca3af;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .user-meta i {
-            color: #6b7280;
-        }
-        
-        /* Modal Styles */
-        .modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            backdrop-filter: blur(8px);
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal-content {
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2.5rem;
-            width: 90%;
-            max-width: 500px;
-            backdrop-filter: blur(20px);
-            box-shadow: 
-                0 25px 80px rgba(0, 0, 0, 0.8),
-                0 0 0 1px rgba(34, 197, 94, 0.1);
-            transform: scale(0.9);
-            transition: transform 0.3s ease;
-        }
-        
-        .modal.active .modal-content {
-            transform: scale(1);
-        }
-        
-        .modal-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .modal-title i {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #22c55e;
-            font-size: 1.125rem;
-        }
-        
-        .modal-label {
-            color: #e5e7eb;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .modal-label i {
-            color: #22c55e;
-        }
-        
-        .modal-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1rem 1.25rem;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin-bottom: 2rem;
-        }
-        
-        .modal-input:focus {
-            outline: none;
-            border-color: rgba(34, 197, 94, 0.5);
-            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-            background: rgba(0, 0, 0, 0.6);
-        }
-        
-        .modal-input::placeholder {
-            color: #6b7280;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            gap: 1rem;
-        }
-        
-        .modal-btn {
-            flex: 1;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-        
-        .modal-btn-primary {
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-        }
-        
-        .modal-btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
-        }
-        
-        .modal-btn-secondary {
-            background: rgba(107, 114, 128, 0.3);
-            color: #e5e7eb;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .modal-btn-secondary:hover {
-            background: rgba(107, 114, 128, 0.4);
-            transform: translateY(-2px);
-        }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #6b7280;
-            background: linear-gradient(135deg, rgba(20, 20, 20, 0.3) 0%, rgba(10, 10, 10, 0.4) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.3;
-            color: #374151;
-        }
-        
-        .empty-state h3 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #9ca3af;
-            margin-bottom: 0.5rem;
-        }
-        
-        .empty-state p {
-            font-size: 1rem;
-            font-weight: 400;
-        }
-        
-        /* Mobile Styles */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                width: 300px;
-                z-index: 1001;
-            }
-            
-            .sidebar:not(.hidden) {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: block;
-            }
-            
-            .header-actions span {
-                display: none !important;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            }
-            
-            .users-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                padding: 1rem;
-            }
-            
-            .page-content {
-                padding: 1.5rem;
-            }
-            
-            .welcome-title {
-                font-size: 2.25rem;
-            }
-            
-            .user-card {
-                padding: 1.5rem;
-            }
-            
-            .action-buttons {
-                grid-template-columns: 1fr;
-            }
-            
-            .modal-content {
-                margin: 1rem;
-                padding: 2rem;
-            }
-            
-            .modal-buttons {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 280px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .welcome-title {
-                font-size: 1.875rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .user-info {
-                grid-template-columns: 1fr;
-            }
-            
-            .user-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-            
-            .sidebar {
-                width: 260px;
-            }
-        }
-        
-        /* Overlay for mobile */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(4px);
-        }
-        
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-    </style>
-</head>
-<body>
-    <!-- Notifications -->
-    <?php if (isset($_SESSION['success'])): ?>
-        <script>
-            Notiflix.Notify.success('<?php= $_SESSION['success'] ?>');
-        </script>
-        <?php unset($_SESSION['success']); ?>
-    <?php elseif (isset($_SESSION['failure'])): ?>
-        <script>
-            Notiflix.Notify.failure('<?php= $_SESSION['failure'] ?>');
-        </script>
-        <?php unset($_SESSION['failure']); ?>
-    <?php endif; ?>
-
-    <!-- Overlay for mobile -->
-    <div class="overlay" id="overlay"></div>
-    
-    <!-- Advanced Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-bolt"></i>
-                </div>
-                <div class="logo-text">
-                    <div class="logo-title">Dashboard</div>
-                </div>
-            </a>
-       </div>
-        
-       <nav class="nav-menu">
-            <div class="nav-section">
-                <div class="nav-section-title">Principal</div>
-                <a href="index.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
-                    <div class="nav-text">Dashboard</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Gestão</div>
-                <a href="usuarios.php" class="nav-item active">
-                    <div class="nav-icon"><i class="fas fa-user"></i></div>
-                    <div class="nav-text">Usuários</div>
-                </a>
-                <a href="afiliados.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-user-plus"></i></div>
-                    <div class="nav-text">Afiliados</div>
-                </a>
-                <a href="depositos.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-credit-card"></i></div>
-                    <div class="nav-text">Depósitos</div>
-                </a>
-                <a href="saques.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-money-bill-wave"></i></div>
-                    <div class="nav-text">Saques</div>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-section-title">Sistema</div>
-                <a href="config.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-cogs"></i></div>
-                    <div class="nav-text">Configurações</div>
-                </a>
-                <a href="gateway.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-usd"></i></div>
-                    <div class="nav-text">Gateway</div>
-                </a>
-                <a href="banners.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-images"></i></div>
-                    <div class="nav-text">Banners</div>
-                </a>
-                <a href="cartelas.php" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-diamond"></i></div>
-                    <div class="nav-text">Raspadinhas</div>
-                </a>
-                <a href="../logout" class="nav-item">
-                    <div class="nav-icon"><i class="fas fa-sign-out-alt"></i></div>
-                    <div class="nav-text">Sair</div>
-                </a>
-            </div>
-        </nav>
-    </aside>
-    
-    <!-- Main Content -->
-    <main class="main-content" id="mainContent">
-        <!-- Enhanced Header -->
-        <header class="header">
-            <div class="header-content">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="menu-toggle" id="menuToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
-                
-                <div class="header-actions">
-                    <span style="color: #a1a1aa; font-size: 0.9rem; display: none;">Bem-vindo, <?php= htmlspecialchars($nome) ?></span>
-                    <div class="user-avatar">
-                        <?php= strtoupper(substr($nome, 0, 1)) ?>
-                    </div>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Page Content -->
-        <div class="page-content">
-            <!-- Welcome Section -->
-            <section class="welcome-section">
-                <h2 class="welcome-title">Usuários do Sistema</h2>
-                <p class="welcome-subtitle">Gerencie todos os usuários cadastrados na plataforma</p>
-            </section>
-            
-            <!-- Stats Grid -->
-            <section class="stats-grid">
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format($total_usuarios, 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Total de Usuários</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-user-check"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format(count($usuarios_ativos), 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Usuários Ativos</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-star"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value"><?php= number_format(count($influencers), 0, ',', '.') ?></div>
-                    <div class="mini-stat-label">Influencers</div>
-                </div>
-                
-                <div class="mini-stat-card">
-                    <div class="mini-stat-header">
-                        <div class="mini-stat-icon">
-                            <i class="fas fa-wallet"></i>
-                        </div>
-                    </div>
-                    <div class="mini-stat-value">R$ <?php= number_format($total_saldo, 2, ',', '.') ?></div>
-                    <div class="mini-stat-label">Saldo Total</div>
-                </div>
-            </section>
-            
-            <!-- Search Section -->
-            <section class="search-section">
-                <div class="search-header">
-                    <div class="search-icon-container">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <h3 class="search-title">Buscar Usuários</h3>
-                </div>
-                
-                <form method="GET">
-                    <div class="search-container">
-                        <i class="fa-solid fa-search search-icon"></i>
-                        <input type="text" name="search" value="<?php= htmlspecialchars($search) ?>" 
-                               class="search-input" 
-                               placeholder="Pesquisar por nome, email ou telefone..." 
-                               onchange="this.form.submit()">
-                    </div>
-                </form>
-            </section>
-            
-            <!-- Users Section -->
-            <section>
-                <?php if (empty($usuarios)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users"></i>
-                        <h3>Nenhum usuário encontrado</h3>
-                        <p>Tente ajustar os filtros de busca ou verificar se há usuários cadastrados</p>
-                    </div>
-                <?php else: ?>
-                    <div class="users-grid">
-                        <?php foreach ($usuarios as $usuario): ?>
-                            <?php 
-                            $telefone = $usuario['telefone'];
-                            if (strlen($telefone) == 11) {
-                                $telefoneFormatado = '('.substr($telefone, 0, 2).') '.substr($telefone, 2, 5).'-'.substr($telefone, 7);
-                            } else {
-                                $telefoneFormatado = $telefone;
-                            }
-                            
-                            $whatsappLink = 'https://wa.me/55'.preg_replace('/[^0-9]/', '', $usuario['telefone']);
-                            ?>
-                            
-                            <div class="user-card">
-                                <div class="user-header">
-                                    <div>
-                                        <h3 class="user-name"><?php= htmlspecialchars($usuario['nome']) ?></h3>
-                                        <div class="user-badges">
-                                            <?php if ($usuario['admin'] == 1): ?>
-                                                <span class="badge admin">Admin</span>
-                                            <?php endif; ?>
-                                            <?php if ($usuario['influencer'] == 1): ?>
-                                                <span class="badge influencer">Influencer</span>
-                                            <?php endif; ?>
-                                            <?php if ($usuario['banido'] == 1): ?>
-                                                <span class="badge banned">Banido</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="user-info">
-                                    <div class="info-item">
-                                        <i class="fa-solid fa-envelope info-icon"></i>
-                                        <span><?php= htmlspecialchars($usuario['email']) ?></span>
-                                    </div>
-                                    <div class="info-item">
-                                        <i class="fa-solid fa-phone info-icon"></i>
-                                        <span><?php= $telefoneFormatado ?></span>
-                                        <a href="<?php= $whatsappLink ?>" target="_blank" class="whatsapp-link">
-                                            <i class="fa-brands fa-whatsapp"></i>
-                                        </a>
-                                    </div>
-                                    <div class="info-item">
-                                        <i class="fa-solid fa-wallet info-icon"></i>
-                                        <span>R$ <?php= number_format($usuario['saldo'], 2, ',', '.') ?></span>
-                                    </div>
-                                    <div class="info-item">
-                                        <i class="fa-solid fa-user-plus info-icon"></i>
-                                        <span>Indicado por: <?php= $usuario['email_indicador'] ? htmlspecialchars($usuario['email_indicador']) : 'Ninguém' ?></span>
-                                    </div>
-                                </div>
-                                
-                                <div class="action-buttons">
-                                    <button onclick="abrirModalEditarSaldo('<?php= $usuario['id'] ?>', '<?php= number_format($usuario['saldo'], 2, '.', '') ?>')" 
-                                            class="action-btn btn-balance">
-                                        <i class="fa-solid fa-edit"></i>
-                                        Editar Saldo
-                                    </button>
-                                    
-                                    <a href="?toggle_banido&id=<?php= $usuario['id'] ?>" 
-                                       class="action-btn <?php= $usuario['banido'] ? 'btn-unban' : 'btn-ban' ?>">
-                                        <i class="fa-solid fa-<?php= $usuario['banido'] ? 'user-check' : 'user-slash' ?>"></i>
-                                        <?php= $usuario['banido'] ? 'Desbanir' : 'Banir' ?>
-                                    </a>
-                                    
-                                    <a href="?toggle_influencer&id=<?php= $usuario['id'] ?>" 
-                                       class="action-btn <?php= $usuario['influencer'] ? 'btn-remove-inf' : 'btn-influencer' ?>">
-                                        <i class="fa-solid fa-<?php= $usuario['influencer'] ? 'user-minus' : 'star' ?>"></i>
-                                        <?php= $usuario['influencer'] ? 'Remover Inf.' : 'Tornar Inf.' ?>
-                                    </a>
-                                </div>
-                                
-                                <div class="user-meta">
-                                    <i class="fa-solid fa-calendar"></i>
-                                    <span>Cadastrado em: <?php= date('d/m/Y H:i', strtotime($usuario['created_at'])) ?></span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </section>
-        </div>
-    </main>
-
-    <!-- Modal Editar Saldo -->
-    <div id="editarSaldoModal" class="modal">
-        <div class="modal-content">
-            <h2 class="modal-title">
-                <i class="fa-solid fa-wallet"></i>
-                Editar Saldo do Usuário
-            </h2>
-            <form method="POST" id="formEditarSaldo">
-                <input type="hidden" name="id" id="usuarioId">
-                <div>
-                    <label class="modal-label">
-                        <i class="fa-solid fa-dollar-sign"></i>
-                        Novo Saldo (R$)
-                    </label>
-                    <input type="text" name="saldo" id="usuarioSaldo" class="modal-input" 
-                           placeholder="0,00" required>
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" name="atualizar_saldo" class="modal-btn modal-btn-primary">
-                        <i class="fa-solid fa-save"></i>
-                        Salvar Alterações
-                    </button>
-                    <button type="button" onclick="fecharModal()" class="modal-btn modal-btn-secondary">
-                        <i class="fa-solid fa-times"></i>
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <script>
-        // Mobile menu toggle with smooth animations
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const overlay = document.getElementById('overlay');
-        
-        menuToggle.addEventListener('click', () => {
-            const isHidden = sidebar.classList.contains('hidden');
-            
-            if (isHidden) {
-                sidebar.classList.remove('hidden');
-                overlay.classList.add('active');
-            } else {
-                sidebar.classList.add('hidden');
-                overlay.classList.add('active');
-            }
-        });
-        
-        overlay.addEventListener('click', () => {
-            sidebar.classList.add('hidden');
-            overlay.classList.remove('active');
-        });
-        
-        // Close sidebar on window resize if it's mobile
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-                overlay.classList.remove('active');
-            } else {
-                sidebar.classList.remove('hidden');
-                overlay.classList.remove('active');
-            }
-        });
-        
-        // Enhanced hover effects for nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateX(8px)';
-            });
-            
-            item.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateX(0)';
-                }
-            });
-        });
-        
-        // Modal functions
-        function abrirModalEditarSaldo(id, saldo) {
-            document.getElementById('usuarioId').value = id;
-            document.getElementById('usuarioSaldo').value = saldo;
-            document.getElementById('editarSaldoModal').classList.add('active');
-        }
-        
-        function fecharModal() {
-            document.getElementById('editarSaldoModal').classList.remove('active');
-        }
-        
-        // Close modal when clicking outside
-        document.getElementById('editarSaldoModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                fecharModal();
-            }
-        });
-
-        // Close modal with ESC key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                fecharModal();
-            }
-        });
-        
-        // Smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('%c👥 Gerenciamento de Usuários carregado!', 'color: #22c55e; font-size: 16px; font-weight: bold;');
-            
-            // Check if mobile on load
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.add('hidden');
-            }
-            
-            // Animate cards on load
-            const userCards = document.querySelectorAll('.user-card');
-            userCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-            
-            // Animate stats cards
-            const statCards = document.querySelectorAll('.mini-stat-card');
-            statCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 150);
-            });
-        });
-    </script>
-</body>
+<?php<?php 
+include<?php '../includes/session.php';<?php 
+include<?php '../conexao.php';<?php 
+include<?php '../includes/notiflix.php';<?php 
+<?php 
+$usuarioId<?php =<?php $_SESSION['usuario_id'];<?php 
+$admin<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php admin<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+<?php 
+if<?php ($admin<?php !=<?php 1)<?php {<?php 
+<?php $_SESSION['message']<?php =<?php ['type'<?php =><?php 'warning',<?php 'text'<?php =><?php 'Você<?php não<?php é<?php um<?php administrador!'];<?php 
+<?php header("Location:<?php /");<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_POST['atualizar_saldo']))<?php {<?php 
+<?php $id<?php =<?php $_POST['id'];<?php 
+<?php $saldo<?php =<?php str_replace(',',<?php '.',<?php $_POST['saldo']);<?php 
+<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php usuarios<?php SET<?php saldo<?php =<?php ?<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$saldo,<?php $id]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Saldo<?php atualizado<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php atualizar<?php saldo!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_GET['toggle_banido']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php usuarios<?php SET<?php banido<?php =<?php IF(banido=1,<?php 0,<?php 1)<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$id]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Status<?php de<?php banido<?php alterado<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php alterar<?php status!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+if<?php (isset($_GET['toggle_influencer']))<?php {<?php 
+<?php $id<?php =<?php $_GET['id'];<?php 
+<?php $stmt<?php =<?php $pdo->prepare("UPDATE<?php usuarios<?php SET<?php influencer<?php =<?php IF(influencer=1,<?php 0,<?php 1)<?php WHERE<?php id<?php =<?php ?");<?php 
+<?php if<?php ($stmt->execute([$id]))<?php {<?php 
+<?php $_SESSION['success']<?php =<?php 'Status<?php de<?php influencer<?php alterado<?php com<?php sucesso!';<?php 
+<?php }<?php else<?php {<?php 
+<?php $_SESSION['failure']<?php =<?php 'Erro<?php ao<?php alterar<?php status!';<?php 
+<?php }<?php 
+<?php header('Location:<?php '.$_SERVER['PHP_SELF']);<?php 
+<?php exit;<?php 
+}<?php 
+<?php 
+$nome<?php =<?php ($stmt<?php =<?php $pdo->prepare("SELECT<?php nome<?php FROM<?php usuarios<?php WHERE<?php id<?php =<?php ?"))->execute([$usuarioId])<?php ?<?php $stmt->fetchColumn()<?php :<?php null;<?php 
+$nome<?php =<?php $nome<?php ?<?php explode('<?php ',<?php $nome)[0]<?php :<?php null;<?php 
+<?php 
+$search<?php =<?php isset($_GET['search'])<?php ?<?php $_GET['search']<?php :<?php '';<?php 
+$query<?php =<?php "SELECT<?php u.*,<?php ui.email<?php as<?php email_indicador<?php FROM<?php usuarios<?php u<?php LEFT<?php JOIN<?php usuarios<?php ui<?php ON<?php u.indicacao<?php =<?php ui.id<?php WHERE<?php 1=1";<?php 
+<?php 
+if<?php (!empty($search))<?php {<?php 
+<?php $query<?php .=<?php "<?php AND<?php (u.nome<?php LIKE<?php :search<?php OR<?php u.email<?php LIKE<?php :search<?php OR<?php u.telefone<?php LIKE<?php :search)";<?php 
+}<?php 
+<?php 
+$query<?php .=<?php "<?php ORDER<?php BY<?php u.created_at<?php DESC";<?php 
+<?php 
+$stmt<?php =<?php $pdo->prepare($query);<?php 
+<?php 
+if<?php (!empty($search))<?php {<?php 
+<?php $searchTerm<?php =<?php "%$search%";<?php 
+<?php $stmt->bindParam(':search',<?php $searchTerm,<?php PDO::PARAM_STR);<?php 
+}<?php 
+<?php 
+$stmt->execute();<?php 
+$usuarios<?php =<?php $stmt->fetchAll(PDO::FETCH_ASSOC);<?php 
+<?php 
+//<?php Count<?php stats<?php 
+$total_usuarios<?php =<?php count($usuarios);<?php 
+$usuarios_ativos<?php =<?php array_filter($usuarios,<?php function($u)<?php {<?php return<?php $u['banido']<?php ==<?php 0;<?php });<?php 
+$influencers<?php =<?php array_filter($usuarios,<?php function($u)<?php {<?php return<?php $u['influencer']<?php ==<?php 1;<?php });<?php 
+$total_saldo<?php =<?php array_sum(array_column($usuarios,<?php 'saldo'));<?php 
+?><?php 
+<?php 
+<!DOCTYPE<?php html><?php 
+<html<?php lang="pt-BR"><?php 
+<head><?php 
+<?php <meta<?php charset="UTF-8"><?php 
+<?php <meta<?php name="viewport"<?php content="width=device-width,<?php initial-scale=1.0"><?php 
+<?php <title><?php<?php echo<?php $nomeSite<?php ??<?php 'Admin';<?php ?><?php -<?php Gerenciar<?php Usuários</title><?php 
+<?php 
+<?php <!--<?php TailwindCSS<?php --><?php 
+<?php <script<?php src="https://cdn.tailwindcss.com"></script><?php 
+<?php 
+<?php <!--<?php Font<?php Awesome<?php --><?php 
+<?php <link<?php rel="stylesheet"<?php href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><?php 
+<?php 
+<?php <!--<?php Notiflix<?php --><?php 
+<?php <script<?php src="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/dist/notiflix-aio-3.2.8.min.js"></script><?php 
+<?php <link<?php href="https://cdn.jsdelivr.net/npm/notiflix@3.2.8/src/notiflix.min.css"<?php rel="stylesheet"><?php 
+<?php 
+<?php <!--<?php Google<?php Fonts<?php --><?php 
+<?php <link<?php href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"<?php rel="stylesheet"><?php 
+<?php 
+<?php <style><?php 
+<?php *<?php {<?php 
+<?php margin:<?php 0;<?php 
+<?php padding:<?php 0;<?php 
+<?php box-sizing:<?php border-box;<?php 
+<?php }<?php 
+<?php 
+<?php body<?php {<?php 
+<?php font-family:<?php 'Inter',<?php -apple-system,<?php BlinkMacSystemFont,<?php sans-serif;<?php 
+<?php background:<?php #000000;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php overflow-x:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Advanced<?php Sidebar<?php Styles<?php */<?php 
+<?php .sidebar<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 320px;<?php 
+<?php height:<?php 100vh;<?php 
+<?php background:<?php linear-gradient(145deg,<?php #0a0a0a<?php 0%,<?php #141414<?php 25%,<?php #1a1a1a<?php 50%,<?php #0f0f0f<?php 100%);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-right:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transition:<?php all<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 0<?php 50px<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php 
+<?php inset<?php 1px<?php 0<?php 0<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 20%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.1)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 60%,<?php rgba(59,<?php 130,<?php 246,<?php 0.05)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php opacity:<?php 0.8;<?php 
+<?php pointer-events:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar.hidden<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Enhanced<?php Sidebar<?php Header<?php */<?php 
+<?php .sidebar-header<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php padding:<?php 2.5rem<?php 2rem;<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php }<?php 
+<?php 
+<?php .logo<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php position:<?php relative;<?php 
+<?php z-index:<?php 2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e<?php 0%,<?php #16a34a<?php 100%);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.3),<?php 
+<?php 0<?php 4px<?php 8px<?php rgba(0,<?php 0,<?php 0,<?php 0.2);<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-icon::after<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php -2px;<?php 
+<?php left:<?php -2px;<?php 
+<?php right:<?php -2px;<?php 
+<?php bottom:<?php -2px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a,<?php #22c55e);<?php 
+<?php border-radius:<?php 18px;<?php 
+<?php z-index:<?php -1;<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .logo:hover<?php .logo-icon::after<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-text<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php flex-direction:<?php column;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-title<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .logo-subtitle<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Advanced<?php Navigation<?php */<?php 
+<?php .nav-menu<?php {<?php 
+<?php padding:<?php 2rem<?php 0;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section<?php {<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-section-title<?php {<?php 
+<?php padding:<?php 0<?php 2rem<?php 0.75rem<?php 2rem;<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 1px;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php padding:<?php 1rem<?php 2rem;<?php 
+<?php color:<?php #a1a1aa;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php position:<?php relative;<?php 
+<?php margin:<?php 0.25rem<?php 1rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 0;<?php 
+<?php top:<?php 0;<?php 
+<?php bottom:<?php 0;<?php 
+<?php width:<?php 4px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 0<?php 4px<?php 4px<?php 0;<?php 
+<?php transform:<?php scaleY(0);<?php 
+<?php transition:<?php transform<?php 0.3s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover::before,<?php 
+<?php .nav-item.active::before<?php {<?php 
+<?php transform:<?php scaleY(1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-item:hover,<?php 
+<?php .nav-item.active<?php {<?php 
+<?php color:<?php #ffffff;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.15)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.05)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php translateX(4px);<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .nav-icon<?php {<?php 
+<?php width:<?php 24px;<?php 
+<?php height:<?php 24px;<?php 
+<?php margin-right:<?php 1rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-text<?php {<?php 
+<?php font-size:<?php 0.95rem;<?php 
+<?php flex:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .nav-badge<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 0.7rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php padding:<?php 0.25rem<?php 0.5rem;<?php 
+<?php border-radius:<?php 6px;<?php 
+<?php min-width:<?php 20px;<?php 
+<?php text-align:<?php center;<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(239,<?php 68,<?php 68,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Sidebar<?php Footer<?php */<?php 
+<?php .sidebar-footer<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php bottom:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 100%);<?php 
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .user-profile<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php padding:<?php 1rem;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .user-profile:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-avatar<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 12px<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-info<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .user-name<?php {<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .user-role<?php {<?php 
+<?php font-size:<?php 0.75rem;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Content<?php */<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 320px;<?php 
+<?php min-height:<?php 100vh;<?php 
+<?php transition:<?php margin-left<?php 0.4s<?php cubic-bezier(0.4,<?php 0,<?php 0.2,<?php 1);<?php 
+<?php background:<?php 
+<?php radial-gradient(circle<?php at<?php 10%<?php 20%,<?php rgba(34,<?php 197,<?php 94,<?php 0.03)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 80%<?php 80%,<?php rgba(16,<?php 185,<?php 129,<?php 0.02)<?php 0%,<?php transparent<?php 50%),<?php 
+<?php radial-gradient(circle<?php at<?php 40%<?php 40%,<?php rgba(59,<?php 130,<?php 246,<?php 0.01)<?php 0%,<?php transparent<?php 50%);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content.expanded<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Enhanced<?php Header<?php */<?php 
+<?php .header<?php {<?php 
+<?php position:<?php sticky;<?php 
+<?php top:<?php 0;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.95);<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php border-bottom:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php padding:<?php 1.5rem<?php 2.5rem;<?php 
+<?php z-index:<?php 100;<?php 
+<?php box-shadow:<?php 0<?php 4px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .header-content<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php none;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.1),<?php rgba(34,<?php 197,<?php 94,<?php 0.05));<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php color:<?php #22c55e;<?php 
+<?php padding:<?php 0.75rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle:hover<?php {<?php 
+<?php background:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php transform:<?php scale(1.05);<?php 
+<?php }<?php 
+<?php 
+<?php .header-title<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff,<?php #a1a1aa);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Main<?php Page<?php Content<?php */<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 2.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-section<?php {<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 3rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ffffff<?php 0%,<?php #fff<?php 50%,<?php #fff<?php 100%);<?php 
+<?php -webkit-background-clip:<?php text;<?php 
+<?php -webkit-text-fill-color:<?php transparent;<?php 
+<?php background-clip:<?php text;<?php 
+<?php line-height:<?php 1.2;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-subtitle<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php font-weight:<?php 400;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Stats<?php Cards<?php */<?php 
+<?php .stats-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(280px,<?php 1fr));<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php margin-bottom:<?php 3rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 16px;<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 3px;<?php 
+<?php background:<?php linear-gradient(90deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-card:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php box-shadow:<?php 0<?php 15px<?php 35px<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-icon<?php {<?php 
+<?php width:<?php 40px;<?php 
+<?php height:<?php 40px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-value<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 800;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php margin-bottom:<?php 0.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .mini-stat-label<?php {<?php 
+<?php color:<?php #a1a1aa;<?php 
+<?php font-size:<?php 0.875rem;<?php 
+<?php font-weight:<?php 500;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Search<?php Section<?php */<?php 
+<?php .search-section<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php }<?php 
+<?php 
+<?php .search-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .search-icon-container<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.125rem;<?php 
+<?php }<?php 
+<?php 
+<?php .search-title<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php }<?php 
+<?php 
+<?php .search-container<?php {<?php 
+<?php position:<?php relative;<?php 
+<?php }<?php 
+<?php 
+<?php .search-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1rem<?php 1rem<?php 1rem<?php 3rem;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .search-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.5);<?php 
+<?php }<?php 
+<?php 
+<?php .search-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .search-icon<?php {<?php 
+<?php position:<?php absolute;<?php 
+<?php left:<?php 1rem;<?php 
+<?php top:<?php 50%;<?php 
+<?php transform:<?php translateY(-50%);<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php User<?php Cards<?php */<?php 
+<?php .users-grid<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fill,<?php minmax(450px,<?php 1fr));<?php 
+<?php gap:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-card<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.8)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.9)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php position:<?php relative;<?php 
+<?php overflow:<?php hidden;<?php 
+<?php }<?php 
+<?php 
+<?php .user-card::before<?php {<?php 
+<?php content:<?php '';<?php 
+<?php position:<?php absolute;<?php 
+<?php top:<?php 0;<?php 
+<?php right:<?php 0;<?php 
+<?php width:<?php 100px;<?php 
+<?php height:<?php 100px;<?php 
+<?php background:<?php radial-gradient(circle,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 0%,<?php transparent<?php 70%);<?php 
+<?php opacity:<?php 0;<?php 
+<?php transition:<?php opacity<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .user-card:hover::before<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php }<?php 
+<?php 
+<?php .user-card:hover<?php {<?php 
+<?php transform:<?php translateY(-4px);<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.2);<?php 
+<?php box-shadow:<?php 0<?php 20px<?php 40px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-header<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php justify-content:<?php space-between;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-name<?php {<?php 
+<?php font-size:<?php 1.25rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php #ffffff;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-badges<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php flex-wrap:<?php wrap;<?php 
+<?php }<?php 
+<?php 
+<?php .badge<?php {<?php 
+<?php padding:<?php 0.25rem<?php 0.75rem;<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php font-size:<?php 0.7rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-transform:<?php uppercase;<?php 
+<?php letter-spacing:<?php 0.5px;<?php 
+<?php }<?php 
+<?php 
+<?php .badge.admin<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #8b5cf6,<?php #7c3aed);<?php 
+<?php color:<?php white;<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(139,<?php 92,<?php 246,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .badge.influencer<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ec4899,<?php #db2777);<?php 
+<?php color:<?php white;<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(236,<?php 72,<?php 153,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .badge.banned<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php box-shadow:<?php 0<?php 2px<?php 8px<?php rgba(239,<?php 68,<?php 68,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .user-info<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .info-item<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 0.9rem;<?php 
+<?php padding:<?php 0.5rem<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .info-icon<?php {<?php 
+<?php width:<?php 20px;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php text-align:<?php center;<?php 
+<?php }<?php 
+<?php 
+<?php .whatsapp-link<?php {<?php 
+<?php color:<?php #25d366;<?php 
+<?php margin-left:<?php 0.5rem;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php padding:<?php 0.25rem;<?php 
+<?php border-radius:<?php 6px;<?php 
+<?php }<?php 
+<?php 
+<?php .whatsapp-link:hover<?php {<?php 
+<?php color:<?php #128c7e;<?php 
+<?php background:<?php rgba(37,<?php 211,<?php 102,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Action<?php Buttons<?php */<?php 
+<?php .action-buttons<?php {<?php 
+<?php display:<?php grid;<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(140px,<?php 1fr));<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php margin-bottom:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .action-btn<?php {<?php 
+<?php padding:<?php 0.75rem<?php 1rem;<?php 
+<?php border-radius:<?php 10px;<?php 
+<?php font-size:<?php 0.875rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php text-decoration:<?php none;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php border:<?php none;<?php 
+<?php }<?php 
+<?php 
+<?php .action-btn:hover<?php {<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(0,<?php 0,<?php 0,<?php 0.3);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-balance<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #3b82f6,<?php #2563eb);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-balance:hover<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #2563eb,<?php #1d4ed8);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(59,<?php 130,<?php 246,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-ban<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #ef4444,<?php #dc2626);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-ban:hover<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #dc2626,<?php #b91c1c);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(239,<?php 68,<?php 68,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-unban<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-unban:hover<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #16a34a,<?php #15803d);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-influencer<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-influencer:hover<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #16a34a,<?php #15803d);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .btn-remove-inf<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #f59e0b,<?php #d97706);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .btn-remove-inf:hover<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #d97706,<?php #b45309);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 20px<?php rgba(245,<?php 158,<?php 11,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .user-meta<?php {<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php font-size:<?php 0.8rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php padding-top:<?php 1rem;<?php 
+<?php border-top:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .user-meta<?php i<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Modal<?php Styles<?php */<?php 
+<?php .modal<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php inset:<?php 0;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.8);<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php z-index:<?php 2000;<?php 
+<?php backdrop-filter:<?php blur(8px);<?php 
+<?php opacity:<?php 0;<?php 
+<?php visibility:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .modal.active<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php visibility:<?php visible;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-content<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.95)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.98)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 24px;<?php 
+<?php padding:<?php 2.5rem;<?php 
+<?php width:<?php 90%;<?php 
+<?php max-width:<?php 500px;<?php 
+<?php backdrop-filter:<?php blur(20px);<?php 
+<?php box-shadow:<?php 
+<?php 0<?php 25px<?php 80px<?php rgba(0,<?php 0,<?php 0,<?php 0.8),<?php 
+<?php 0<?php 0<?php 0<?php 1px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php transform:<?php scale(0.9);<?php 
+<?php transition:<?php transform<?php 0.3s<?php ease;<?php 
+<?php }<?php 
+<?php 
+<?php .modal.active<?php .modal-content<?php {<?php 
+<?php transform:<?php scale(1);<?php 
+<?php }<?php 
+<?php 
+<?php .modal-title<?php {<?php 
+<?php font-size:<?php 1.75rem;<?php 
+<?php font-weight:<?php 700;<?php 
+<?php color:<?php white;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-title<?php i<?php {<?php 
+<?php width:<?php 48px;<?php 
+<?php height:<?php 48px;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(34,<?php 197,<?php 94,<?php 0.2)<?php 0%,<?php rgba(34,<?php 197,<?php 94,<?php 0.1)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(34,<?php 197,<?php 94,<?php 0.3);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php color:<?php #22c55e;<?php 
+<?php font-size:<?php 1.125rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-label<?php {<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php margin-bottom:<?php 0.75rem;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php gap:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-label<?php i<?php {<?php 
+<?php color:<?php #22c55e;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-input<?php {<?php 
+<?php width:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.4);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php padding:<?php 1rem<?php 1.25rem;<?php 
+<?php color:<?php white;<?php 
+<?php font-size:<?php 1.1rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php margin-bottom:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-input:focus<?php {<?php 
+<?php outline:<?php none;<?php 
+<?php border-color:<?php rgba(34,<?php 197,<?php 94,<?php 0.5);<?php 
+<?php box-shadow:<?php 0<?php 0<?php 0<?php 3px<?php rgba(34,<?php 197,<?php 94,<?php 0.1);<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.6);<?php 
+<?php }<?php 
+<?php 
+<?php .modal-input::placeholder<?php {<?php 
+<?php color:<?php #6b7280;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-buttons<?php {<?php 
+<?php display:<?php flex;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-btn<?php {<?php 
+<?php flex:<?php 1;<?php 
+<?php padding:<?php 1rem<?php 1.5rem;<?php 
+<?php border-radius:<?php 12px;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php cursor:<?php pointer;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php border:<?php none;<?php 
+<?php display:<?php flex;<?php 
+<?php align-items:<?php center;<?php 
+<?php justify-content:<?php center;<?php 
+<?php gap:<?php 0.75rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-btn-primary<?php {<?php 
+<?php background:<?php linear-gradient(135deg,<?php #22c55e,<?php #16a34a);<?php 
+<?php color:<?php white;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-btn-primary:hover<?php {<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php box-shadow:<?php 0<?php 8px<?php 25px<?php rgba(34,<?php 197,<?php 94,<?php 0.4);<?php 
+<?php }<?php 
+<?php 
+<?php .modal-btn-secondary<?php {<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.3);<?php 
+<?php color:<?php #e5e7eb;<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.1);<?php 
+<?php }<?php 
+<?php 
+<?php .modal-btn-secondary:hover<?php {<?php 
+<?php background:<?php rgba(107,<?php 114,<?php 128,<?php 0.4);<?php 
+<?php transform:<?php translateY(-2px);<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Empty<?php State<?php */<?php 
+<?php .empty-state<?php {<?php 
+<?php text-align:<?php center;<?php 
+<?php padding:<?php 4rem<?php 2rem;<?php 
+<?php color:<?php #6b7280;<?php 
+<?php background:<?php linear-gradient(135deg,<?php rgba(20,<?php 20,<?php 20,<?php 0.3)<?php 0%,<?php rgba(10,<?php 10,<?php 10,<?php 0.4)<?php 100%);<?php 
+<?php border:<?php 1px<?php solid<?php rgba(255,<?php 255,<?php 255,<?php 0.05);<?php 
+<?php border-radius:<?php 20px;<?php 
+<?php backdrop-filter:<?php blur(10px);<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php i<?php {<?php 
+<?php font-size:<?php 4rem;<?php 
+<?php margin-bottom:<?php 1.5rem;<?php 
+<?php opacity:<?php 0.3;<?php 
+<?php color:<?php #374151;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php h3<?php {<?php 
+<?php font-size:<?php 1.5rem;<?php 
+<?php font-weight:<?php 600;<?php 
+<?php color:<?php #9ca3af;<?php 
+<?php margin-bottom:<?php 0.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .empty-state<?php p<?php {<?php 
+<?php font-size:<?php 1rem;<?php 
+<?php font-weight:<?php 400;<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Mobile<?php Styles<?php */<?php 
+<?php @media<?php (max-width:<?php 1024px)<?php {<?php 
+<?php .sidebar<?php {<?php 
+<?php transform:<?php translateX(-100%);<?php 
+<?php width:<?php 300px;<?php 
+<?php z-index:<?php 1001;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar:not(.hidden)<?php {<?php 
+<?php transform:<?php translateX(0);<?php 
+<?php }<?php 
+<?php 
+<?php .main-content<?php {<?php 
+<?php margin-left:<?php 0;<?php 
+<?php }<?php 
+<?php 
+<?php .menu-toggle<?php {<?php 
+<?php display:<?php block;<?php 
+<?php }<?php 
+<?php 
+<?php .header-actions<?php span<?php {<?php 
+<?php display:<?php none<?php !important;<?php 
+<?php }<?php 
+<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php repeat(auto-fit,<?php minmax(250px,<?php 1fr));<?php 
+<?php }<?php 
+<?php 
+<?php .users-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 768px)<?php {<?php 
+<?php .header<?php {<?php 
+<?php padding:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .page-content<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 2.25rem;<?php 
+<?php }<?php 
+<?php 
+<?php .user-card<?php {<?php 
+<?php padding:<?php 1.5rem;<?php 
+<?php }<?php 
+<?php 
+<?php .action-buttons<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-content<?php {<?php 
+<?php margin:<?php 1rem;<?php 
+<?php padding:<?php 2rem;<?php 
+<?php }<?php 
+<?php 
+<?php .modal-buttons<?php {<?php 
+<?php flex-direction:<?php column;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 280px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php @media<?php (max-width:<?php 480px)<?php {<?php 
+<?php .welcome-title<?php {<?php 
+<?php font-size:<?php 1.875rem;<?php 
+<?php }<?php 
+<?php 
+<?php .stats-grid<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .user-info<?php {<?php 
+<?php grid-template-columns:<?php 1fr;<?php 
+<?php }<?php 
+<?php 
+<?php .user-header<?php {<?php 
+<?php flex-direction:<?php column;<?php 
+<?php align-items:<?php flex-start;<?php 
+<?php gap:<?php 1rem;<?php 
+<?php }<?php 
+<?php 
+<?php .sidebar<?php {<?php 
+<?php width:<?php 260px;<?php 
+<?php }<?php 
+<?php }<?php 
+<?php 
+<?php /*<?php Overlay<?php for<?php mobile<?php */<?php 
+<?php .overlay<?php {<?php 
+<?php position:<?php fixed;<?php 
+<?php top:<?php 0;<?php 
+<?php left:<?php 0;<?php 
+<?php width:<?php 100%;<?php 
+<?php height:<?php 100%;<?php 
+<?php background:<?php rgba(0,<?php 0,<?php 0,<?php 0.7);<?php 
+<?php z-index:<?php 1000;<?php 
+<?php opacity:<?php 0;<?php 
+<?php visibility:<?php hidden;<?php 
+<?php transition:<?php all<?php 0.3s<?php ease;<?php 
+<?php backdrop-filter:<?php blur(4px);<?php 
+<?php }<?php 
+<?php 
+<?php .overlay.active<?php {<?php 
+<?php opacity:<?php 1;<?php 
+<?php visibility:<?php visible;<?php 
+<?php }<?php 
+<?php </style><?php 
+</head><?php 
+<body><?php 
+<?php <!--<?php Notifications<?php --><?php 
+<?php <?php<?php if<?php (isset($_SESSION['success'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.success('<?php=<?php $_SESSION['success']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['success']);<?php ?><?php 
+<?php <?php<?php elseif<?php (isset($_SESSION['failure'])):<?php ?><?php 
+<?php <script><?php 
+<?php Notiflix.Notify.failure('<?php=<?php $_SESSION['failure']<?php ?>');<?php 
+<?php </script><?php 
+<?php <?php<?php unset($_SESSION['failure']);<?php ?><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php 
+<?php <!--<?php Overlay<?php for<?php mobile<?php --><?php 
+<?php <div<?php class="overlay"<?php id="overlay"></div><?php 
+<?php 
+<?php <!--<?php Advanced<?php Sidebar<?php --><?php 
+<?php <aside<?php class="sidebar"<?php id="sidebar"><?php 
+<?php <div<?php class="sidebar-header"><?php 
+<?php <a<?php href="#"<?php class="logo"><?php 
+<?php <div<?php class="logo-icon"><?php 
+<?php <i<?php class="fas<?php fa-bolt"></i><?php 
+<?php </div><?php 
+<?php <div<?php class="logo-text"><?php 
+<?php <div<?php class="logo-title">Dashboard</div><?php 
+<?php </div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <nav<?php class="nav-menu"><?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Principal</div><?php 
+<?php <a<?php href="index.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-chart-pie"></i></div><?php 
+<?php <div<?php class="nav-text">Dashboard</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Gestão</div><?php 
+<?php <a<?php href="usuarios.php"<?php class="nav-item<?php active"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user"></i></div><?php 
+<?php <div<?php class="nav-text">Usuários</div><?php 
+<?php </a><?php 
+<?php <a<?php href="afiliados.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-user-plus"></i></div><?php 
+<?php <div<?php class="nav-text">Afiliados</div><?php 
+<?php </a><?php 
+<?php <a<?php href="depositos.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-credit-card"></i></div><?php 
+<?php <div<?php class="nav-text">Depósitos</div><?php 
+<?php </a><?php 
+<?php <a<?php href="saques.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-money-bill-wave"></i></div><?php 
+<?php <div<?php class="nav-text">Saques</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="nav-section"><?php 
+<?php <div<?php class="nav-section-title">Sistema</div><?php 
+<?php <a<?php href="config.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-cogs"></i></div><?php 
+<?php <div<?php class="nav-text">Configurações</div><?php 
+<?php </a><?php 
+<?php <a<?php href="gateway.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-usd"></i></div><?php 
+<?php <div<?php class="nav-text">Gateway</div><?php 
+<?php </a><?php 
+<?php <a<?php href="banners.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-images"></i></div><?php 
+<?php <div<?php class="nav-text">Banners</div><?php 
+<?php </a><?php 
+<?php <a<?php href="cartelas.php"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-diamond"></i></div><?php 
+<?php <div<?php class="nav-text">Raspadinhas</div><?php 
+<?php </a><?php 
+<?php <a<?php href="../logout"<?php class="nav-item"><?php 
+<?php <div<?php class="nav-icon"><i<?php class="fas<?php fa-sign-out-alt"></i></div><?php 
+<?php <div<?php class="nav-text">Sair</div><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php </nav><?php 
+<?php </aside><?php 
+<?php 
+<?php <!--<?php Main<?php Content<?php --><?php 
+<?php <main<?php class="main-content"<?php id="mainContent"><?php 
+<?php <!--<?php Enhanced<?php Header<?php --><?php 
+<?php <header<?php class="header"><?php 
+<?php <div<?php class="header-content"><?php 
+<?php <div<?php style="display:<?php flex;<?php align-items:<?php center;<?php gap:<?php 1rem;"><?php 
+<?php <button<?php class="menu-toggle"<?php id="menuToggle"><?php 
+<?php <i<?php class="fas<?php fa-bars"></i><?php 
+<?php </button><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="header-actions"><?php 
+<?php <span<?php style="color:<?php #a1a1aa;<?php font-size:<?php 0.9rem;<?php display:<?php none;">Bem-vindo,<?php <?php=<?php htmlspecialchars($nome)<?php ?></span><?php 
+<?php <div<?php class="user-avatar"><?php 
+<?php <?php=<?php strtoupper(substr($nome,<?php 0,<?php 1))<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </header><?php 
+<?php 
+<?php <!--<?php Page<?php Content<?php --><?php 
+<?php <div<?php class="page-content"><?php 
+<?php <!--<?php Welcome<?php Section<?php --><?php 
+<?php <section<?php class="welcome-section"><?php 
+<?php <h2<?php class="welcome-title">Usuários<?php do<?php Sistema</h2><?php 
+<?php <p<?php class="welcome-subtitle">Gerencie<?php todos<?php os<?php usuários<?php cadastrados<?php na<?php plataforma</p><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Stats<?php Grid<?php --><?php 
+<?php <section<?php class="stats-grid"><?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-users"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format($total_usuarios,<?php 0,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Total<?php de<?php Usuários</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-user-check"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format(count($usuarios_ativos),<?php 0,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Usuários<?php Ativos</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-star"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value"><?php=<?php number_format(count($influencers),<?php 0,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Influencers</div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="mini-stat-card"><?php 
+<?php <div<?php class="mini-stat-header"><?php 
+<?php <div<?php class="mini-stat-icon"><?php 
+<?php <i<?php class="fas<?php fa-wallet"></i><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <div<?php class="mini-stat-value">R$<?php <?php=<?php number_format($total_saldo,<?php 2,<?php ',',<?php '.')<?php ?></div><?php 
+<?php <div<?php class="mini-stat-label">Saldo<?php Total</div><?php 
+<?php </div><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Search<?php Section<?php --><?php 
+<?php <section<?php class="search-section"><?php 
+<?php <div<?php class="search-header"><?php 
+<?php <div<?php class="search-icon-container"><?php 
+<?php <i<?php class="fas<?php fa-search"></i><?php 
+<?php </div><?php 
+<?php <h3<?php class="search-title">Buscar<?php Usuários</h3><?php 
+<?php </div><?php 
+<?php 
+<?php <form<?php method="GET"><?php 
+<?php <div<?php class="search-container"><?php 
+<?php <i<?php class="fa-solid<?php fa-search<?php search-icon"></i><?php 
+<?php <input<?php type="text"<?php name="search"<?php value="<?php=<?php htmlspecialchars($search)<?php ?>"<?php 
+<?php class="search-input"<?php 
+<?php placeholder="Pesquisar<?php por<?php nome,<?php email<?php ou<?php telefone..."<?php 
+<?php onchange="this.form.submit()"><?php 
+<?php </div><?php 
+<?php </form><?php 
+<?php </section><?php 
+<?php 
+<?php <!--<?php Users<?php Section<?php --><?php 
+<?php <section><?php 
+<?php <?php<?php if<?php (empty($usuarios)):<?php ?><?php 
+<?php <div<?php class="empty-state"><?php 
+<?php <i<?php class="fas<?php fa-users"></i><?php 
+<?php <h3>Nenhum<?php usuário<?php encontrado</h3><?php 
+<?php <p>Tente<?php ajustar<?php os<?php filtros<?php de<?php busca<?php ou<?php verificar<?php se<?php há<?php usuários<?php cadastrados</p><?php 
+<?php </div><?php 
+<?php <?php<?php else:<?php ?><?php 
+<?php <div<?php class="users-grid"><?php 
+<?php <?php<?php foreach<?php ($usuarios<?php as<?php $usuario):<?php ?><?php 
+<?php <?php<?php 
+<?php $telefone<?php =<?php $usuario['telefone'];<?php 
+<?php if<?php (strlen($telefone)<?php ==<?php 11)<?php {<?php 
+<?php $telefoneFormatado<?php =<?php '('.substr($telefone,<?php 0,<?php 2).')<?php '.substr($telefone,<?php 2,<?php 5).'-'.substr($telefone,<?php 7);<?php 
+<?php }<?php else<?php {<?php 
+<?php $telefoneFormatado<?php =<?php $telefone;<?php 
+<?php }<?php 
+<?php 
+<?php $whatsappLink<?php =<?php 'https://wa.me/55'.preg_replace('/[^0-9]/',<?php '',<?php $usuario['telefone']);<?php 
+<?php ?><?php 
+<?php 
+<?php <div<?php class="user-card"><?php 
+<?php <div<?php class="user-header"><?php 
+<?php <div><?php 
+<?php <h3<?php class="user-name"><?php=<?php htmlspecialchars($usuario['nome'])<?php ?></h3><?php 
+<?php <div<?php class="user-badges"><?php 
+<?php <?php<?php if<?php ($usuario['admin']<?php ==<?php 1):<?php ?><?php 
+<?php <span<?php class="badge<?php admin">Admin</span><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php <?php<?php if<?php ($usuario['influencer']<?php ==<?php 1):<?php ?><?php 
+<?php <span<?php class="badge<?php influencer">Influencer</span><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php <?php<?php if<?php ($usuario['banido']<?php ==<?php 1):<?php ?><?php 
+<?php <span<?php class="badge<?php banned">Banido</span><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="user-info"><?php 
+<?php <div<?php class="info-item"><?php 
+<?php <i<?php class="fa-solid<?php fa-envelope<?php info-icon"></i><?php 
+<?php <span><?php=<?php htmlspecialchars($usuario['email'])<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="info-item"><?php 
+<?php <i<?php class="fa-solid<?php fa-phone<?php info-icon"></i><?php 
+<?php <span><?php=<?php $telefoneFormatado<?php ?></span><?php 
+<?php <a<?php href="<?php=<?php $whatsappLink<?php ?>"<?php target="_blank"<?php class="whatsapp-link"><?php 
+<?php <i<?php class="fa-brands<?php fa-whatsapp"></i><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php <div<?php class="info-item"><?php 
+<?php <i<?php class="fa-solid<?php fa-wallet<?php info-icon"></i><?php 
+<?php <span>R$<?php <?php=<?php number_format($usuario['saldo'],<?php 2,<?php ',',<?php '.')<?php ?></span><?php 
+<?php </div><?php 
+<?php <div<?php class="info-item"><?php 
+<?php <i<?php class="fa-solid<?php fa-user-plus<?php info-icon"></i><?php 
+<?php <span>Indicado<?php por:<?php <?php=<?php $usuario['email_indicador']<?php ?<?php htmlspecialchars($usuario['email_indicador'])<?php :<?php 'Ninguém'<?php ?></span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="action-buttons"><?php 
+<?php <button<?php onclick="abrirModalEditarSaldo('<?php=<?php $usuario['id']<?php ?>',<?php '<?php=<?php number_format($usuario['saldo'],<?php 2,<?php '.',<?php '')<?php ?>')"<?php 
+<?php class="action-btn<?php btn-balance"><?php 
+<?php <i<?php class="fa-solid<?php fa-edit"></i><?php 
+<?php Editar<?php Saldo<?php 
+<?php </button><?php 
+<?php 
+<?php <a<?php href="?toggle_banido&id=<?php=<?php $usuario['id']<?php ?>"<?php 
+<?php class="action-btn<?php <?php=<?php $usuario['banido']<?php ?<?php 'btn-unban'<?php :<?php 'btn-ban'<?php ?>"><?php 
+<?php <i<?php class="fa-solid<?php fa-<?php=<?php $usuario['banido']<?php ?<?php 'user-check'<?php :<?php 'user-slash'<?php ?>"></i><?php 
+<?php <?php=<?php $usuario['banido']<?php ?<?php 'Desbanir'<?php :<?php 'Banir'<?php ?><?php 
+<?php </a><?php 
+<?php 
+<?php <a<?php href="?toggle_influencer&id=<?php=<?php $usuario['id']<?php ?>"<?php 
+<?php class="action-btn<?php <?php=<?php $usuario['influencer']<?php ?<?php 'btn-remove-inf'<?php :<?php 'btn-influencer'<?php ?>"><?php 
+<?php <i<?php class="fa-solid<?php fa-<?php=<?php $usuario['influencer']<?php ?<?php 'user-minus'<?php :<?php 'star'<?php ?>"></i><?php 
+<?php <?php=<?php $usuario['influencer']<?php ?<?php 'Remover<?php Inf.'<?php :<?php 'Tornar<?php Inf.'<?php ?><?php 
+<?php </a><?php 
+<?php </div><?php 
+<?php 
+<?php <div<?php class="user-meta"><?php 
+<?php <i<?php class="fa-solid<?php fa-calendar"></i><?php 
+<?php <span>Cadastrado<?php em:<?php <?php=<?php date('d/m/Y<?php H:i',<?php strtotime($usuario['created_at']))<?php ?></span><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php <?php<?php endforeach;<?php ?><?php 
+<?php </div><?php 
+<?php <?php<?php endif;<?php ?><?php 
+<?php </section><?php 
+<?php </div><?php 
+<?php </main><?php 
+<?php 
+<?php <!--<?php Modal<?php Editar<?php Saldo<?php --><?php 
+<?php <div<?php id="editarSaldoModal"<?php class="modal"><?php 
+<?php <div<?php class="modal-content"><?php 
+<?php <h2<?php class="modal-title"><?php 
+<?php <i<?php class="fa-solid<?php fa-wallet"></i><?php 
+<?php Editar<?php Saldo<?php do<?php Usuário<?php 
+<?php </h2><?php 
+<?php <form<?php method="POST"<?php id="formEditarSaldo"><?php 
+<?php <input<?php type="hidden"<?php name="id"<?php id="usuarioId"><?php 
+<?php <div><?php 
+<?php <label<?php class="modal-label"><?php 
+<?php <i<?php class="fa-solid<?php fa-dollar-sign"></i><?php 
+<?php Novo<?php Saldo<?php (R$)<?php 
+<?php </label><?php 
+<?php <input<?php type="text"<?php name="saldo"<?php id="usuarioSaldo"<?php class="modal-input"<?php 
+<?php placeholder="0,00"<?php required><?php 
+<?php </div><?php 
+<?php <div<?php class="modal-buttons"><?php 
+<?php <button<?php type="submit"<?php name="atualizar_saldo"<?php class="modal-btn<?php modal-btn-primary"><?php 
+<?php <i<?php class="fa-solid<?php fa-save"></i><?php 
+<?php Salvar<?php Alterações<?php 
+<?php </button><?php 
+<?php <button<?php type="button"<?php onclick="fecharModal()"<?php class="modal-btn<?php modal-btn-secondary"><?php 
+<?php <i<?php class="fa-solid<?php fa-times"></i><?php 
+<?php Cancelar<?php 
+<?php </button><?php 
+<?php </div><?php 
+<?php </form><?php 
+<?php </div><?php 
+<?php </div><?php 
+<?php 
+<?php <script><?php 
+<?php //<?php Mobile<?php menu<?php toggle<?php with<?php smooth<?php animations<?php 
+<?php const<?php menuToggle<?php =<?php document.getElementById('menuToggle');<?php 
+<?php const<?php sidebar<?php =<?php document.getElementById('sidebar');<?php 
+<?php const<?php mainContent<?php =<?php document.getElementById('mainContent');<?php 
+<?php const<?php overlay<?php =<?php document.getElementById('overlay');<?php 
+<?php 
+<?php menuToggle.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php const<?php isHidden<?php =<?php sidebar.classList.contains('hidden');<?php 
+<?php 
+<?php if<?php (isHidden)<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.add('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php overlay.addEventListener('click',<?php ()<?php =><?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Close<?php sidebar<?php on<?php window<?php resize<?php if<?php it's<?php mobile<?php 
+<?php window.addEventListener('resize',<?php ()<?php =><?php {<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php else<?php {<?php 
+<?php sidebar.classList.remove('hidden');<?php 
+<?php overlay.classList.remove('active');<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Enhanced<?php hover<?php effects<?php for<?php nav<?php items<?php 
+<?php document.querySelectorAll('.nav-item').forEach(item<?php =><?php {<?php 
+<?php item.addEventListener('mouseenter',<?php function()<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(8px)';<?php 
+<?php });<?php 
+<?php 
+<?php item.addEventListener('mouseleave',<?php function()<?php {<?php 
+<?php if<?php (!this.classList.contains('active'))<?php {<?php 
+<?php this.style.transform<?php =<?php 'translateX(0)';<?php 
+<?php }<?php 
+<?php });<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Modal<?php functions<?php 
+<?php function<?php abrirModalEditarSaldo(id,<?php saldo)<?php {<?php 
+<?php document.getElementById('usuarioId').value<?php =<?php id;<?php 
+<?php document.getElementById('usuarioSaldo').value<?php =<?php saldo;<?php 
+<?php document.getElementById('editarSaldoModal').classList.add('active');<?php 
+<?php }<?php 
+<?php 
+<?php function<?php fecharModal()<?php {<?php 
+<?php document.getElementById('editarSaldoModal').classList.remove('active');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Close<?php modal<?php when<?php clicking<?php outside<?php 
+<?php document.getElementById('editarSaldoModal').addEventListener('click',<?php function(e)<?php {<?php 
+<?php if<?php (e.target<?php ===<?php this)<?php {<?php 
+<?php fecharModal();<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Close<?php modal<?php with<?php ESC<?php key<?php 
+<?php document.addEventListener('keydown',<?php function(e)<?php {<?php 
+<?php if<?php (e.key<?php ===<?php 'Escape')<?php {<?php 
+<?php fecharModal();<?php 
+<?php }<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Smooth<?php scroll<?php behavior<?php 
+<?php document.documentElement.style.scrollBehavior<?php =<?php 'smooth';<?php 
+<?php 
+<?php //<?php Initialize<?php 
+<?php document.addEventListener('DOMContentLoaded',<?php ()<?php =><?php {<?php 
+<?php console.log('%c👥<?php Gerenciamento<?php de<?php Usuários<?php carregado!',<?php 'color:<?php #22c55e;<?php font-size:<?php 16px;<?php font-weight:<?php bold;');<?php 
+<?php 
+<?php //<?php Check<?php if<?php mobile<?php on<?php load<?php 
+<?php if<?php (window.innerWidth<?php <=<?php 1024)<?php {<?php 
+<?php sidebar.classList.add('hidden');<?php 
+<?php }<?php 
+<?php 
+<?php //<?php Animate<?php cards<?php on<?php load<?php 
+<?php const<?php userCards<?php =<?php document.querySelectorAll('.user-card');<?php 
+<?php userCards.forEach((card,<?php index)<?php =><?php {<?php 
+<?php card.style.opacity<?php =<?php '0';<?php 
+<?php card.style.transform<?php =<?php 'translateY(20px)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';<?php 
+<?php card.style.opacity<?php =<?php '1';<?php 
+<?php card.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php },<?php index<?php *<?php 100);<?php 
+<?php });<?php 
+<?php 
+<?php //<?php Animate<?php stats<?php cards<?php 
+<?php const<?php statCards<?php =<?php document.querySelectorAll('.mini-stat-card');<?php 
+<?php statCards.forEach((card,<?php index)<?php =><?php {<?php 
+<?php card.style.opacity<?php =<?php '0';<?php 
+<?php card.style.transform<?php =<?php 'translateY(20px)';<?php 
+<?php setTimeout(()<?php =><?php {<?php 
+<?php card.style.transition<?php =<?php 'all<?php 0.6s<?php ease';<?php 
+<?php card.style.opacity<?php =<?php '1';<?php 
+<?php card.style.transform<?php =<?php 'translateY(0)';<?php 
+<?php },<?php index<?php *<?php 150);<?php 
+<?php });<?php 
+<?php });<?php 
+<?php </script><?php 
+</body><?php 
 </html>

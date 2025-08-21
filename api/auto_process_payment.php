@@ -1,96 +1,96 @@
 <?php
 session_start();
-header('Content-Type: application/json');
+header('Content-Type:<?php application/json');
 
-require_once __DIR__ . '/../conexao.php';
-require_once __DIR__ . '/../classes/RushPay.php';
+require_once<?php __DIR__<?php .<?php '/../conexao.php';
+require_once<?php __DIR__<?php .<?php '/../classes/RushPay.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Método não permitido']);
-    exit;
+if<?php ($_SERVER['REQUEST_METHOD']<?php !==<?php 'POST')<?php {
+<?php http_response_code(405);
+<?php echo<?php json_encode(['error'<?php =><?php 'Método<?php não<?php permitido']);
+<?php exit;
 }
 
-$transactionId = $_POST['transactionId'] ?? '';
+$transactionId<?php =<?php $_POST['transactionId']<?php ??<?php '';
 
-if (empty($transactionId)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Transaction ID obrigatório']);
-    exit;
+if<?php (empty($transactionId))<?php {
+<?php http_response_code(400);
+<?php echo<?php json_encode(['error'<?php =><?php 'Transaction<?php ID<?php obrigatório']);
+<?php exit;
 }
 
-try {
-    // Buscar depósito
-    $stmt = $pdo->prepare("SELECT * FROM depositos WHERE transactionId = :transactionId AND status = 'PENDING'");
-    $stmt->bindParam(':transactionId', $transactionId);
-    $stmt->execute();
-    $deposit = $stmt->fetch();
+try<?php {
+<?php //<?php Buscar<?php depósito
+<?php $stmt<?php =<?php $pdo->prepare("SELECT<?php *<?php FROM<?php depositos<?php WHERE<?php transactionId<?php =<?php :transactionId<?php AND<?php status<?php =<?php 'PENDING'");
+<?php $stmt->bindParam(':transactionId',<?php $transactionId);
+<?php $stmt->execute();
+<?php $deposit<?php =<?php $stmt->fetch();
 
-    if (!$deposit) {
-        echo json_encode(['isPaid' => false, 'message' => 'Depósito não encontrado ou já processado']);
-        exit;
-    }
+<?php if<?php (!$deposit)<?php {
+<?php echo<?php json_encode(['isPaid'<?php =><?php false,<?php 'message'<?php =><?php 'Depósito<?php não<?php encontrado<?php ou<?php já<?php processado']);
+<?php exit;
+<?php }
 
-    // Verificar status na RushPay
-    $rushPay = new RushPay($pdo);
-    $status = $rushPay->checkPaymentStatus($transactionId);
+<?php //<?php Verificar<?php status<?php na<?php RushPay
+<?php $rushPay<?php =<?php new<?php RushPay($pdo);
+<?php $status<?php =<?php $rushPay->checkPaymentStatus($transactionId);
 
-    if ($status && $status['status'] === 'APPROVED') {
-        $pdo->beginTransaction();
+<?php if<?php ($status<?php &&<?php $status['status']<?php ===<?php 'APPROVED')<?php {
+<?php $pdo->beginTransaction();
 
-        try {
-            // Atualizar status do depósito
-            $updateStmt = $pdo->prepare("
-                UPDATE depositos 
-                SET status = 'PAID', webhook_data = :webhook_data, updated_at = NOW()
-                WHERE transactionId = :transactionId
-            ");
-            $updateStmt->execute([
-                ':webhook_data' => json_encode(['auto_processed' => true, 'processed_at' => date('Y-m-d H:i:s'), 'rushpay_data' => $status]),
-                ':transactionId' => $transactionId
-            ]);
+<?php try<?php {
+<?php //<?php Atualizar<?php status<?php do<?php depósito
+<?php $updateStmt<?php =<?php $pdo->prepare("
+<?php UPDATE<?php depositos<?php 
+<?php SET<?php status<?php =<?php 'PAID',<?php webhook_data<?php =<?php :webhook_data,<?php updated_at<?php =<?php NOW()
+<?php WHERE<?php transactionId<?php =<?php :transactionId
+<?php ");
+<?php $updateStmt->execute([
+<?php ':webhook_data'<?php =><?php json_encode(['auto_processed'<?php =><?php true,<?php 'processed_at'<?php =><?php date('Y-m-d<?php H:i:s'),<?php 'rushpay_data'<?php =><?php $status]),
+<?php ':transactionId'<?php =><?php $transactionId
+<?php ]);
 
-            // Creditar saldo do usuário
-            $creditStmt = $pdo->prepare("
-                UPDATE usuarios 
-                SET saldo = saldo + :valor 
-                WHERE id = :user_id
-            ");
-            $creditStmt->execute([
-                ':valor' => $deposit['valor'],
-                ':user_id' => $deposit['user_id']
-            ]);
+<?php //<?php Creditar<?php saldo<?php do<?php usuário
+<?php $creditStmt<?php =<?php $pdo->prepare("
+<?php UPDATE<?php usuarios<?php 
+<?php SET<?php saldo<?php =<?php saldo<?php +<?php :valor<?php 
+<?php WHERE<?php id<?php =<?php :user_id
+<?php ");
+<?php $creditStmt->execute([
+<?php ':valor'<?php =><?php $deposit['valor'],
+<?php ':user_id'<?php =><?php $deposit['user_id']
+<?php ]);
 
-            $pdo->commit();
+<?php $pdo->commit();
 
-            // XTracky será notificado via webhook RushPay -> xTracky (não duplicar aqui)
+<?php //<?php XTracky<?php será<?php notificado<?php via<?php webhook<?php RushPay<?php -><?php xTracky<?php (não<?php duplicar<?php aqui)
 
 
-            echo json_encode([
-                'isPaid' => true, 
-                'message' => 'Pagamento aprovado!',
-                'amount' => $deposit['valor']
-            ]);
+<?php echo<?php json_encode([
+<?php 'isPaid'<?php =><?php true,<?php 
+<?php 'message'<?php =><?php 'Pagamento<?php aprovado!',
+<?php 'amount'<?php =><?php $deposit['valor']
+<?php ]);
 
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            throw $e;
-        }
+<?php }<?php catch<?php (Exception<?php $e)<?php {
+<?php $pdo->rollBack();
+<?php throw<?php $e;
+<?php }
 
-    } else {
-        echo json_encode([
-            'isPaid' => false, 
-            'message' => 'Aguardando confirmação do pagamento...',
-            'status' => $status['status'] ?? 'PENDING'
-        ]);
-    }
+<?php }<?php else<?php {
+<?php echo<?php json_encode([
+<?php 'isPaid'<?php =><?php false,<?php 
+<?php 'message'<?php =><?php 'Aguardando<?php confirmação<?php do<?php pagamento...',
+<?php 'status'<?php =><?php $status['status']<?php ??<?php 'PENDING'
+<?php ]);
+<?php }
 
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        'isPaid' => false,
-        'error' => $e->getMessage()
-    ]);
+}<?php catch<?php (Exception<?php $e)<?php {
+<?php http_response_code(500);
+<?php echo<?php json_encode([
+<?php 'isPaid'<?php =><?php false,
+<?php 'error'<?php =><?php $e->getMessage()
+<?php ]);
 }
 ?>
 
