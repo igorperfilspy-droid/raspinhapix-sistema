@@ -8,8 +8,9 @@ class RushPay {
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
-        $this->secretKey = '213d1905-9ac0-4023-8dbd-0279918c7bcd';
-        $this->publicKey = '50742ec4-8eac-4516-a957-b896209ce27c';
+        // Chaves via variáveis de ambiente (Railway)
+        $this->secretKey = $_ENV['RUSHPAY_SECRET_KEY'] ?? getenv('RUSHPAY_SECRET_KEY') ?? '213d1905-9ac0-4023-8dbd-0279918c7bcd';
+        $this->publicKey = $_ENV['RUSHPAY_PUBLIC_KEY'] ?? getenv('RUSHPAY_PUBLIC_KEY') ?? '50742ec4-8eac-4516-a957-b896209ce27c';
         $this->apiUrl = 'https://pay.rushpayoficial.com/api/v1';
     }
 
@@ -52,7 +53,9 @@ class RushPay {
                 'Authorization: ' . $this->secretKey
             ],
             CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true, // Importante para Railway
+            CURLOPT_SSL_VERIFYHOST => 2
         ]);
 
         $response = curl_exec($ch);
@@ -92,7 +95,6 @@ class RushPay {
     public function getPaymentDetails($transactionId) {
         $url = $this->apiUrl . '/transaction/' . $transactionId;
 
-        error_log("RushPay Payload Debug: " . json_encode($payload));
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -100,7 +102,9 @@ class RushPay {
             CURLOPT_HTTPHEADER => [
                 'Authorization: ' . $this->secretKey
             ],
-            CURLOPT_TIMEOUT => 30
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2
         ]);
 
         $response = curl_exec($ch);
@@ -173,8 +177,8 @@ class RushPay {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
